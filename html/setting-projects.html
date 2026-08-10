@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Workspace settings · Projects — Project Block</title>
+
+  <!--
+    Project Block — Workspace settings · Projects (setting-projects.html)
+    Tabs: Project states (accordion + inline edit + color picker) / Project labels.
+  -->
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="assets/js/tailwind.config.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/css/styles.css" />
+</head>
+<body class="bg-white text-ink text-[13px] h-screen flex flex-col overflow-hidden">
+
+  <header class="relative h-14 shrink-0 border-b border-line flex items-center px-4">
+    <a href="welcome.html" title="Back" class="h-9 w-9 grid place-items-center rounded-md text-sub hover:bg-hover">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </a>
+    <span class="absolute left-1/2 -translate-x-1/2 font-semibold text-[15px] text-head">Workspace settings</span>
+    <div class="ml-auto flex items-center gap-2">
+      <span class="h-6 w-px bg-line"></span>
+      <a href="welcome.html" title="Close" class="h-9 w-9 grid place-items-center rounded-md text-sub hover:bg-hover">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </a>
+    </div>
+  </header>
+
+  <div class="flex-1 flex min-h-0 relative">
+    <div id="settings-backdrop" class="hidden md:hidden fixed inset-0 bg-black/30 z-30"></div>
+
+    <aside id="settings-nav" class="w-64 shrink-0 border-r border-line bg-white flex flex-col
+           fixed md:relative inset-y-0 left-0 z-40 -translate-x-full md:translate-x-0 transition-transform duration-200">
+      <div class="md:hidden flex justify-end px-2 h-12 items-center shrink-0">
+        <button id="close-nav" class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+      <nav id="settings-list" class="flex-1 overflow-y-auto pt-2 pb-4"></nav>
+    </aside>
+
+    <main class="flex-1 min-w-0 flex flex-col">
+      <div class="h-12 shrink-0 border-b border-line flex items-center gap-2 px-4 sm:px-6">
+        <button id="open-nav" class="md:hidden h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover -ml-1">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+        <span class="flex items-center gap-1.5 text-[13px] text-sub">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+          Projects
+        </span>
+      </div>
+
+      <div class="flex-1 overflow-auto">
+        <div class="max-w-[820px] mx-auto px-5 sm:px-8 py-8">
+          <h1 class="text-[24px] font-bold text-head">Projects</h1>
+          <p class="text-[14px] text-sub mt-1">States and labels here apply to every project in this workspace, so all projects follow the same structure.</p>
+
+          <!-- Tabs -->
+          <div class="flex items-center gap-5 mt-6 border-b border-line">
+            <button id="tab-states" class="pb-2 -mb-px border-b-2 border-brand text-ink font-medium text-[14px]">Project states</button>
+            <button id="tab-labels" class="pb-2 -mb-px border-b-2 border-transparent text-sub hover:text-ink text-[14px]">Project labels</button>
+          </div>
+
+          <!-- ===== Panel: Project states ===== -->
+          <div id="panel-states">
+            <div class="flex items-center gap-3 mt-6">
+              <div class="min-w-0">
+                <h2 class="text-[18px] font-bold text-head">Project states</h2>
+                <p class="text-[14px] text-sub mt-1">States show where each project is in its lifecycle. Customize them here for all projects in this workspace.</p>
+              </div>
+              <button id="states-toggle" role="switch" aria-checked="true" class="ml-auto shrink-0 relative inline-flex h-5 w-9 items-center rounded-full px-0.5 transition-colors bg-brand">
+                <span id="states-knob" class="h-4 w-4 rounded-full bg-white shadow transition-transform translate-x-4"></span>
+              </button>
+            </div>
+            <div id="states-list" class="mt-4 space-y-2.5"></div>
+          </div>
+
+          <!-- ===== Panel: Project labels ===== -->
+          <div id="panel-labels" class="hidden">
+            <div class="flex items-center gap-3 mt-6">
+              <h2 class="text-[18px] font-bold text-head">Project labels</h2>
+              <button id="add-plabel-top" class="ml-auto h-9 px-3 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold">Add label</button>
+            </div>
+            <p class="text-[14px] text-sub mt-1 mb-4">Labels help you group and filter work items consistently across every project.</p>
+
+            <div id="plabel-form" class="hidden flex items-center gap-3 mb-4">
+              <button id="plabel-color" type="button" data-coloropener class="h-6 w-6 rounded-full border border-line shrink-0" style="background:#F78DA7"></button>
+              <input id="plabel-name" type="text" placeholder="Label name" class="pb-input flex-1" />
+              <button id="plabel-cancel" type="button" class="h-9 px-4 rounded-md border border-stroke text-[13px] font-semibold text-ink hover:bg-hover shrink-0">Cancel</button>
+              <button id="plabel-add" type="button" class="h-9 px-4 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold shrink-0">Add</button>
+            </div>
+
+            <div id="plabel-list" class="hidden flex flex-wrap gap-2 border border-line rounded-xl p-4"></div>
+            <div id="plabel-empty" class="border border-line rounded-xl py-12 px-6 grid place-items-center text-center">
+              <svg width="52" height="52" viewBox="0 0 48 48" fill="none" class="text-faint mb-3"><path d="M6 14a2 2 0 012-2h12l4 4h16v18a2 2 0 01-2 2H8a2 2 0 01-2-2V14z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+              <div class="text-[15px] font-semibold text-head">No project labels yet</div>
+              <p class="text-[13px] text-sub mt-1 mb-4">Create your first label to get started</p>
+              <button id="add-plabel-empty" class="h-9 px-4 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold">Add label</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Shared floating color picker -->
+  <div id="color-pop" class="hidden fixed z-50 w-[212px] bg-white border border-line rounded-lg shadow-lg p-2.5">
+    <div id="pop-swatches" class="grid grid-cols-6 gap-2"></div>
+    <input id="pop-hex" type="text" class="mt-2.5 w-full h-8 rounded-md px-2.5 text-[13px] text-ink outline outline-1 -outline-offset-1 outline-stroke focus:outline-2 focus:-outline-offset-2 focus:outline-brand" />
+  </div>
+
+  <script>
+    // ---- Settings navigation ----
+    var NAV = [
+      { h: 'Administration', items: ['General', 'Members', 'Billing and plans', 'Imports', 'Exports'] },
+      { h: 'Products', items: ['Wiki', 'Project Block AI'] },
+      { h: 'Features', items: ['Projects', 'Teamspaces', 'Initiatives', 'Customers', 'Templates', 'Integrations', 'Connections', 'Releases'] },
+      { h: 'Developers', items: ['Webhooks', 'Access Tokens'] }
+    ];
+    var ACTIVE = 'Projects';
+    var LINKS = { 'General': 'setting-general.html', 'Members': 'setting-member.html', 'Wiki': 'setting-wiki.html', 'Projects': 'setting-projects.html', 'Teamspaces': 'setting-teamspaces.html', 'Initiatives': 'setting-initiatives.html', 'Customers': 'setting-customers.html', 'Releases': 'setting-releases.html' };
+    var SOON = ['Templates', 'Integrations'];
+    var ICONS = {
+      'General': '<path d="M6 4v6M6 14v6M12 4v1M12 9v11M18 4v9M18 17v3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="6" cy="12" r="2" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="7" r="2" stroke="currentColor" stroke-width="1.7"/><circle cx="18" cy="15" r="2" stroke="currentColor" stroke-width="1.7"/>',
+      'Members': '<circle cx="9" cy="8" r="3" stroke="currentColor" stroke-width="1.7"/><path d="M3 19a6 6 0 0112 0M16 6a3 3 0 010 6M21 19a6 6 0 00-3-5.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
+      'Billing and plans': '<rect x="3" y="6" width="18" height="12" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M3 10h18" stroke="currentColor" stroke-width="1.7"/>',
+      'Imports': '<path d="M12 3v10M8 9l4 4 4-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 17v2a1 1 0 001 1h14a1 1 0 001-1v-2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
+      'Exports': '<path d="M12 13V3M8 7l4-4 4 4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 17v2a1 1 0 001 1h14a1 1 0 001-1v-2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
+      'Wiki': '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>',
+      'Project Block AI': '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>',
+      'Projects': '<path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>',
+      'Teamspaces': '<circle cx="7" cy="8" r="2.4" stroke="currentColor" stroke-width="1.7"/><circle cx="17" cy="8" r="2.4" stroke="currentColor" stroke-width="1.7"/><path d="M2.5 18a4.5 4.5 0 019 0M12.5 18a4.5 4.5 0 019 0" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
+      'Initiatives': '<circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.7"/>',
+      'Customers': '<path d="M4 21V5a1 1 0 011-1h8a1 1 0 011 1v16" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M14 21V10h4a1 1 0 011 1v10" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M7 8h3M7 12h3M7 16h3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
+      'Templates': '<rect x="4" y="5" width="16" height="14" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M4 9h16M9 9v10" stroke="currentColor" stroke-width="1.7"/>',
+      'Integrations': '<rect x="4" y="4" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/><rect x="13" y="4" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/><rect x="4" y="13" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/><rect x="13" y="13" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/>',
+      'Connections': '<path d="M9 15l6-6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M10.5 6.5l1-1a3.5 3.5 0 015 5l-1 1M13.5 17.5l-1 1a3.5 3.5 0 01-5-5l1-1" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>',
+      'Releases': '<path d="M4 4h9l7 7-9 9-7-7V4z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="8.5" cy="8.5" r="1.3" fill="currentColor"/>',
+      'Webhooks': '<path d="M13 3L5 13h6l-1 8 8-11h-6l1-7z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>',
+      'Access Tokens': '<circle cx="8" cy="14" r="3.5" stroke="currentColor" stroke-width="1.7"/><path d="M10.5 11.5L20 2M17 5l2 2M14 8l2 2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>'
+    };
+    function navIcon(label) {
+      return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" class="shrink-0 text-head">' + (ICONS[label] || '<rect x="4" y="4" width="16" height="16" rx="3" stroke="currentColor" stroke-width="1.7"/>') + '</svg>';
+    }
+    document.getElementById('settings-list').innerHTML = NAV.map(function (sec) {
+      return '<div class="px-2 mt-4">' +
+        '<div class="px-2 h-6 flex items-center text-[11px] font-semibold text-faint uppercase tracking-wide">' + sec.h + '</div>' +
+        sec.items.map(function (it) {
+          var a = it === ACTIVE;
+          if (SOON.indexOf(it) > -1) {
+            return '<span class="flex items-center gap-2.5 px-2 h-8 rounded-md text-[13px] text-faint cursor-not-allowed select-none">' + navIcon(it).replace('text-head', 'text-faint') + '<span>' + it + '</span><span class="ml-auto text-[10px] font-medium text-sub bg-hover rounded px-1.5 py-0.5">Soon</span></span>';
+          }
+          return '<a href="' + (LINKS[it] || '#') + '" class="flex items-center gap-2.5 px-2 h-8 rounded-md text-[13px] cursor-pointer ' + (a ? 'bg-sel text-ink font-medium' : 'text-ink hover:bg-hover') + '">' + navIcon(it) + it + '</a>';
+        }).join('') +
+        '</div>';
+    }).join('');
+
+    // ---- Shared floating color picker ----
+    var PRESETS = ['#F97316', '#F59E0B', '#4ADE80', '#22C55E', '#7DD3FC', '#2563EB', '#9CA3AF', '#DC2626', '#F78DA7', '#7C3AED'];
+    var pop = document.getElementById('color-pop');
+    var popHex = document.getElementById('pop-hex');
+    var popCb = null;
+    document.getElementById('pop-swatches').innerHTML =
+      PRESETS.map(function (c) { return '<button type="button" data-color="' + c + '" class="h-7 w-7 rounded" style="background:' + c + '"></button>'; }).join('') +
+      '<button type="button" id="pop-hash" class="h-7 w-7 rounded grid place-items-center text-sub border border-line">#</button>';
+    function openColorPop(anchor, current, cb) {
+      popCb = cb; popHex.value = (current || '#000000').replace('#', '').toUpperCase();
+      pop.classList.remove('hidden');
+      var w = pop.offsetWidth || 212, r = anchor.getBoundingClientRect();
+      pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + 'px';
+      pop.style.top = (r.bottom + 6) + 'px';
+    }
+    function closeColorPop() { pop.classList.add('hidden'); popCb = null; }
+    document.getElementById('pop-swatches').addEventListener('click', function (e) {
+      var sw = e.target.closest('[data-color]');
+      if (sw) { var c = sw.getAttribute('data-color'); popHex.value = c.replace('#', '').toUpperCase(); if (popCb) popCb(c); closeColorPop(); return; }
+      if (e.target.closest('#pop-hash')) popHex.focus();
+    });
+    popHex.addEventListener('input', function () {
+      var v = popHex.value.replace(/[^0-9a-fA-F]/g, '').slice(0, 6);
+      if (v.length === 6 && popCb) popCb('#' + v);
+    });
+    document.addEventListener('click', function (e) {
+      if (!pop.contains(e.target) && !e.target.closest('[data-coloropener]')) closeColorPop();
+    });
+
+    // ---- Tabs ----
+    var tS = document.getElementById('tab-states'), tL = document.getElementById('tab-labels');
+    function setTab(states) {
+      document.getElementById('panel-states').classList.toggle('hidden', !states);
+      document.getElementById('panel-labels').classList.toggle('hidden', states);
+      tS.className = 'pb-2 -mb-px border-b-2 text-[14px] ' + (states ? 'border-brand text-ink font-medium' : 'border-transparent text-sub hover:text-ink');
+      tL.className = 'pb-2 -mb-px border-b-2 text-[14px] ' + (states ? 'border-transparent text-sub hover:text-ink' : 'border-brand text-ink font-medium');
+    }
+    tS.addEventListener('click', function () { setTab(true); });
+    tL.addEventListener('click', function () { setTab(false); });
+
+    // ---- Toggle ----
+    (function () {
+      var t = document.getElementById('states-toggle'), knob = document.getElementById('states-knob'), on = true;
+      t.addEventListener('click', function () {
+        on = !on;
+        t.setAttribute('aria-checked', on ? 'true' : 'false');
+        t.classList.toggle('bg-brand', on); t.classList.toggle('bg-line', !on);
+        knob.classList.toggle('translate-x-4', on); knob.classList.toggle('translate-x-0', !on);
+        // hide the states list when the feature is turned off
+        document.getElementById('states-list').classList.toggle('hidden', !on);
+      });
+    })();
+
+    // ---- Project states (accordion + inline edit) ----
+    function stateIcon(color, group) {
+      var inner;
+      if (group === 'backlog') inner = '<rect x="3" y="3" width="18" height="18" rx="5" stroke="' + color + '" stroke-width="2" stroke-dasharray="3.5 3.5"/>';
+      else if (group === 'unstarted') inner = '<rect x="3.5" y="3.5" width="17" height="17" rx="5" stroke="' + color + '" stroke-width="2"/>';
+      else if (group === 'started') inner = '<rect x="3.5" y="3.5" width="17" height="17" rx="5" stroke="' + color + '" stroke-width="2"/><rect x="8" y="8" width="8" height="8" rx="2" fill="' + color + '"/>';
+      else if (group === 'active') inner = '<rect x="3.5" y="3.5" width="17" height="17" rx="5" fill="' + color + '"/>';
+      else if (group === 'completed') inner = '<rect x="3" y="3" width="18" height="18" rx="5" fill="' + color + '"/><path d="M8 12l2.5 2.5L16 9" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>';
+      else inner = '<rect x="3" y="3" width="18" height="18" rx="5" fill="' + color + '"/><path d="M9 9l6 6M15 9l-6 6" stroke="#fff" stroke-width="2" stroke-linecap="round"/>';
+      return '<svg class="state-ico" width="16" height="16" viewBox="0 0 24 24" fill="none">' + inner + '</svg>';
+    }
+    var STATES = [
+      { name: 'Draft', color: '#60646C', group: 'backlog', isDefault: true },
+      { name: 'Planning', color: '#6B7280', group: 'unstarted' },
+      { name: 'Execution', color: '#F97316', group: 'started' },
+      { name: 'Monitoring', color: '#14B8A6', group: 'active' },
+      { name: 'Completed', color: '#22C55E', group: 'completed' },
+      { name: 'Cancelled', color: '#9CA3AF', group: 'cancelled' }
+    ];
+    var pencil = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4 12.5-12.5z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    var xicon = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+    var plus = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+
+    document.getElementById('states-list').innerHTML = STATES.map(function (s, i) {
+      return '<div class="state-card border border-line rounded-lg overflow-hidden" data-i="' + i + '">' +
+        '<div class="state-head flex items-center gap-2.5 px-3 h-12 bg-[#f7f8f9] cursor-pointer">' +
+          '<svg class="chev shrink-0 text-sub transition-transform" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+          stateIcon(s.color, s.group) +
+          '<span class="state-name text-[14px] text-ink">' + s.name + '</span>' +
+          '<button class="add-state ml-auto h-7 w-7 grid place-items-center rounded-md text-sub hover:bg-white hover:text-ink">' + plus + '</button>' +
+        '</div>' +
+        '<div class="state-body hidden border-t border-line bg-white">' +
+          '<div class="item-view flex items-center gap-2.5 px-3 h-11">' +
+            stateIcon(s.color, s.group) + '<span class="text-[14px] text-ink">' + s.name + '</span>' +
+            '<div class="ml-auto flex items-center gap-3">' +
+              (s.isDefault ? '<span class="text-[12px] text-sub">Default</span>' : '') +
+              '<button class="edit-state text-sub hover:text-ink">' + pencil + '</button>' +
+              '<button class="del-state text-sub hover:text-danger">' + xicon + '</button>' +
+            '</div>' +
+          '</div>' +
+          '<div class="item-edit hidden p-3 border-t border-line">' +
+            '<div class="flex items-center gap-2">' +
+              '<button type="button" data-coloropener class="state-color-btn h-9 w-9 rounded-md border border-line shrink-0" data-color="' + s.color + '" style="background:' + s.color + '"></button>' +
+              '<input type="text" class="state-name-input pb-input flex-1" value="' + s.name + '" />' +
+            '</div>' +
+            '<textarea rows="2" class="pb-textarea mt-2 resize-none" placeholder="Describe this state for your members."></textarea>' +
+            '<div class="flex gap-2 mt-2"><button class="state-update h-8 px-3 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold">Update</button><button class="state-cancel h-8 px-3 rounded-md border border-stroke text-[13px] font-semibold text-ink hover:bg-hover">Cancel</button></div>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+
+    document.getElementById('states-list').addEventListener('click', function (e) {
+      var card = e.target.closest('.state-card');
+      if (!card) return;
+      var body = card.querySelector('.state-body');
+      var chev = card.querySelector('.chev');
+      var view = card.querySelector('.item-view');
+      var edit = card.querySelector('.item-edit');
+
+      if (e.target.closest('.add-state')) {
+        body.classList.remove('hidden'); chev.classList.add('rotate-90');
+        view.classList.add('hidden'); edit.classList.remove('hidden');
+        edit.querySelector('.state-name-input').value = '';
+        edit.querySelector('.state-name-input').focus();
+        return;
+      }
+      if (e.target.closest('.edit-state')) {
+        view.classList.add('hidden'); edit.classList.remove('hidden');
+        edit.querySelector('.state-name-input').focus();
+        return;
+      }
+      if (e.target.closest('.del-state')) { body.classList.add('hidden'); chev.classList.remove('rotate-90'); return; }
+      if (e.target.closest('.state-cancel')) { edit.classList.add('hidden'); view.classList.remove('hidden'); return; }
+      if (e.target.closest('.state-update')) {
+        var nm = edit.querySelector('.state-name-input').value.trim() || card.querySelector('.state-name').textContent;
+        var col = edit.querySelector('.state-color-btn').getAttribute('data-color');
+        card.querySelector('.state-name').textContent = nm;
+        view.querySelector('span').textContent = nm;
+        card.querySelectorAll('.state-ico rect, .state-ico path').forEach(function (el) {
+          if (el.getAttribute('fill') && el.getAttribute('fill') !== '#fff') el.setAttribute('fill', col);
+          if (el.getAttribute('stroke') && el.getAttribute('stroke') !== '#fff') el.setAttribute('stroke', col);
+        });
+        edit.classList.add('hidden'); view.classList.remove('hidden');
+        return;
+      }
+      if (e.target.closest('.state-color-btn')) {
+        var btn = e.target.closest('.state-color-btn');
+        openColorPop(btn, btn.getAttribute('data-color'), function (c) { btn.style.background = c; btn.setAttribute('data-color', c); });
+        return;
+      }
+      if (e.target.closest('.state-head')) {
+        var open = body.classList.contains('hidden');
+        body.classList.toggle('hidden', !open);
+        chev.classList.toggle('rotate-90', open);
+      }
+    });
+
+    // ---- Project labels ----
+    (function () {
+      var labels = [], curColor = '#F78DA7';
+      var form = document.getElementById('plabel-form');
+      var nameEl = document.getElementById('plabel-name');
+      var dot = document.getElementById('plabel-color');
+      var listEl = document.getElementById('plabel-list');
+      var emptyEl = document.getElementById('plabel-empty');
+      function open() { nameEl.value = ''; curColor = '#F78DA7'; dot.style.background = curColor; form.classList.remove('hidden'); nameEl.focus(); }
+      function close() { form.classList.add('hidden'); }
+      function render() {
+        if (labels.length) {
+          emptyEl.classList.add('hidden'); listEl.classList.remove('hidden');
+          listEl.innerHTML = labels.map(function (l) { return '<span class="inline-flex items-center gap-1.5 border border-line rounded-full pl-2 pr-2.5 py-1 text-[13px] text-ink"><span class="h-2.5 w-2.5 rounded-full shrink-0" style="background:' + l.color + '"></span>' + l.name + '</span>'; }).join('');
+        } else { emptyEl.classList.remove('hidden'); listEl.classList.add('hidden'); }
+      }
+      document.getElementById('add-plabel-top').addEventListener('click', open);
+      document.getElementById('add-plabel-empty').addEventListener('click', open);
+      document.getElementById('plabel-cancel').addEventListener('click', close);
+      dot.addEventListener('click', function () { openColorPop(dot, curColor, function (c) { curColor = c; dot.style.background = c; }); });
+      document.getElementById('plabel-add').addEventListener('click', function () {
+        var n = nameEl.value.trim(); if (!n) { nameEl.focus(); return; }
+        labels.push({ name: n, color: curColor }); render(); close();
+      });
+    })();
+
+    // ---- Mobile drawer ----
+    var nav = document.getElementById('settings-nav');
+    var bd = document.getElementById('settings-backdrop');
+    document.getElementById('open-nav').addEventListener('click', function () { nav.classList.remove('-translate-x-full'); bd.classList.remove('hidden'); });
+    document.getElementById('close-nav').addEventListener('click', function () { nav.classList.add('-translate-x-full'); bd.classList.add('hidden'); });
+    bd.addEventListener('click', function () { nav.classList.add('-translate-x-full'); bd.classList.add('hidden'); });
+  </script>
+</body>
+</html>

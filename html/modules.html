@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Testing · Modules — Project Block</title>
+  <!--
+    Project Block — Project Modules listing
+    Components: AppTopbar / AppRail / AppSidebar / ProjectHeader / ModulesToolbar / ModuleRow / CreateModuleModal
+  -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="assets/js/tailwind.config.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/css/styles.css" />
+  <link rel="stylesheet" href="https://unpkg.com/tabulator-tables@6/dist/css/tabulator.min.css" />
+  <link rel="stylesheet" href="assets/css/tabulator-skin.css" />
+  <script src="https://unpkg.com/tabulator-tables@6/dist/js/tabulator.min.js"></script>
+  <style>
+    #mod-table.tabulator { border: none; border-radius: 0; background: #fff; }
+    #mod-table .tabulator-tableholder { background: #fff; }
+    #mod-table .tabulator-row, #mod-table .tabulator-row.tabulator-row-even { background: #fff; }
+    #mod-table .tabulator-row { border-bottom: 1px solid #f1f2f4; cursor: pointer; }
+    #mod-table .tabulator-row:hover { background: #f8f9fa !important; }
+    #mod-table .tabulator-row .tabulator-cell { padding: 0 8px; }
+    #mod-table .tabulator-row .tabulator-cell:first-child { padding-left: 24px; }
+    #mod-table .tabulator-row .tabulator-cell:last-child { padding-right: 24px; }
+    #mod-table .mod-hover { opacity: 0; transition: opacity .12s ease; }
+    #mod-table .tabulator-row:hover .mod-hover { opacity: 1; }
+  </style>
+</head>
+<body class="bg-white text-ink h-screen flex flex-col overflow-hidden text-[13px]">
+
+  <!-- ============ component: AppTopbar ============ -->
+  <header class="h-14 shrink-0 border-b border-line flex items-center gap-2 px-3 sm:px-4">
+    <button id="open-sidebar" class="lg:hidden h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+    <div class="flex items-center gap-2 shrink-0">
+      <span class="flex items-center gap-2 px-2 h-9"><span class="h-6 w-6 rounded-md bg-slate-700 text-white grid place-items-center text-[11px] font-semibold">J</span><span class="font-medium text-[13px] max-w-[110px] sm:max-w-[150px] truncate">Janus Communicaiton</span></span>
+      <button class="inline-flex items-center h-7 px-2.5 rounded-md border border-brand text-[12px] text-brand hover:bg-hover whitespace-nowrap">Switch workspace</button>
+    </div>
+    <div class="flex-1 flex justify-center px-2"><div class="relative w-full max-w-md"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="absolute left-3 top-1/2 -translate-y-1/2 text-faint"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><input type="text" placeholder="Search" class="w-full h-9 rounded-md bg-hover pl-9 pr-3 text-[13px] text-ink placeholder:text-faint outline outline-1 -outline-offset-1 outline-transparent focus:bg-white focus:outline-stroke" /></div></div>
+    <div class="flex items-center gap-1.5 shrink-0">
+      <button class="hidden sm:inline-flex items-center h-8 px-3 rounded-md border border-line text-[13px] text-ink hover:bg-hover">Get started</button>
+      <button class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover" title="Inbox"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M3 13h4l2 3h6l2-3h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 6h14l2 7v4a1 1 0 01-1 1H4a1 1 0 01-1-1v-4l2-7z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></button>
+      <button class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover" title="Help"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M9.5 9.5a2.5 2.5 0 114 2c-1 .7-1.5 1.2-1.5 2.5M12 17.5v.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+      <span class="h-7 w-7 rounded-full bg-emerald-500 grid place-items-center text-white text-[11px] font-bold ml-1">Z</span>
+    </div>
+  </header>
+
+  <div class="flex-1 flex min-h-0 relative">
+    <!-- ============ component: AppRail ============ -->
+    <nav class="hidden lg:flex w-16 shrink-0 border-r border-line bg-[#f6f7f8] flex-col items-center py-3 gap-1">
+      <a href="projects.html" class="flex flex-col items-center gap-1 w-full px-0.5 py-2 rounded-lg bg-sel text-brand"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.8"/><rect x="13" y="4" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.8"/><rect x="4" y="13" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.8"/><rect x="13" y="13" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.8"/></svg><span class="text-[10px] text-center leading-tight">Projects</span></a>
+      <a class="flex flex-col items-center gap-1 w-full px-0.5 py-2 rounded-lg text-ink hover:bg-hover"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg><span class="text-[10px] text-center leading-tight">Wiki</span></a>
+      <a class="flex flex-col items-center gap-1 w-full px-0.5 py-2 rounded-lg text-ink hover:bg-hover"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 13v-1a8 8 0 0116 0v1" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><rect x="3" y="12.5" width="4" height="6" rx="1.6" stroke="currentColor" stroke-width="1.7"/><rect x="17" y="12.5" width="4" height="6" rx="1.6" stroke="currentColor" stroke-width="1.7"/><path d="M19 18.5v.5a2.5 2.5 0 01-2.5 2.5H13" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg><span class="text-[10px] text-center leading-tight">Help Desk</span></a>
+      <a href="setting-member.html" class="mt-auto flex flex-col items-center gap-1 w-full px-0.5 py-2 rounded-lg text-ink hover:bg-hover"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M10.3 3.2a1 1 0 011.4 0l.9.9a1 1 0 00.9.3l1.2-.2a1 1 0 011.1.7l.4 1.2a1 1 0 00.6.6l1.2.4a1 1 0 01.7 1.1l-.2 1.2a1 1 0 00.3.9l.9.9a1 1 0 010 1.4l-.9.9a1 1 0 00-.3.9l.2 1.2a1 1 0 01-.7 1.1l-1.2.4a1 1 0 00-.6.6l-.4 1.2a1 1 0 01-1.1.7l-1.2-.2a1 1 0 00-.9.3l-.9.9a1 1 0 01-1.4 0l-.9-.9a1 1 0 00-.9-.3l-1.2.2a1 1 0 01-1.1-.7l-.4-1.2a1 1 0 00-.6-.6l-1.2-.4a1 1 0 01-.7-1.1l.2-1.2a1 1 0 00-.3-.9l-.9-.9a1 1 0 010-1.4l.9-.9a1 1 0 00.3-.9l-.2-1.2a1 1 0 01.7-1.1l1.2-.4a1 1 0 00.6-.6l.4-1.2a1 1 0 011.1-.7l1.2.2a1 1 0 00.9-.3l.9-.9z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.6"/></svg><span class="text-[10px] text-center leading-tight">Settings</span></a>
+    </nav>
+
+    <div id="sidebar-backdrop" class="hidden lg:hidden fixed inset-0 bg-black/30 z-30"></div>
+
+    <!-- ============ component: AppSidebar ============ -->
+    <aside id="sidebar" class="w-60 shrink-0 border-r border-line bg-white flex flex-col fixed lg:relative inset-y-0 left-0 z-40 -translate-x-full lg:translate-x-0 transition-transform duration-200">
+      <div class="flex items-center gap-2 px-4 h-12 shrink-0"><span class="font-semibold text-ink">Projects</span><div class="ml-auto flex items-center gap-1 text-faint"><button class="h-7 w-7 grid place-items-center rounded hover:bg-hover"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4 7h9M17 7h3M4 17h7M15 17h5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="15" cy="7" r="2.1" stroke="currentColor" stroke-width="1.7"/><circle cx="13" cy="17" r="2.1" stroke="currentColor" stroke-width="1.7"/></svg></button><button id="close-sidebar" class="lg:hidden h-7 w-7 grid place-items-center rounded hover:bg-hover"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></div></div>
+      <div class="px-2 overflow-y-auto flex-1">
+        <a href="work-items.html" class="w-full flex items-center justify-center gap-2 px-2 h-9 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold mb-2 transition-colors"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>New work item</a>
+        <a class="flex items-center gap-2 px-2 h-8 rounded-md text-ink hover:bg-hover"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4 11l8-6 8 6v8a1 1 0 01-1 1h-4v-6H9v6H5a1 1 0 01-1-1v-8z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>Home</a>
+        <a class="flex items-center gap-2 px-2 h-8 rounded-md text-ink hover:bg-hover"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4 12.5-12.5z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>Drafts</a>
+        <a class="flex items-center gap-2 px-2 h-8 rounded-md text-ink hover:bg-hover"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.2" stroke="currentColor" stroke-width="1.7"/><path d="M5 20a7 7 0 0114 0" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>Your work</a>
+        <a class="flex items-center gap-2 px-2 h-8 rounded-md text-ink hover:bg-hover"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M5 4h14v11l-5 5H5V4z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M14 20v-5h5" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>Stickies</a>
+        <div class="flex items-center gap-1 px-2 h-8 mt-3 text-[11px] font-semibold text-faint uppercase tracking-wide">Workspace</div>
+        <a href="projects.html" class="flex items-center gap-2 px-2 h-8 rounded-md bg-sel text-ink font-medium"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>Projects</a>
+        <button class="w-full flex items-center gap-2 px-2 h-8 rounded-md text-ink hover:bg-hover"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="5" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="19" cy="12" r="1.6" fill="currentColor"/></svg>More</button>
+        <div class="flex items-center gap-1 px-2 h-8 mt-3 text-[11px] font-semibold text-faint uppercase tracking-wide">Projects</div>
+        <a href="work-items.html" class="flex items-center gap-2 px-2 h-8 rounded-md bg-sel text-ink font-medium"><span>🖐️</span>Testing</a>
+      </div>
+    </aside>
+
+    <!-- ============ MAIN ============ -->
+    <main class="flex-1 min-w-0 overflow-y-auto flex flex-col">
+      <!-- component: ProjectHeader -->
+      <div class="border-b border-line px-6 shrink-0">
+        <div class="flex items-center gap-2 h-12 overflow-x-auto">
+          <span class="inline-flex items-center gap-1.5 text-[14px] font-medium text-ink shrink-0"><span>🖐️</span>Testing</span>
+          <button class="h-7 w-7 grid place-items-center rounded-md text-sub hover:bg-hover shrink-0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="5" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="19" cy="12" r="1.6" fill="currentColor"/></svg></button>
+          <nav class="ml-3 flex items-center gap-1 h-12 shrink-0">
+            <a href="#" class="px-2.5 h-12 flex items-center text-[13px] text-sub hover:text-ink border-b-2 border-transparent">Overview</a>
+            <a href="work-items.html" class="px-2.5 h-12 flex items-center text-[13px] text-sub hover:text-ink border-b-2 border-transparent">Work items</a>
+            <a href="cycles.html" class="px-2.5 h-12 flex items-center text-[13px] text-sub hover:text-ink border-b-2 border-transparent">Cycles</a>
+            <a href="modules.html" class="px-2.5 h-12 flex items-center text-[13px] text-ink font-medium border-b-2 border-brand">Modules</a>
+            <a href="#" class="px-2.5 h-12 flex items-center text-[13px] text-sub hover:text-ink border-b-2 border-transparent">Views</a>
+            <a href="pages.html" class="px-2.5 h-12 flex items-center text-[13px] text-sub hover:text-ink border-b-2 border-transparent">Pages</a>
+          </nav>
+        </div>
+      </div>
+
+      <!-- component: ModulesToolbar -->
+      <div class="flex items-center gap-2 px-6 h-12 border-b border-line shrink-0">
+        <span class="inline-flex items-center gap-2 text-[13px] font-medium text-ink"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-sub"><rect x="4" y="4" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.6"/><rect x="13" y="4" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.6"/><rect x="4" y="13" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.6"/><rect x="13" y="13" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.6"/></svg>Modules</span>
+        <div class="ml-auto flex items-center gap-1.5 text-sub">
+          <button class="h-8 w-8 grid place-items-center rounded-md hover:bg-hover" title="Search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="M21 21l-4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+          <button class="inline-flex items-center gap-1.5 h-8 px-2.5 sm:px-3 rounded-md border border-stroke text-[13px] text-ink hover:bg-hover shrink-0"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M4 7h10M4 12h7M4 17h4M17 5v14M17 19l3-3M17 19l-3-3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="hidden sm:inline">Name</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <button class="inline-flex items-center gap-1.5 h-8 px-2.5 sm:px-3 rounded-md border border-stroke text-[13px] text-ink hover:bg-hover shrink-0"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M4 5h16l-6 8v5l-4 2v-7L4 5z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg><span class="hidden sm:inline">Filters</span></button>
+          <div class="hidden sm:flex items-center gap-0.5 mr-1">
+            <button class="h-8 w-8 grid place-items-center rounded-md bg-sel text-brand" title="List"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+            <button class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover" title="Board"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="6" height="16" rx="1.5" stroke="currentColor" stroke-width="1.7"/><rect x="14" y="4" width="6" height="10" rx="1.5" stroke="currentColor" stroke-width="1.7"/></svg></button>
+            <button class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover" title="Timeline"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 7h10M4 12h14M4 17h7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+          </div>
+          <button id="add-module-btn" class="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold shrink-0"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Add Module</button>
+        </div>
+      </div>
+
+      <!-- component: ModulesList (Tabulator) -->
+      <div class="flex-1 min-h-0"><div id="mod-table"></div></div>
+    </main>
+  </div>
+
+  <!-- component: CreateModuleModal -->
+  <div id="module-modal" class="hidden fixed inset-0 z-[70] flex items-start justify-center p-4 sm:pt-24">
+    <div class="absolute inset-0 bg-black/40" data-mod-close></div>
+    <div class="relative w-full max-w-[560px] bg-white rounded-xl shadow-xl flex flex-col">
+      <div class="flex items-center gap-2 px-6 pt-5 pb-3">
+        <span class="inline-flex items-center gap-1.5 h-7 px-2 rounded-md border border-stroke text-[13px] text-ink"><span>🖐️</span>Testing</span>
+        <h2 class="text-[16px] font-semibold text-head">Create module</h2>
+      </div>
+      <div class="px-6">
+        <input id="module-title" type="text" placeholder="Title" class="w-full h-11 px-3 rounded-md text-[15px] text-ink placeholder:text-faint outline outline-1 -outline-offset-1 outline-stroke focus:outline-brand" />
+        <textarea rows="4" placeholder="Description" class="w-full mt-3 px-3 py-2.5 rounded-md text-[13px] text-ink placeholder:text-faint outline outline-1 -outline-offset-1 outline-stroke focus:outline-brand resize-none"></textarea>
+        <div class="flex flex-wrap items-center gap-2 mt-4 pb-4">
+          <button id="module-daterange" type="button" class="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border border-stroke bg-white text-[13px] text-ink hover:bg-hover"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="4" y="5" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span data-dr-start class="text-sub">Start date</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg><span data-dr-end class="text-sub">End date</span></button>
+          <button id="module-status-btn" type="button" class="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border border-stroke bg-white text-[13px] text-ink hover:bg-hover"><span data-status-ic><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" stroke="#9ca3af" stroke-width="2" stroke-dasharray="3 3"/></svg></span><span data-status-label>Backlog</span></button>
+          <button id="module-lead-btn" type="button" class="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border border-stroke bg-white text-[13px] text-ink hover:bg-hover"><span data-lead-ic><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3" stroke="currentColor" stroke-width="1.7"/><path d="M5 20a7 7 0 0114 0" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></span><span data-lead-label>Lead</span></button>
+          <button id="module-members-btn" type="button" class="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border border-stroke bg-white text-[13px] text-ink hover:bg-hover"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3" stroke="currentColor" stroke-width="1.7"/><path d="M3 19a6 6 0 0112 0M16 6a3 3 0 010 6M18 19a6 6 0 00-3-5.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg><span data-members-label>Members</span></button>
+        </div>
+      </div>
+      <div class="flex items-center justify-end gap-2 px-6 py-4 border-t border-line">
+        <button data-mod-close class="h-9 px-4 rounded-md border border-stroke text-[13px] font-semibold text-ink hover:bg-hover">Cancel</button>
+        <button id="module-create" class="h-9 px-4 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold disabled:opacity-50" disabled>Create Module</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- shared floating popovers -->
+  <div id="mod-pop" class="hidden fixed z-[80] w-64 bg-white rounded-lg border border-stroke shadow-xl p-1.5 select-none"></div>
+  <div id="mod-dp" class="hidden fixed z-[80] bg-white rounded-lg border border-stroke shadow-xl p-3 select-none" style="width:500px;max-width:calc(100vw - 24px)"></div>
+
+  <script>
+    // Mobile sidebar drawer
+    (function () {
+      var sb = document.getElementById('sidebar'), bd = document.getElementById('sidebar-backdrop');
+      var o = document.getElementById('open-sidebar'); if (o) o.addEventListener('click', function () { sb.classList.remove('-translate-x-full'); bd.classList.remove('hidden'); });
+      var c = document.getElementById('close-sidebar'); if (c) c.addEventListener('click', function () { sb.classList.add('-translate-x-full'); bd.classList.add('hidden'); });
+      if (bd) bd.addEventListener('click', function () { sb.classList.add('-translate-x-full'); bd.classList.add('hidden'); });
+    })();
+
+    (function () {
+      var MOD_STATUS = {
+        planned: { label: 'Planned', color: '#2563eb', bg: '#eff6ff' },
+        backlog: { label: 'Backlog', color: '#6b7280', bg: '#f3f4f6' },
+        inprogress: { label: 'In Progress', color: '#d97706', bg: '#fef3c7' },
+        paused: { label: 'Paused', color: '#6b7280', bg: '#f3f4f6' },
+        completed: { label: 'Completed', color: '#16a34a', bg: '#dcfce7' },
+        cancelled: { label: 'Cancelled', color: '#dc2626', bg: '#fee2e2' }
+      };
+      var MODULES = [
+        { id: 'core-workflow', name: 'Core Workflow (System)', pct: 25, dates: 'Aug 08 - 22, 2026', status: 'planned', lead: 'Z', star: false },
+        { id: 'onboarding-flow', name: 'Onboarding Flow (Feature)', pct: 0, dates: 'Aug 10 - 24, 2026', status: 'backlog', lead: 'S', star: false },
+        { id: 'workspace-setup', name: 'Workspace Setup (Area)', pct: 0, dates: 'Aug 12 - 26, 2026', status: 'inprogress', lead: 'J', star: false }
+      ];
+      function ring(pct) {
+        var r = 8.5, c = 2 * Math.PI * r, off = c * (1 - pct / 100);
+        return '<span class="relative inline-grid place-items-center shrink-0" style="width:30px;height:30px"><svg width="30" height="30" viewBox="0 0 24 24"><circle cx="12" cy="12" r="' + r + '" fill="none" stroke="#e5e7eb" stroke-width="2.4"/><circle cx="12" cy="12" r="' + r + '" fill="none" stroke="#22c55e" stroke-width="2.4" stroke-linecap="round" stroke-dasharray="' + c.toFixed(1) + '" stroke-dashoffset="' + off.toFixed(1) + '" transform="rotate(-90 12 12)"/></svg><span class="absolute text-[8px] font-semibold text-sub">' + pct + '%</span></span>';
+      }
+      function star(on) { return on ? '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" class="text-warning"><path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9 6.8 19.2l1-5.8L3.5 9.2l5.9-.9L12 3z"/></svg>' : '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9 6.8 19.2l1-5.8L3.5 9.2l5.9-.9L12 3z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>'; }
+      var IC_MENU = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="5" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="19" cy="12" r="1.6" fill="currentColor"/></svg>';
+      var CAL_SM = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0"><rect x="4" y="5" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
+      var CHK = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="text-brand shrink-0"><path d="M5 12l5 5 9-11" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+      var STATUS_OPTS = Object.keys(MOD_STATUS).map(function (k) { return { key: k, label: MOD_STATUS[k].label, color: MOD_STATUS[k].color, bg: MOD_STATUS[k].bg }; });
+      var MEMBERS = [
+        { key: 'Z', label: 'Zora', initial: 'Z', color: '#1b5f8a' },
+        { key: 'S', label: 'Sam', initial: 'S', color: '#0891b2' },
+        { key: 'J', label: 'Jai', initial: 'J', color: '#7c3aed' },
+        { key: 'A', label: 'Aria', initial: 'A', color: '#db2777' },
+        { key: 'M', label: 'Milo', initial: 'M', color: '#ca8a04' }
+      ];
+      var MEMBERS_MAP = {}; MEMBERS.forEach(function (m) { MEMBERS_MAP[m.key] = m; });
+      function statusDot(o) { return '<span class="h-2.5 w-2.5 rounded-full shrink-0" style="background:' + o.color + '"></span>'; }
+      function avatarIc(o) { return '<span class="h-5 w-5 rounded-full grid place-items-center text-white text-[9px] font-bold shrink-0" style="background:' + o.color + '">' + o.initial + '</span>'; }
+
+      function nameFmt(cell) { var m = cell.getData(); return '<div class="flex items-center gap-3 min-w-0">' + ring(m.pct) + '<span class="text-[14px] text-ink truncate">' + m.name + '</span></div>'; }
+      function metaFmt(cell) {
+        var m = cell.getData(), s = MOD_STATUS[m.status];
+        var lead = MEMBERS_MAP[m.lead] || { initial: m.lead, color: '#1b5f8a' };
+        return '<div class="flex items-center justify-end gap-2">' +
+          '<button data-mact="dates" data-id="' + m.id + '" class="inline-flex items-center gap-1.5 h-6 px-2 rounded-md border border-stroke bg-white text-[12px] text-sub whitespace-nowrap hover:bg-hover" title="Set dates">' + CAL_SM + m.dates + '</button>' +
+          '<button data-mact="status" data-id="' + m.id + '" class="inline-flex items-center h-6 px-2.5 rounded-md text-[12px] font-medium whitespace-nowrap hover:brightness-95" style="color:' + s.color + ';background:' + s.bg + '" title="Set status">' + s.label + '</button>' +
+          '<button data-mact="lead" data-id="' + m.id + '" class="h-6 w-6 rounded-full text-white grid place-items-center text-[10px] font-bold" style="background:' + lead.color + '" title="Set lead">' + lead.initial + '</button>' +
+          '<button data-star="' + m.id + '" class="h-7 w-7 grid place-items-center rounded hover:bg-line ' + (m.star ? '' : 'text-faint') + '" title="Favorite">' + star(m.star) + '</button>' +
+          '<button data-mmenu="' + m.id + '" class="h-7 w-7 grid place-items-center rounded hover:bg-line text-faint" title="More">' + IC_MENU + '</button>' +
+        '</div>';
+      }
+      var table = new Tabulator('#mod-table', {
+        data: MODULES, index: 'id', layout: 'fitColumns', headerVisible: false, rowHeight: 52,
+        columnDefaults: { vertAlign: 'middle', headerSort: false, resizable: false },
+        columns: [
+          { title: 'Name', field: 'name', widthGrow: 1, formatter: nameFmt },
+          { title: 'meta', width: 360, hozAlign: 'right', formatter: metaFmt }
+        ]
+      });
+      table.on('rowClick', function (e, row) { if (e.target.closest('button')) return; location.href = 'module.html?name=' + encodeURIComponent(row.getData().name); });
+
+      /* ============ shared floating pickers ============ */
+      var pop = document.getElementById('mod-pop');
+      var dp = document.getElementById('mod-dp');
+      function closePops() { pop.classList.add('hidden'); dp.classList.add('hidden'); }
+      function placePop(el, anchor) {
+        el.classList.remove('hidden');
+        var r = anchor.getBoundingClientRect();
+        var top = r.bottom + 6; if (top + el.offsetHeight > window.innerHeight - 8) top = Math.max(8, r.top - el.offsetHeight - 6);
+        var left = r.left; if (left + el.offsetWidth > window.innerWidth - 12) left = window.innerWidth - 12 - el.offsetWidth;
+        el.style.top = top + 'px'; el.style.left = Math.max(12, left) + 'px';
+      }
+      function openPicker(cfg, anchor) {
+        closePops();
+        var multi = !!cfg.multi;
+        var selected = multi ? (cfg.selected ? cfg.selected.slice() : []) : cfg.selected;
+        function isSel(k) { return multi ? selected.indexOf(k) > -1 : k === selected; }
+        var search = cfg.searchable ? '<div class="relative mb-1"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-faint"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><input type="text" class="mp-search w-full h-9 pl-8 pr-3 rounded-md bg-hover text-[13px] text-ink placeholder:text-faint outline outline-1 -outline-offset-1 outline-transparent focus:bg-white focus:outline-stroke" placeholder="' + (cfg.placeholder || 'Search') + '" /></div>' : '';
+        function rows(q) {
+          q = (q || '').toLowerCase();
+          return cfg.options.filter(function (o) { return o.label.toLowerCase().indexOf(q) > -1; }).map(function (o) {
+            return '<button type="button" data-k="' + o.key + '" class="w-full text-left flex items-center gap-2.5 px-2 h-9 rounded-md text-[13px] text-ink hover:bg-hover">' + (cfg.icon ? cfg.icon(o) : '') + '<span class="truncate flex-1">' + o.label + '</span>' + (isSel(o.key) ? CHK : '') + '</button>';
+          }).join('') || '<div class="px-2 py-3 text-[13px] text-sub text-center">No results</div>';
+        }
+        pop.innerHTML = search + '<div class="mp-list max-h-60 overflow-y-auto">' + rows('') + '</div>';
+        placePop(pop, anchor);
+        var s = pop.querySelector('.mp-search'), listEl = pop.querySelector('.mp-list');
+        if (s) { s.addEventListener('input', function () { listEl.innerHTML = rows(s.value); }); setTimeout(function () { s.focus(); }, 0); }
+        listEl.addEventListener('click', function (e) {
+          var b = e.target.closest('[data-k]'); if (!b) return; e.stopPropagation();
+          var k = b.getAttribute('data-k');
+          if (multi) { var i = selected.indexOf(k); if (i > -1) selected.splice(i, 1); else selected.push(k); cfg.onChange(selected.slice()); listEl.innerHTML = rows(s ? s.value : ''); }
+          else { cfg.onPick(k); closePops(); }
+        });
+      }
+
+      /* ============ compact date-range picker (daterangepicker style) ============ */
+      var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+      var MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      var DOW = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+      var TODAY = new Date(2026, 7, 9);
+      function d0(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
+      function addDays(d, n) { return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n); }
+      function ymd(d) { return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate(); }
+      function sameD(a, b) { return a && b && ymd(a) === ymd(b); }
+      function labelD(d) { return MON[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear(); }
+      function pad2(n) { return (n < 10 ? '0' : '') + n; }
+      function rangeStr(s, e) { if (s.getFullYear() === e.getFullYear() && s.getMonth() === e.getMonth()) return MON[s.getMonth()] + ' ' + pad2(s.getDate()) + ' - ' + pad2(e.getDate()) + ', ' + e.getFullYear(); return MON[s.getMonth()] + ' ' + pad2(s.getDate()) + ' - ' + MON[e.getMonth()] + ' ' + pad2(e.getDate()) + ', ' + e.getFullYear(); }
+
+      function openRange(anchor, cur, onApply) {
+        closePops();
+        var start = cur && cur.start ? d0(cur.start) : null, end = cur && cur.end ? d0(cur.end) : null, hover = null;
+        var view = new Date((start || TODAY).getFullYear(), (start || TODAY).getMonth(), 1);
+        var PRESETS = [
+          { k: 'today', label: 'Today', r: function () { return [TODAY, TODAY]; } },
+          { k: 'yesterday', label: 'Yesterday', r: function () { return [addDays(TODAY, -1), addDays(TODAY, -1)]; } },
+          { k: 'l7', label: 'Last 7 Days', r: function () { return [addDays(TODAY, -6), TODAY]; } },
+          { k: 'l30', label: 'Last 30 Days', r: function () { return [addDays(TODAY, -29), TODAY]; } },
+          { k: 'tm', label: 'This Month', r: function () { return [new Date(TODAY.getFullYear(), TODAY.getMonth(), 1), new Date(TODAY.getFullYear(), TODAY.getMonth() + 1, 0)]; } },
+          { k: 'lm', label: 'Last Month', r: function () { return [new Date(TODAY.getFullYear(), TODAY.getMonth() - 1, 1), new Date(TODAY.getFullYear(), TODAY.getMonth(), 0)]; } }
+        ];
+        function activePreset() { if (!start || !end) return null; for (var i = 0; i < PRESETS.length; i++) { var rr = PRESETS[i].r(); if (sameD(rr[0], start) && sameD(rr[1], end)) return PRESETS[i].k; } return 'custom'; }
+        function inRange(d) { if (!start) return false; var e = end || hover; if (!e) return false; var lo = Math.min(ymd(start), ymd(e)), hi = Math.max(ymd(start), ymd(e)); return ymd(d) > lo && ymd(d) < hi; }
+        function grid(base) {
+          var y = base.getFullYear(), m = base.getMonth(), first = new Date(y, m, 1).getDay(), days = new Date(y, m + 1, 0).getDate(), cells = '';
+          for (var i = 0; i < first; i++) cells += '<div class="h-7"></div>';
+          for (var d = 1; d <= days; d++) {
+            var dt = new Date(y, m, d), isS = sameD(dt, start), isE = sameD(dt, (end || hover)), isI = inRange(dt);
+            var cls = 'h-7 grid place-items-center text-[11px] cursor-pointer ';
+            if (isS || isE) cls += 'bg-brand text-white font-semibold ' + (isS && isE ? 'rounded-md' : isS ? 'rounded-l-md' : 'rounded-r-md');
+            else if (isI) cls += 'bg-sel text-brand'; else cls += 'text-ink rounded-md hover:bg-hover';
+            cells += '<div data-day="' + ymd(dt) + '" class="' + cls + '">' + d + '</div>';
+          }
+          return '<div class="w-[168px]"><div class="text-center text-[12px] font-semibold text-head mb-1.5">' + MONTHS[m] + ' ' + y + '</div><div class="grid grid-cols-7 mb-0.5">' + DOW.map(function (w) { return '<div class="h-5 grid place-items-center text-[10px] font-semibold text-faint">' + w + '</div>'; }).join('') + '</div><div class="grid grid-cols-7 gap-y-0.5">' + cells + '</div></div>';
+        }
+        function render() {
+          var next = new Date(view.getFullYear(), view.getMonth() + 1, 1), nb = 'h-6 w-6 grid place-items-center rounded-md text-sub hover:bg-hover', act = activePreset();
+          var side = PRESETS.map(function (p) { var on = act === p.k; return '<button type="button" data-preset="' + p.k + '" class="text-left h-7 px-2.5 rounded-md text-[12px] whitespace-nowrap ' + (on ? 'bg-brand text-white font-medium' : 'text-ink hover:bg-hover') + '">' + p.label + '</button>'; }).join('');
+          side += '<button type="button" data-preset="custom" class="text-left h-7 px-2.5 rounded-md text-[12px] whitespace-nowrap ' + (act === 'custom' ? 'bg-brand text-white font-medium' : 'text-ink hover:bg-hover') + '">Custom Range</button>';
+          dp.innerHTML = '<div class="flex"><div class="w-[116px] shrink-0 border-r border-line pr-2 mr-3 flex flex-col gap-0.5">' + side + '</div><div class="min-w-0"><div class="flex items-center mb-1.5"><button type="button" data-nav="-1" class="' + nb + '"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button><div class="flex-1"></div><button type="button" data-nav="1" class="' + nb + '"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div><div class="flex gap-4">' + grid(view) + grid(next) + '</div></div></div>' +
+            '<div class="flex items-center justify-between mt-2.5 pt-2.5 border-t border-line"><div class="text-[11px] text-sub"><span class="text-ink font-medium">' + (start ? labelD(start) : 'Start') + '</span><span class="mx-1.5">→</span><span class="text-ink font-medium">' + (end ? labelD(end) : 'End') + '</span></div><div class="flex items-center gap-1.5"><button type="button" data-dr-clear class="h-7 px-2.5 rounded-md text-[12px] text-sub hover:bg-hover">Clear</button><button type="button" data-dr-apply class="h-7 px-3 rounded-md bg-brand hover:bg-brand-dark text-white text-[12px] font-semibold disabled:opacity-50"' + (start && end ? '' : ' disabled') + '>Apply</button></div></div>';
+          placePop(dp, anchor);
+        }
+        dp._onclick = function (e) {
+          e.stopPropagation();
+          var pr = e.target.closest('[data-preset]');
+          if (pr) { var k = pr.getAttribute('data-preset'); if (k === 'custom') { start = end = hover = null; render(); return; } for (var i = 0; i < PRESETS.length; i++) { if (PRESETS[i].k === k) { var rr = PRESETS[i].r(); start = d0(rr[0]); end = d0(rr[1]); onApply(start, end); closePops(); return; } } return; }
+          var nav = e.target.closest('[data-nav]'); if (nav) { view.setMonth(view.getMonth() + (nav.getAttribute('data-nav') === '1' ? 1 : -1)); render(); return; }
+          var day = e.target.closest('[data-day]'); if (day) { var v = +day.getAttribute('data-day'), dt = new Date(Math.floor(v / 10000), Math.floor(v / 100) % 100 - 1, v % 100); if (!start || (start && end)) { start = dt; end = null; hover = null; } else { if (ymd(dt) < ymd(start)) { end = start; start = dt; } else { end = dt; } } render(); return; }
+          if (e.target.closest('[data-dr-clear]')) { start = end = hover = null; render(); return; }
+          if (e.target.closest('[data-dr-apply]')) { if (start && end) { onApply(start, end); closePops(); } return; }
+        };
+        dp._onover = function (e) { var day = e.target.closest('[data-day]'); if (day && start && !end) { var v = +day.getAttribute('data-day'); if (hover && ymd(hover) === v) return; hover = new Date(Math.floor(v / 10000), Math.floor(v / 100) % 100 - 1, v % 100); render(); } };
+        render();
+      }
+      dp.addEventListener('click', function (e) { if (dp._onclick) dp._onclick(e); });
+      dp.addEventListener('mouseover', function (e) { if (dp._onover) dp._onover(e); });
+      pop.addEventListener('click', function (e) { e.stopPropagation(); });
+      document.addEventListener('click', closePops);
+      window.addEventListener('resize', closePops);
+
+      /* ============ editable row badges ============ */
+      document.getElementById('mod-table').addEventListener('click', function (e) {
+        var s = e.target.closest('[data-star]');
+        if (s) { e.stopPropagation(); var row0 = table.getRow(s.getAttribute('data-star')); if (row0) { var d = row0.getData(); d.star = !d.star; row0.update({ star: d.star }); row0.reformat(); } return; }
+        if (e.target.closest('[data-mmenu]')) { e.stopPropagation(); return; }
+        var el = e.target.closest('[data-mact]'); if (!el) return;
+        e.stopPropagation();
+        var act = el.getAttribute('data-mact'), row = table.getRow(el.getAttribute('data-id')); if (!row) return;
+        var m = row.getData();
+        function apply(patch) { var r = row.update(patch); function rf() { try { row.reformat(); } catch (x) {} } if (r && r.then) r.then(rf); else rf(); }
+        if (act === 'status') openPicker({ options: STATUS_OPTS, selected: m.status, icon: statusDot, onPick: function (k) { apply({ status: k }); } }, el);
+        else if (act === 'lead') openPicker({ options: MEMBERS, selected: m.lead, searchable: true, placeholder: 'Search members', icon: avatarIc, onPick: function (k) { apply({ lead: k }); } }, el);
+        else if (act === 'dates') openRange(el, null, function (s2, e2) { apply({ dates: rangeStr(s2, e2) }); });
+      });
+
+      /* ============ Create module modal ============ */
+      var modal = document.getElementById('module-modal');
+      var titleInput = document.getElementById('module-title');
+      var createBtn = document.getElementById('module-create');
+      var mStatus = null, mLead = null, mMembers = [], mStart = null, mEnd = null;
+      var drStart = document.querySelector('#module-daterange [data-dr-start]'), drEnd = document.querySelector('#module-daterange [data-dr-end]');
+      var stIc = document.querySelector('#module-status-btn [data-status-ic]'), stLabel = document.querySelector('#module-status-btn [data-status-label]');
+      var ldIc = document.querySelector('#module-lead-btn [data-lead-ic]'), ldLabel = document.querySelector('#module-lead-btn [data-lead-label]');
+      var mbLabel = document.querySelector('#module-members-btn [data-members-label]');
+      function paintModal() {
+        drStart.textContent = mStart ? labelD(mStart) : 'Start date'; drStart.className = mStart ? 'text-ink' : 'text-sub';
+        drEnd.textContent = mEnd ? labelD(mEnd) : 'End date'; drEnd.className = mEnd ? 'text-ink' : 'text-sub';
+        if (mStatus) { var so = MOD_STATUS[mStatus]; stIc.innerHTML = '<span class="h-2.5 w-2.5 rounded-full inline-block" style="background:' + so.color + '"></span>'; stLabel.textContent = so.label; } else { stIc.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" stroke="#9ca3af" stroke-width="2" stroke-dasharray="3 3"/></svg>'; stLabel.textContent = 'Backlog'; }
+        if (mLead) { var lo = MEMBERS_MAP[mLead]; ldIc.innerHTML = avatarIc(lo); ldLabel.textContent = lo.label; } else { ldIc.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3" stroke="currentColor" stroke-width="1.7"/><path d="M5 20a7 7 0 0114 0" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>'; ldLabel.textContent = 'Lead'; }
+        mbLabel.textContent = mMembers.length ? mMembers.length + ' member' + (mMembers.length > 1 ? 's' : '') : 'Members';
+      }
+      function open() { titleInput.value = ''; createBtn.disabled = true; mStatus = null; mLead = null; mMembers = []; mStart = null; mEnd = null; paintModal(); closePops(); modal.classList.remove('hidden'); setTimeout(function () { titleInput.focus(); }, 0); }
+      function close() { closePops(); modal.classList.add('hidden'); }
+      document.getElementById('add-module-btn').addEventListener('click', open);
+      titleInput.addEventListener('input', function () { createBtn.disabled = titleInput.value.trim() === ''; });
+      document.getElementById('module-daterange').addEventListener('click', function (e) { e.stopPropagation(); openRange(this, { start: mStart, end: mEnd }, function (s, en) { mStart = s; mEnd = en; paintModal(); }); });
+      document.getElementById('module-status-btn').addEventListener('click', function (e) { e.stopPropagation(); openPicker({ options: STATUS_OPTS, selected: mStatus, icon: statusDot, onPick: function (k) { mStatus = k; paintModal(); } }, this); });
+      document.getElementById('module-lead-btn').addEventListener('click', function (e) { e.stopPropagation(); openPicker({ options: MEMBERS, selected: mLead, searchable: true, placeholder: 'Search members', icon: avatarIc, onPick: function (k) { mLead = k; paintModal(); } }, this); });
+      document.getElementById('module-members-btn').addEventListener('click', function (e) { e.stopPropagation(); openPicker({ options: MEMBERS, multi: true, selected: mMembers, searchable: true, placeholder: 'Search members', icon: avatarIc, onChange: function (arr) { mMembers = arr; paintModal(); } }, this); });
+      modal.addEventListener('click', function (e) { if (e.target.closest('[data-mod-close]')) close(); });
+      createBtn.addEventListener('click', close);
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
+    })();
+  </script>
+</body>
+</html>

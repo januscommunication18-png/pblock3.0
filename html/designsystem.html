@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Design System — Project Block</title>
+
+  <!--
+    Project Block — Design System
+    A single-page reference of every component used across the app
+    (signup.html, etc.). Each block below maps to a future Vue SFC.
+    Stack today: static HTML + Tailwind (CDN). Target: Laravel + Vue.
+    Tokens live in assets/js/tailwind.config.js (single source of truth).
+  -->
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="assets/js/tailwind.config.js"></script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/css/styles.css" />
+
+  <!-- Tabulator (data table) + our skin -->
+  <link rel="stylesheet" href="https://unpkg.com/tabulator-tables@6/dist/css/tabulator.min.css" />
+  <link rel="stylesheet" href="assets/css/tabulator-skin.css" />
+  <script src="https://unpkg.com/tabulator-tables@6/dist/js/tabulator.min.js"></script>
+</head>
+<body class="bg-[#fafbfc] text-ink text-[13px]">
+
+  <!-- ===== Top bar ===== -->
+  <header class="sticky top-0 z-20 bg-white/90 backdrop-blur border-b border-line">
+    <div class="max-w-[1080px] mx-auto px-6 h-14 flex items-center gap-3">
+      <svg width="22" height="22" viewBox="0 0 32 32" fill="#0f0f10"><path d="M5 21 L15 4 L20.5 4 L10.5 21 Z"/><path d="M13 28 L23 11 L28.5 11 L18.5 28 Z"/></svg>
+      <span class="font-bold text-head text-[15px]">Project Block</span>
+      <span class="text-faint">/</span>
+      <span class="text-sub">Design System</span>
+      <div class="ml-auto flex items-center gap-2 text-[12px] text-sub">
+        <a href="signup.html" class="px-2.5 py-1 rounded-md hover:bg-hover">Sign up</a>
+        <a href="onboarding-profile.html" class="px-2.5 py-1 rounded-md hover:bg-hover">Onboarding</a>
+        <a href="welcome.html" class="px-2.5 py-1 rounded-md hover:bg-hover">Welcome</a>
+        <a href="create-workspace.html" class="px-2.5 py-1 rounded-md hover:bg-hover">Create WS</a>
+        <a href="setting-general.html" class="px-2.5 py-1 rounded-md hover:bg-hover">Settings</a>
+      </div>
+    </div>
+  </header>
+
+  <div class="max-w-[1080px] mx-auto px-6 py-10">
+    <h1 class="text-[28px] font-bold text-head">Components</h1>
+    <p class="text-sub mt-1 mb-2 max-w-2xl">
+      Living reference for Project Block. Everything here is built from the shared design
+      tokens in <code class="text-ink bg-hover px-1.5 py-0.5 rounded">assets/js/tailwind.config.js</code>.
+      Each section becomes a Vue component in the Laravel + Vue build.
+    </p>
+
+    <!-- ===== 1. Colors ===== -->
+    <section class="mt-10">
+      <h2 class="text-[16px] font-semibold text-head mb-4 pb-2 border-b border-line">Color tokens</h2>
+      <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4">
+        <!-- swatch template -->
+        <div><div class="h-16 rounded-card border border-line" style="background:#1b5f8a"></div><div class="mt-2 font-medium">brand</div><div class="text-faint">#1b5f8a</div></div>
+        <div><div class="h-16 rounded-card border border-line" style="background:#164d70"></div><div class="mt-2 font-medium">brand-dark</div><div class="text-faint">#164d70</div></div>
+        <div><div class="h-16 rounded-card border border-line" style="background:#2563eb"></div><div class="mt-2 font-medium">link</div><div class="text-faint">#2563eb</div></div>
+        <div><div class="h-16 rounded-card border border-line" style="background:#0f0f10"></div><div class="mt-2 font-medium">head</div><div class="text-faint">#0f0f10</div></div>
+        <div><div class="h-16 rounded-card border border-line" style="background:#23272f"></div><div class="mt-2 font-medium">ink</div><div class="text-faint">#23272f</div></div>
+        <div><div class="h-16 rounded-card border border-line" style="background:#6b7280"></div><div class="mt-2 font-medium">sub</div><div class="text-faint">#6b7280</div></div>
+        <div><div class="h-16 rounded-card border border-line" style="background:#9ca3af"></div><div class="mt-2 font-medium">faint</div><div class="text-faint">#9ca3af</div></div>
+        <div><div class="h-16 rounded-card border border-line" style="background:#e5e7eb"></div><div class="mt-2 font-medium">line</div><div class="text-faint">#e5e7eb</div></div>
+        <div><div class="h-16 rounded-card border border-line" style="background:#f3f4f6"></div><div class="mt-2 font-medium">hover</div><div class="text-faint">#f3f4f6</div></div>
+        <div><div class="h-16 rounded-card border border-line" style="background:#22c55e"></div><div class="mt-2 font-medium">success</div><div class="text-faint">#22c55e</div></div>
+        <div><div class="h-16 rounded-card border border-line" style="background:#f59e0b"></div><div class="mt-2 font-medium">warning</div><div class="text-faint">#f59e0b</div></div>
+        <div><div class="h-16 rounded-card border border-line" style="background:#ef4444"></div><div class="mt-2 font-medium">danger</div><div class="text-faint">#ef4444</div></div>
+      </div>
+    </section>
+
+    <!-- ===== 2. Typography ===== -->
+    <section class="mt-12">
+      <h2 class="text-[16px] font-semibold text-head mb-4 pb-2 border-b border-line">Typography — Inter</h2>
+      <div class="bg-white border border-line rounded-card p-6 space-y-3">
+        <div class="text-[28px] font-bold text-head">Display / 28 Bold</div>
+        <div class="text-[24px] font-bold text-head">Heading 1 / 24 Bold</div>
+        <div class="text-[18px] text-sub">Subtitle / 18 Regular</div>
+        <div class="text-[16px] font-semibold text-head">Section / 16 Semibold</div>
+        <div class="text-[14px] text-ink">Body / 14 Regular — the quick brown fox jumps over the lazy dog.</div>
+        <div class="text-[13px] text-sub">Small / 13 — secondary text and metadata.</div>
+        <div class="text-[11px] font-semibold text-faint uppercase tracking-wide">Label / 11 Semibold Uppercase</div>
+      </div>
+    </section>
+
+    <!-- ===== 3. Buttons ===== -->
+    <section class="mt-12">
+      <h2 class="text-[16px] font-semibold text-head mb-4 pb-2 border-b border-line">Buttons</h2>
+      <div class="bg-white border border-line rounded-card p-6 flex flex-wrap items-center gap-4">
+        <button class="h-11 px-6 rounded-lg bg-brand hover:bg-brand-dark text-white text-[14px] font-semibold transition-colors">Primary</button>
+        <button class="h-11 px-6 rounded-lg bg-hover text-faint text-[14px] font-semibold cursor-not-allowed">Primary disabled</button>
+        <button class="h-11 px-6 rounded-lg border border-stroke bg-white hover:bg-hover text-ink text-[14px] font-semibold transition-colors">Secondary</button>
+        <button class="h-9 px-4 rounded-md text-link text-[14px] font-semibold hover:underline">Text / link</button>
+        <button class="h-8 w-8 grid place-items-center rounded-md border border-line text-sub hover:bg-hover">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+    </section>
+
+    <!-- ===== 3a. Tabs ===== -->
+    <section class="mt-12">
+      <h2 class="text-[16px] font-semibold text-head mb-1 pb-2 border-b border-line">Tabs</h2>
+      <p class="text-[13px] text-sub mb-4 mt-2">Underline tabs are the primary pattern (project header + list toolbars). The tab row is <em>full height</em> so the active <code class="text-ink bg-hover px-1 py-0.5 rounded">border-b-2 border-brand</code> sits flush with the container's bottom border. Segmented groups and pill tabs are used for view switches and sub-filters.</p>
+
+      <!-- Underline tabs -->
+      <div class="bg-white border border-line rounded-card overflow-hidden">
+        <div class="border-b border-line px-4">
+          <nav class="flex items-center gap-1 h-11">
+            <a class="px-2.5 h-11 flex items-center text-[13px] text-ink font-medium border-b-2 border-brand">Active</a>
+            <a class="px-2.5 h-11 flex items-center text-[13px] text-sub hover:text-ink border-b-2 border-transparent">Upcoming</a>
+            <a class="px-2.5 h-11 flex items-center text-[13px] text-sub hover:text-ink border-b-2 border-transparent">Completed</a>
+            <span class="ml-2 inline-flex items-center h-5 px-1.5 rounded-md bg-hover text-faint text-[11px] font-medium">3</span>
+          </nav>
+        </div>
+        <div class="p-5 text-[13px] text-sub">Active tab panel content…</div>
+      </div>
+
+      <div class="grid sm:grid-cols-2 gap-4 mt-4">
+        <!-- Segmented group -->
+        <div class="bg-white border border-line rounded-card p-6">
+          <p class="text-[13px] font-medium text-ink mb-3">Segmented group</p>
+          <div class="inline-flex items-center rounded-md border border-stroke overflow-hidden">
+            <button class="h-8 px-3 text-[13px] bg-sel text-brand font-medium">List</button>
+            <button class="h-8 px-3 text-[13px] text-sub hover:bg-hover border-l border-stroke">Board</button>
+            <button class="h-8 px-3 text-[13px] text-sub hover:bg-hover border-l border-stroke">Timeline</button>
+          </div>
+        </div>
+        <!-- Pill tabs + icon toggle -->
+        <div class="bg-white border border-line rounded-card p-6">
+          <p class="text-[13px] font-medium text-ink mb-3">Pill tabs &amp; icon view-toggle</p>
+          <div class="flex flex-wrap items-center gap-4">
+            <div class="inline-flex items-center gap-1 p-1 rounded-lg bg-hover">
+              <button class="h-7 px-3 rounded-md text-[13px] bg-white text-ink font-medium shadow-sm">Public</button>
+              <button class="h-7 px-3 rounded-md text-[13px] text-sub hover:text-ink">Private</button>
+              <button class="h-7 px-3 rounded-md text-[13px] text-sub hover:text-ink">Archived</button>
+            </div>
+            <div class="inline-flex items-center gap-0.5">
+              <button class="h-8 w-8 grid place-items-center rounded-md bg-sel text-brand" title="List"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+              <button class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover" title="Board"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="6" height="16" rx="1.5" stroke="currentColor" stroke-width="1.7"/><rect x="14" y="4" width="6" height="10" rx="1.5" stroke="currentColor" stroke-width="1.7"/></svg></button>
+              <button class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover" title="Timeline"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 7h10M4 12h14M4 17h7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 3b. Badges & chips ===== -->
+    <section class="mt-12">
+      <h2 class="text-[16px] font-semibold text-head mb-1 pb-2 border-b border-line">Badges &amp; chips</h2>
+      <p class="text-[13px] text-sub mb-4 mt-2">Convention: neutral bordered badges always carry an explicit <code class="text-ink bg-hover px-1 py-0.5 rounded">bg-white</code> so they stay legible on hovered rows and grey group headers. <b>Editable</b> badges (<code class="text-ink bg-hover px-1 py-0.5 rounded">border-stroke</code>, open a picker on click) vs <b>display</b> chips (<code class="text-ink bg-hover px-1 py-0.5 rounded">border-line</code>, static). Status badges use a soft tint. Long values truncate; extra items collapse to “+N”.</p>
+      <div class="bg-white border border-line rounded-card p-6 space-y-5">
+
+        <!-- Status (tinted) -->
+        <div>
+          <p class="text-[11px] font-semibold text-faint uppercase tracking-wide mb-2">Status — soft tint</p>
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="inline-flex items-center h-6 px-2.5 rounded-md text-[12px] font-medium" style="color:#2563eb;background:#eff6ff">Planned</span>
+            <span class="inline-flex items-center h-6 px-2.5 rounded-md text-[12px] font-medium" style="color:#6b7280;background:#f3f4f6">Backlog</span>
+            <span class="inline-flex items-center h-6 px-2.5 rounded-md text-[12px] font-medium" style="color:#d97706;background:#fef3c7">In Progress</span>
+            <span class="inline-flex items-center h-6 px-2.5 rounded-md text-[12px] font-medium" style="color:#16a34a;background:#dcfce7">Completed</span>
+            <span class="inline-flex items-center h-6 px-2.5 rounded-md text-[12px] font-medium" style="color:#dc2626;background:#fee2e2">Cancelled</span>
+            <span class="inline-flex items-center h-6 px-2.5 rounded-md text-[12px] font-medium" style="color:#2563eb;background:#eff6ff">Upcoming</span>
+          </div>
+        </div>
+
+        <!-- Work item state / priority icon badges -->
+        <div>
+          <p class="text-[11px] font-semibold text-faint uppercase tracking-wide mb-2">Work item state &amp; priority (white bg, editable)</p>
+          <div class="flex flex-wrap items-center gap-2">
+            <button class="inline-flex items-center gap-1.5 h-6 px-2 rounded-md border border-stroke bg-white text-[12px] text-ink hover:bg-hover"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" class="text-emerald-600"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M8 12l3 3 5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Done</button>
+            <button class="inline-flex items-center gap-1.5 h-6 px-2 rounded-md border border-stroke bg-white text-[12px] text-ink hover:bg-hover"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" class="text-amber-600"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 12l3-2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Started</button>
+            <button class="inline-flex items-center gap-1.5 h-6 px-2 rounded-md border border-stroke bg-white text-[12px] text-ink hover:bg-hover"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" class="text-faint"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="2" stroke-dasharray="3 3"/></svg>Backlog</button>
+            <button class="inline-flex items-center gap-1.5 h-6 px-2 rounded-md border border-stroke bg-white text-[12px] text-ink hover:bg-hover"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" class="text-danger"><path d="M5 12h3M11 8h3M17 5h2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Urgent</button>
+          </div>
+        </div>
+
+        <!-- Editable vs display -->
+        <div class="grid sm:grid-cols-2 gap-4">
+          <div>
+            <p class="text-[11px] font-semibold text-faint uppercase tracking-wide mb-2">Editable · <code class="normal-case text-ink bg-hover px-1 rounded">badgeBtn</code></p>
+            <div class="flex flex-wrap items-center gap-2">
+              <button class="inline-flex items-center gap-1.5 h-6 px-2 rounded-md border border-stroke bg-white text-[12px] text-sub hover:bg-hover"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" class="text-faint"><rect x="4" y="5" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>Aug 08 – 22, 2026</button>
+              <button class="inline-flex items-center gap-1.5 h-6 px-2 rounded-md border border-stroke bg-white text-[12px] text-ink hover:bg-hover"><span class="h-2.5 w-2.5 rounded-full" style="background:#8b5cf6"></span>concepts</button>
+              <button class="inline-flex items-center gap-1.5 h-6 px-2 rounded-md border border-stroke bg-white text-[12px] text-ink hover:bg-hover"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" class="text-sub"><path d="M21 12a9 9 0 11-3.6-7.2" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><path d="M21 4v4h-4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>Cycle 1</button>
+            </div>
+          </div>
+          <div>
+            <p class="text-[11px] font-semibold text-faint uppercase tracking-wide mb-2">Display · <code class="normal-case text-ink bg-hover px-1 rounded">chip</code></p>
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="inline-flex items-center gap-1.5 h-6 px-2 rounded-md border border-line bg-white text-[12px] text-ink"><span class="h-2.5 w-2.5 rounded-full" style="background:#3b82f6"></span>admin</span>
+              <span class="inline-flex items-center h-6 px-2 rounded-md border border-line bg-white text-[12px] text-ink max-w-[96px] truncate">Onboarding Flow (Feature)</span>
+              <span class="inline-flex items-center h-6 px-2 rounded-md border border-line bg-white text-[12px] text-sub">+2</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Assignee & count -->
+        <div>
+          <p class="text-[11px] font-semibold text-faint uppercase tracking-wide mb-2">Assignee, tag &amp; count</p>
+          <div class="flex flex-wrap items-center gap-3">
+            <button class="h-6 w-6 rounded-full text-white grid place-items-center text-[10px] font-bold" style="background:#1b5f8a" title="Assignee">Z</button>
+            <span class="inline-flex items-center gap-1.5 border border-line rounded-full pl-2 pr-2.5 py-0.5 bg-white text-ink text-[12px]"><span class="h-2 w-2 rounded-full bg-danger"></span>Bug</span>
+            <span class="inline-flex items-center gap-1.5 border border-line rounded-full pl-2 pr-2.5 py-0.5 bg-white text-ink text-[12px]"><span class="h-2 w-2 rounded-full bg-brand"></span>Feature</span>
+            <span class="inline-flex items-center h-5 px-1.5 rounded-md bg-hover text-faint text-[11px] font-medium">12</span>
+            <span class="inline-flex items-center h-5 px-2 rounded-full bg-brand/10 text-brand text-[11px] font-semibold">New</span>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ===== 4. OAuth buttons ===== -->
+    <section class="mt-12">
+      <h2 class="text-[16px] font-semibold text-head mb-4 pb-2 border-b border-line">OAuth buttons</h2>
+      <div class="bg-white border border-line rounded-card p-6 max-w-[380px] space-y-3">
+        <button class="relative w-full h-11 rounded-lg border border-stroke bg-white hover:bg-hover text-[14px] font-semibold text-ink">
+          <span class="absolute left-4 top-1/2 -translate-y-1/2"><svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.6l6.7-6.7C35.6 2.4 30.2 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.8 6.1C12.3 13.2 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.1 5.3-4.6 7l7.1 5.5c4.1-3.8 6.4-9.4 6.4-16z"/><path fill="#FBBC05" d="M10.4 28.3c-.5-1.4-.8-2.9-.8-4.3s.3-3 .8-4.3l-7.8-6.1C.9 16.6 0 20.2 0 24s.9 7.4 2.6 10.4l7.8-6.1z"/><path fill="#34A853" d="M24 48c6.2 0 11.5-2 15.3-5.5l-7.1-5.5c-2 1.3-4.6 2.1-8.2 2.1-6.3 0-11.7-3.7-13.6-9l-7.8 6.1C6.5 42.6 14.6 48 24 48z"/></svg></span>
+          Sign up with Google
+        </button>
+        <button class="relative w-full h-11 rounded-lg border border-stroke bg-white hover:bg-hover text-[14px] font-semibold text-ink">
+          <span class="absolute left-4 top-1/2 -translate-y-1/2"><svg width="18" height="18" viewBox="0 0 24 24" fill="#0f0f10"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.3.8-.6v-2c-3.2.7-3.9-1.5-3.9-1.5-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.7 1.3 3.4 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.5 11.5 0 016 0C17.3 4.6 18.3 5 18.3 5c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6 4.6-1.5 7.9-5.8 7.9-10.9C23.5 5.7 18.3.5 12 .5z"/></svg></span>
+          Sign up with GitHub
+        </button>
+        <button class="relative w-full h-11 rounded-lg border border-stroke bg-white hover:bg-hover text-[14px] font-semibold text-ink">
+          <span class="absolute left-4 top-1/2 -translate-y-1/2"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0f0f10" stroke-width="2"><circle cx="8" cy="8" r="4"/><path d="M11 11l8 8M16 16l2-2M19 19l2-2" stroke-linecap="round"/></svg></span>
+          Sign up with Single Sign-On
+        </button>
+      </div>
+    </section>
+
+    <!-- ===== 5. Form fields ===== -->
+    <section class="mt-12">
+      <h2 class="text-[16px] font-semibold text-head mb-4 pb-2 border-b border-line">Form fields</h2>
+      <div class="bg-white border border-line rounded-card p-6 max-w-[380px] space-y-5">
+        <div>
+          <label class="block text-[13px] font-medium text-ink mb-1.5">Email</label>
+          <input type="email" placeholder="name@company.com" class="pb-input" />
+        </div>
+        <div>
+          <label class="block text-[13px] font-medium text-ink mb-1.5">Email — filled with clear</label>
+          <div class="relative">
+            <input type="email" value="zorainteractive@gmail.com" class="pb-input has-suffix" />
+            <button class="absolute right-3 top-1/2 -translate-y-1/2 text-faint hover:text-sub"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/><path d="M9 9l6 6M15 9l-6 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+          </div>
+        </div>
+        <div>
+          <label class="block text-[13px] font-medium text-ink mb-1.5">Unique code</label>
+          <input type="text" value="227698" class="pb-input" />
+          <div class="flex items-center justify-between mt-1.5">
+            <span class="flex items-center gap-1.5 text-[12px] text-success">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M8 12l2.5 2.5L16 9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Paste the code sent to your email
+            </span>
+            <a href="#" class="text-[12px] text-link font-medium hover:underline">Resend</a>
+          </div>
+        </div>
+
+        <!-- Read-only -->
+        <div>
+          <label class="block text-[13px] font-medium text-ink mb-1.5">Email — read only</label>
+          <input type="email" value="zorainteractive@gmail.com" readonly class="pb-input" />
+          <p class="mt-1.5 text-[12px] text-faint">This value can’t be edited.</p>
+        </div>
+
+        <!-- Error -->
+        <div>
+          <label class="block text-[13px] font-medium text-danger mb-1.5">Email — error</label>
+          <div class="relative">
+            <input type="email" value="name@company" aria-invalid="true" class="pb-input is-error has-suffix" />
+            <span class="absolute right-3 top-1/2 -translate-y-1/2 text-danger">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M12 7v6M12 16.5v.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            </span>
+          </div>
+          <p class="mt-1.5 flex items-center gap-1.5 text-[12px] text-danger">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M12 7v6M12 16.5v.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            Please enter a valid email address.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 5a. Checkboxes & radios ===== -->
+    <section class="mt-12">
+      <h2 class="text-[16px] font-semibold text-head mb-4 pb-2 border-b border-line">Checkboxes &amp; radios</h2>
+      <div class="grid sm:grid-cols-2 gap-4">
+
+        <!-- Checkboxes -->
+        <div class="bg-white border border-line rounded-card p-6">
+          <p class="text-[13px] font-medium text-ink mb-3">Checkboxes</p>
+          <div class="space-y-3">
+            <label class="flex items-center gap-2.5 text-[14px] text-ink cursor-pointer">
+              <input type="checkbox" class="pb-check" /> Unchecked
+            </label>
+            <label class="flex items-center gap-2.5 text-[14px] text-ink cursor-pointer">
+              <input type="checkbox" class="pb-check" checked /> Checked
+            </label>
+            <label class="flex items-center gap-2.5 text-[14px] text-ink cursor-pointer">
+              <input type="checkbox" id="ds-indeterminate" class="pb-check" /> Indeterminate
+            </label>
+            <label class="flex items-center gap-2.5 text-[14px] text-sub cursor-not-allowed">
+              <input type="checkbox" class="pb-check" checked disabled /> Read only / disabled
+            </label>
+            <div>
+              <label class="flex items-center gap-2.5 text-[14px] text-danger cursor-pointer">
+                <input type="checkbox" class="pb-check is-error" /> Accept the terms
+              </label>
+              <p class="mt-1.5 ml-[26px] flex items-center gap-1.5 text-[12px] text-danger">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M12 7v6M12 16.5v.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                You must accept before continuing.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Radios -->
+        <div class="bg-white border border-line rounded-card p-6">
+          <p class="text-[13px] font-medium text-ink mb-3">Radios · Select one</p>
+          <div class="space-y-3">
+            <label class="flex items-center gap-2.5 text-[14px] text-ink cursor-pointer">
+              <input type="radio" name="ds-radio" class="pb-radio" checked /> Option one
+            </label>
+            <label class="flex items-center gap-2.5 text-[14px] text-ink cursor-pointer">
+              <input type="radio" name="ds-radio" class="pb-radio" /> Option two
+            </label>
+            <label class="flex items-center gap-2.5 text-[14px] text-sub cursor-not-allowed">
+              <input type="radio" name="ds-radio" class="pb-radio" disabled /> Read only / disabled
+            </label>
+          </div>
+
+          <div class="mt-4 pt-4 border-t border-line">
+            <p class="text-[13px] font-medium text-danger mb-3">Error state</p>
+            <div class="space-y-3">
+              <label class="flex items-center gap-2.5 text-[14px] text-ink cursor-pointer">
+                <input type="radio" name="ds-radio-err" class="pb-radio is-error" /> Plan A
+              </label>
+              <label class="flex items-center gap-2.5 text-[14px] text-ink cursor-pointer">
+                <input type="radio" name="ds-radio-err" class="pb-radio is-error" /> Plan B
+              </label>
+            </div>
+            <p class="mt-1.5 flex items-center gap-1.5 text-[12px] text-danger">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M12 7v6M12 16.5v.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+              Please select an option.
+            </p>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ===== 5b1. Selectable option cards (onboarding role & goals) ===== -->
+    <section class="mt-12">
+      <h2 class="text-[16px] font-semibold text-head mb-1 pb-2 border-b border-line">Selectable option cards</h2>
+      <p class="text-[13px] text-sub mb-4 mt-2">Used in onboarding (role &amp; goals). Cards take a brand border + ring when selected. Multi-select shows a checkbox on the left; single-select shows a check on the right. Try clicking them.</p>
+      <div class="grid sm:grid-cols-2 gap-4">
+        <div class="bg-white border border-line rounded-card p-6">
+          <p class="text-[13px] font-medium text-ink mb-3">Multi-select · Select one or more</p>
+          <div id="ds-multi" class="space-y-2.5"></div>
+        </div>
+        <div class="bg-white border border-line rounded-card p-6">
+          <p class="text-[13px] font-medium text-ink mb-3">Single-select · Select one</p>
+          <div id="ds-single" class="space-y-2.5"></div>
+        </div>
+      </div>
+
+      <div class="grid sm:grid-cols-2 gap-4 mt-4">
+        <!-- Read only / disabled -->
+        <div class="bg-white border border-line rounded-card p-6">
+          <p class="text-[13px] font-medium text-ink mb-3">Read only / disabled</p>
+          <div class="space-y-2.5">
+            <div aria-disabled="true" class="w-full flex items-center gap-3 h-12 px-4 rounded-lg border border-line bg-hover text-sub cursor-not-allowed select-none text-[14px]">
+              <span class="h-5 w-5 rounded bg-faint grid place-items-center shrink-0"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5 9-11" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+              <span>Manage engineering sprints</span>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="ml-auto text-faint"><rect x="4" y="10" width="16" height="10" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M8 10V7a4 4 0 018 0v3" stroke="currentColor" stroke-width="1.8"/></svg>
+            </div>
+            <div aria-disabled="true" class="w-full flex items-center gap-3 h-12 px-4 rounded-lg border border-line text-faint opacity-70 cursor-not-allowed select-none text-[14px]">
+              <span class="h-5 w-5 rounded border border-stroke shrink-0"></span>
+              <span>Plan and track product roadmaps</span>
+            </div>
+          </div>
+          <p class="mt-2 text-[12px] text-sub">Locked — selection can't be changed.</p>
+        </div>
+
+        <!-- Error -->
+        <div class="bg-white border border-line rounded-card p-6">
+          <p class="text-[13px] font-medium text-danger mb-3">Error · Select one or more</p>
+          <div class="space-y-2.5">
+            <button type="button" class="w-full flex items-center gap-3 h-12 px-4 rounded-lg border border-danger ring-1 ring-danger bg-red-50/40 text-ink text-left text-[14px]">
+              <span class="h-5 w-5 rounded border border-danger shrink-0"></span>
+              <span>Coordinate cross-functional projects</span>
+            </button>
+            <button type="button" class="w-full flex items-center gap-3 h-12 px-4 rounded-lg border border-danger ring-1 ring-danger bg-red-50/40 text-ink text-left text-[14px]">
+              <span class="h-5 w-5 rounded border border-danger shrink-0"></span>
+              <span>Replace our current tool</span>
+            </button>
+          </div>
+          <p class="mt-2 flex items-center gap-1.5 text-[12px] text-danger">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M12 7v6M12 16.5v.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            Please select at least one option.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 5b. Text areas ===== -->
+    <section class="mt-12">
+      <h2 class="text-[16px] font-semibold text-head mb-4 pb-2 border-b border-line">Text areas</h2>
+      <div class="bg-white border border-line rounded-card p-6 max-w-[380px] space-y-5">
+        <!-- Small -->
+        <div>
+          <label class="block text-[13px] font-medium text-ink mb-1.5">Small</label>
+          <textarea rows="2" placeholder="Short note…" class="pb-textarea resize-none"></textarea>
+          <p class="mt-1.5 text-[12px] text-faint">Fixed 2 rows, no resize.</p>
+        </div>
+
+        <!-- Default -->
+        <div>
+          <label class="block text-[13px] font-medium text-ink mb-1.5">Default</label>
+          <textarea rows="4" placeholder="Add a description…" class="pb-textarea resize-y"></textarea>
+          <p class="mt-1.5 text-[12px] text-faint">4 rows, user-resizable vertically.</p>
+        </div>
+
+        <!-- Expanding (auto-grow) -->
+        <div>
+          <label class="block text-[13px] font-medium text-ink mb-1.5">Expanding</label>
+          <textarea data-autogrow rows="1" placeholder="Type and I’ll grow…" class="pb-textarea resize-none overflow-hidden"></textarea>
+          <p class="mt-1.5 text-[12px] text-faint">Grows to fit content — no scrollbar.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 5c. Comboboxes ===== -->
+    <section class="mt-12">
+      <h2 class="text-[16px] font-semibold text-head mb-1 pb-2 border-b border-line">Comboboxes</h2>
+      <p class="text-[13px] text-sub mb-4 mt-2">Custom select (Tailwind Plus style): styled button + floating list, brand highlight on hover, check on the selected option. Click to open.</p>
+      <div class="bg-white border border-line rounded-card p-6">
+        <div id="combobox-demos" class="grid sm:grid-cols-2 gap-x-6 gap-y-5 max-w-[760px]">
+          <div>
+            <label class="block text-[13px] font-medium text-ink mb-1.5">Read only</label>
+            <div id="combo-ro"></div>
+          </div>
+          <div>
+            <label class="block text-[13px] font-medium text-danger mb-1.5">Error</label>
+            <div id="combo-err"></div>
+            <p class="mt-1.5 flex items-center gap-1.5 text-[12px] text-danger"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M12 7v6M12 16.5v.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Please select a person.</p>
+          </div>
+          <div>
+            <label class="block text-[13px] font-medium text-ink mb-1.5">With image</label>
+            <div id="combo-img"></div>
+          </div>
+          <div>
+            <label class="block text-[13px] font-medium text-ink mb-1.5">With secondary text</label>
+            <div id="combo-sec"></div>
+          </div>
+          <div>
+            <label class="block text-[13px] font-medium text-ink mb-1.5">With status indicator</label>
+            <div id="combo-stat"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 5d. Date picker ===== -->
+    <section class="mt-12">
+      <h2 class="text-[16px] font-semibold text-head mb-1 pb-2 border-b border-line">Date picker</h2>
+      <p class="text-[13px] text-sub mb-4 mt-2">Single date picker. Click the field to open the calendar; month and year use our combobox dropdowns, with prev/next arrows.</p>
+      <div class="bg-white border border-line rounded-card p-6 max-w-[340px]">
+        <label class="block text-[13px] font-medium text-ink mb-1.5">Date</label>
+        <div class="relative" id="dp-single">
+          <input id="dp-input" type="text" readonly placeholder="MM/DD/YYYY" class="pb-input is-picker has-suffix" />
+          <span class="absolute right-3 top-1/2 -translate-y-1/2 text-faint pointer-events-none"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M3 9h18M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></span>
+          <div id="dp-cal" class="hidden absolute z-40 mt-1 left-0 w-[300px] bg-white border border-line rounded-lg shadow-lg p-3"></div>
+        </div>
+      </div>
+
+      <div class="bg-white border border-line rounded-card p-6 mt-4">
+        <div class="grid sm:grid-cols-2 gap-x-6 gap-y-5 max-w-[720px]">
+          <!-- Read only -->
+          <div>
+            <label class="block text-[13px] font-medium text-ink mb-1.5">Read only</label>
+            <div class="relative">
+              <input type="text" value="08/07/2026" readonly class="pb-input has-suffix" />
+              <span class="absolute right-3 top-1/2 -translate-y-1/2 text-faint pointer-events-none"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M3 9h18M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></span>
+            </div>
+            <p class="mt-1.5 text-[12px] text-sub">Locked — the date can't be changed.</p>
+          </div>
+
+          <!-- Error -->
+          <div>
+            <label class="block text-[13px] font-medium text-danger mb-1.5">Error</label>
+            <div class="relative">
+              <input type="text" value="" placeholder="MM/DD/YYYY" class="pb-input is-error has-suffix" />
+              <span class="absolute right-3 top-1/2 -translate-y-1/2 text-danger pointer-events-none"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M3 9h18M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></span>
+            </div>
+            <p class="mt-1.5 flex items-center gap-1.5 text-[12px] text-danger"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M12 7v6M12 16.5v.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Please select a valid date.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 5e. Data table (Tabulator) ===== -->
+    <section class="mt-12">
+      <h2 class="text-[16px] font-semibold text-head mb-1 pb-2 border-b border-line">Data table</h2>
+      <p class="text-[13px] text-sub mb-4 mt-2">Powered by <a href="https://tabulator.info" class="text-link hover:underline" target="_blank" rel="noopener">Tabulator</a>, skinned to the design system — sortable headers, zebra rows, brand pagination. Full example in setting-member.html.</p>
+      <div class="bg-white border border-line rounded-card p-6">
+        <div id="ds-table"></div>
+      </div>
+    </section>
+
+    <!-- ===== 5f. Progress indicators ===== -->
+    <section class="mt-12">
+      <h2 class="text-[16px] font-semibold text-head mb-1 pb-2 border-b border-line">Progress indicators</h2>
+      <p class="text-[13px] text-sub mb-4 mt-2">Progress ring (cycles &amp; modules — % completion) and the segmented breakdown bar (share of work items by state). Success green fills against the <code class="text-ink bg-hover px-1 py-0.5 rounded">line</code> track.</p>
+      <div class="bg-white border border-line rounded-card p-6 flex flex-wrap items-center gap-10">
+        <!-- big ring -->
+        <div class="flex items-center gap-3">
+          <span class="relative inline-grid place-items-center shrink-0" style="width:64px;height:64px">
+            <svg width="64" height="64" viewBox="0 0 64 64"><circle cx="32" cy="32" r="27" fill="none" stroke="#e5e7eb" stroke-width="6"/><circle cx="32" cy="32" r="27" fill="none" stroke="#22c55e" stroke-width="6" stroke-linecap="round" stroke-dasharray="169.6" stroke-dashoffset="127.2" transform="rotate(-90 32 32)"/></svg>
+            <span class="absolute text-[13px] font-semibold text-head">25%</span>
+          </span>
+          <span class="text-[12px] text-sub">Ring · large</span>
+        </div>
+        <!-- small ring (list row) -->
+        <div class="flex items-center gap-3">
+          <span class="relative inline-grid place-items-center shrink-0" style="width:30px;height:30px"><svg width="30" height="30" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="#e5e7eb" stroke-width="2.4"/><circle cx="12" cy="12" r="8.5" fill="none" stroke="#22c55e" stroke-width="2.4" stroke-linecap="round" stroke-dasharray="53.4" stroke-dashoffset="40.1" transform="rotate(-90 12 12)"/></svg><span class="absolute text-[8px] font-semibold text-sub">25%</span></span>
+          <span class="text-[12px] text-sub">Ring · list row</span>
+        </div>
+        <!-- segmented bar -->
+        <div class="min-w-[220px]">
+          <div class="flex h-2.5 w-full rounded-full overflow-hidden bg-line">
+            <span style="width:25%;background:#22c55e"></span>
+            <span style="width:25%;background:#d97706"></span>
+            <span style="width:25%;background:#6366f1"></span>
+            <span style="width:25%;background:#9ca3af"></span>
+          </div>
+          <div class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-sub">
+            <span class="inline-flex items-center gap-1.5"><span class="h-2 w-2 rounded-full" style="background:#22c55e"></span>Completed</span>
+            <span class="inline-flex items-center gap-1.5"><span class="h-2 w-2 rounded-full" style="background:#d97706"></span>Started</span>
+            <span class="inline-flex items-center gap-1.5"><span class="h-2 w-2 rounded-full" style="background:#6366f1"></span>Unstarted</span>
+            <span class="inline-flex items-center gap-1.5"><span class="h-2 w-2 rounded-full" style="background:#9ca3af"></span>Backlog</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 5g. Popover picker ===== -->
+    <section class="mt-12">
+      <h2 class="text-[16px] font-semibold text-head mb-1 pb-2 border-b border-line">Popover picker</h2>
+      <p class="text-[13px] text-sub mb-4 mt-2">Floating list that opens from an editable badge — optional search, brand-hover rows, a check on the selected item. Single-select closes on pick; multi-select stays open and toggles. Opening one picker closes any other.</p>
+      <div class="bg-white border border-line rounded-card p-6 flex flex-wrap gap-6">
+        <!-- single -->
+        <div class="w-64 bg-white rounded-lg border border-stroke shadow-xl p-1.5 select-none">
+          <div class="relative mb-1"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-faint"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><input type="text" placeholder="Search members" class="w-full h-9 pl-8 pr-3 rounded-md bg-hover text-[13px] text-ink placeholder:text-faint outline outline-1 -outline-offset-1 outline-transparent focus:bg-white focus:outline-stroke" /></div>
+          <div class="max-h-60 overflow-y-auto">
+            <button class="w-full text-left flex items-center gap-2.5 px-2 h-9 rounded-md text-[13px] text-ink hover:bg-hover"><span class="h-5 w-5 rounded-full grid place-items-center text-white text-[9px] font-bold" style="background:#1b5f8a">Z</span><span class="truncate flex-1">Zora</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="text-brand shrink-0"><path d="M5 12l5 5 9-11" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            <button class="w-full text-left flex items-center gap-2.5 px-2 h-9 rounded-md text-[13px] text-ink hover:bg-hover"><span class="h-5 w-5 rounded-full grid place-items-center text-white text-[9px] font-bold" style="background:#0891b2">S</span><span class="truncate flex-1">Sam</span></button>
+            <button class="w-full text-left flex items-center gap-2.5 px-2 h-9 rounded-md text-[13px] text-ink hover:bg-hover"><span class="h-5 w-5 rounded-full grid place-items-center text-white text-[9px] font-bold" style="background:#7c3aed">J</span><span class="truncate flex-1">Jai</span></button>
+          </div>
+        </div>
+        <!-- status list -->
+        <div class="w-56 bg-white rounded-lg border border-stroke shadow-xl p-1.5 select-none h-max">
+          <button class="w-full text-left flex items-center gap-2.5 px-2 h-9 rounded-md text-[13px] text-ink hover:bg-hover"><span class="h-2.5 w-2.5 rounded-full" style="background:#2563eb"></span><span class="flex-1">Planned</span></button>
+          <button class="w-full text-left flex items-center gap-2.5 px-2 h-9 rounded-md text-[13px] text-ink hover:bg-hover"><span class="h-2.5 w-2.5 rounded-full" style="background:#d97706"></span><span class="flex-1">In Progress</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="text-brand shrink-0"><path d="M5 12l5 5 9-11" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <button class="w-full text-left flex items-center gap-2.5 px-2 h-9 rounded-md text-[13px] text-ink hover:bg-hover"><span class="h-2.5 w-2.5 rounded-full" style="background:#16a34a"></span><span class="flex-1">Completed</span></button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 5h. Date range picker ===== -->
+    <section class="mt-12">
+      <h2 class="text-[16px] font-semibold text-head mb-1 pb-2 border-b border-line">Date range picker</h2>
+      <p class="text-[13px] text-sub mb-4 mt-2">Compact <a href="https://www.daterangepicker.com/" class="text-link hover:underline" target="_blank" rel="noopener">daterangepicker</a>-style range selector: a preset sidebar beside two months, brand endpoints with the range fill between. Presets apply on click; “Custom Range” lights up for a manual selection. Used in Create cycle / Create module and on editable date badges.</p>
+      <div class="bg-white border border-line rounded-card p-6">
+        <div id="ds-range" class="inline-block bg-white rounded-lg border border-stroke shadow-xl p-3 select-none" style="width:500px;max-width:100%"></div>
+      </div>
+    </section>
+
+    <!-- ===== 5i. Section card ===== -->
+    <section class="mt-12">
+      <h2 class="text-[16px] font-semibold text-head mb-1 pb-2 border-b border-line">Section card</h2>
+      <p class="text-[13px] text-sub mb-4 mt-2">Bordered card grouping list rows under a collapsible header with a count (work item drawer sections, cycle work items). Rows are flush, divided by <code class="text-ink bg-hover px-1 py-0.5 rounded">border-line</code>, and highlight on hover.</p>
+      <div class="bg-white border border-line rounded-card overflow-hidden max-w-[560px]">
+        <div class="flex items-center gap-2 px-4 h-10 border-b border-line bg-hover/40">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" class="text-sub"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span class="text-[12px] font-semibold text-ink">Cycle work items</span>
+          <span class="text-[11px] text-faint">2</span>
+        </div>
+        <div class="flex items-center gap-2.5 px-4 h-11 border-b border-line hover:bg-hover"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="text-emerald-600"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M8 12l3 3 5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="text-[11px] text-faint font-medium">TESTI-3</span><span class="text-[13px] text-ink truncate">Set up your first workspace</span></div>
+        <div class="flex items-center gap-2.5 px-4 h-11 hover:bg-hover"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="text-amber-600"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 12l3-2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span class="text-[11px] text-faint font-medium">TESTI-6</span><span class="text-[13px] text-ink truncate">Invite your teammates</span></div>
+      </div>
+    </section>
+
+    <!-- ===== 5j. Empty state ===== -->
+    <section class="mt-12">
+      <h2 class="text-[16px] font-semibold text-head mb-1 pb-2 border-b border-line">Empty state</h2>
+      <p class="text-[13px] text-sub mb-4 mt-2">Centered icon tile + title + one line of guidance. Used for empty tabs (e.g. Completed cycles).</p>
+      <div class="bg-white border border-line rounded-card p-6">
+        <div class="flex flex-col items-center justify-center text-center py-10">
+          <span class="h-16 w-16 rounded-2xl bg-hover grid place-items-center text-faint mb-4"><svg width="30" height="30" viewBox="0 0 24 24" fill="none"><path d="M21 12a9 9 0 11-3.6-7.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M21 4v4h-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          <h3 class="text-[15px] font-semibold text-head">No completed cycles yet</h3>
+          <p class="text-[13px] text-sub mt-1 max-w-[380px]">Cycles that have reached their end date will appear here so you can review how each one went.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 6. Divider ===== -->
+    <section class="mt-12">
+      <h2 class="text-[16px] font-semibold text-head mb-4 pb-2 border-b border-line">Divider</h2>
+      <div class="bg-white border border-line rounded-card p-6 max-w-[380px]">
+        <div class="flex items-center gap-3"><div class="h-px flex-1 bg-line"></div><span class="text-[13px] text-faint">or</span><div class="h-px flex-1 bg-line"></div></div>
+      </div>
+    </section>
+
+    <!-- ===== 7. Avatars ===== -->
+    <section class="mt-12">
+      <h2 class="text-[16px] font-semibold text-head mb-4 pb-2 border-b border-line">Avatars</h2>
+      <div class="bg-white border border-line rounded-card p-6 flex flex-wrap items-center gap-6">
+        <div class="flex items-center gap-2"><span class="h-6 w-6 rounded-full bg-emerald-500 grid place-items-center text-white text-[9px] font-bold">FH</span><span class="text-sub">User initials</span></div>
+        <div class="flex items-center gap-2"><span class="h-6 w-6 rounded-md bg-brand text-white grid place-items-center text-[10px] font-semibold">TO</span><span class="text-sub">Workspace</span></div>
+        <div class="flex items-center gap-2"><span class="h-4 w-4 rounded bg-emerald-500 grid place-items-center text-white text-[9px] font-bold">T</span><span class="text-sub">Team</span></div>
+        <div class="flex items-center gap-2"><span class="h-6 w-6 rounded-full bg-hover grid place-items-center"><span class="h-2 w-2 rounded-full bg-brand"></span></span><span class="text-sub">Unread dot</span></div>
+      </div>
+    </section>
+
+    <!-- ===== 8. Labels & status ===== -->
+    <section class="mt-12">
+      <h2 class="text-[16px] font-semibold text-head mb-4 pb-2 border-b border-line">Labels &amp; status</h2>
+      <div class="bg-white border border-line rounded-card p-6 flex flex-wrap items-center gap-6">
+        <span class="inline-flex items-center gap-1.5 border border-line rounded-full pl-2 pr-2.5 py-0.5 text-ink"><span class="h-2 w-2 rounded-full bg-danger"></span>Bug</span>
+        <span class="inline-flex items-center gap-1.5 border border-line rounded-full pl-2 pr-2.5 py-0.5 text-ink"><span class="h-2 w-2 rounded-full bg-brand"></span>Feature</span>
+        <span class="inline-flex items-center gap-2 text-ink"><span class="h-4 w-4 rounded-full bg-brand grid place-items-center"><svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5 9-11" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Done</span>
+        <span class="inline-flex items-center gap-2 text-ink"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" fill="#22c55e"/><path d="M8 12l2.5 2.5L16 9" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Completed</span>
+        <span class="inline-flex items-center gap-2 text-ink"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="4" fill="#f59e0b"/><path d="M12 7v6M12 16.5v.5" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>Attention</span>
+      </div>
+    </section>
+
+    <!-- ===== 9. Navigation ===== -->
+    <section class="mt-12">
+      <h2 class="text-[16px] font-semibold text-head mb-4 pb-2 border-b border-line">Navigation items</h2>
+      <div class="bg-white border border-line rounded-card p-6 max-w-[260px]">
+        <div class="text-[11px] font-semibold text-faint uppercase tracking-wide px-2 mb-1">Section header</div>
+        <a class="flex items-center gap-2 px-2 h-7 rounded-md bg-sel font-medium text-ink">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-sub"><path d="M4 4h16v12h-5l-3 3-3-3H4z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+          Active item<span class="ml-auto text-faint font-normal">7</span>
+        </a>
+        <a class="flex items-center gap-2 px-2 h-7 rounded-md text-sub hover:bg-hover">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M8 10h8M8 14h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          Default item
+        </a>
+      </div>
+    </section>
+
+    <!-- ===== 10. List row ===== -->
+    <section class="mt-12">
+      <h2 class="text-[16px] font-semibold text-head mb-4 pb-2 border-b border-line">Inbox list row</h2>
+      <div class="bg-white border border-line rounded-card overflow-hidden max-w-[360px] divide-y divide-line">
+        <div class="flex items-center gap-2.5 px-4 py-2 bg-sel">
+          <span class="h-6 w-6 rounded-full bg-emerald-500 grid place-items-center text-white text-[9px] font-bold shrink-0">FH</span>
+          <div class="min-w-0 flex-1"><div class="truncate font-medium text-ink">TOT-21 Hours</div><div class="truncate text-faint text-[12px]">Marked as completed by faizanhumayun486</div></div>
+          <div class="flex items-center gap-1.5 shrink-0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" fill="#22c55e"/><path d="M8 12l2.5 2.5L16 9" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="text-faint text-[12px]">3w</span></div>
+        </div>
+        <div class="flex items-center gap-2.5 px-4 py-2 hover:bg-hover">
+          <span class="h-6 w-6 rounded-full bg-hover grid place-items-center shrink-0"><span class="h-2 w-2 rounded-full bg-brand"></span></span>
+          <div class="min-w-0 flex-1"><div class="truncate text-ink">TOT-25 Dropdown type</div><div class="truncate text-faint text-[12px]">Marked as completed by faizanhumayun486</div></div>
+          <div class="flex items-center gap-1.5 shrink-0"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="4" fill="#f59e0b"/><path d="M12 7v6M12 16.5v.5" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg><span class="text-faint text-[12px]">3w</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 11. Properties fields ===== -->
+    <section class="mt-12">
+      <h2 class="text-[16px] font-semibold text-head mb-4 pb-2 border-b border-line">Properties fields</h2>
+      <div class="bg-white border border-line rounded-card p-4 max-w-[240px] space-y-3">
+        <button class="flex items-center gap-2 text-ink hover:bg-hover rounded px-1.5 py-1 w-full text-left"><span class="h-4 w-4 rounded-full bg-brand grid place-items-center"><svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5 9-11" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Done</button>
+        <button class="flex items-center gap-2 text-sub hover:bg-hover rounded px-1.5 py-1 w-full text-left"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 12h3M11 8h3M17 5h2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Set priority</button>
+        <button class="flex items-center gap-2 text-ink hover:bg-hover rounded px-1.5 py-1 w-full text-left"><span class="h-4 w-4 rounded-full bg-emerald-500 grid place-items-center text-white text-[8px] font-bold">FH</span>faizanhumayun486</button>
+      </div>
+    </section>
+
+    <!-- ===== 12. Brand ===== -->
+    <section class="mt-12 mb-4">
+      <h2 class="text-[16px] font-semibold text-head mb-4 pb-2 border-b border-line">Brand / logo</h2>
+      <div class="bg-white border border-line rounded-card p-6 flex items-center gap-3">
+        <svg width="28" height="28" viewBox="0 0 32 32" fill="#0f0f10"><path d="M5 21 L15 4 L20.5 4 L10.5 21 Z"/><path d="M13 28 L23 11 L28.5 11 L18.5 28 Z"/></svg>
+        <span class="text-[20px] font-bold tracking-tight text-head">Project Block</span>
+      </div>
+    </section>
+
+  </div>
+
+  <script>
+    // Auto-grow textareas (the "Expanding" format).
+    // In Vue this becomes a small directive / composable on <textarea>.
+    document.querySelectorAll('textarea[data-autogrow]').forEach(function (el) {
+      var grow = function () {
+        el.style.height = 'auto';
+        el.style.height = el.scrollHeight + 'px';
+      };
+      el.addEventListener('input', grow);
+      grow();
+    });
+
+    // Indeterminate checkbox demo (can only be set via JS, not markup).
+    var ind = document.getElementById('ds-indeterminate');
+    if (ind) ind.indeterminate = true;
+
+    // Selectable option cards (mirrors onboarding role & goals).
+    // Shared card class; only the selection affordance differs.
+    function optClass(sel) {
+      return 'w-full flex items-center gap-3 h-12 px-4 rounded-lg border text-left text-[14px] ' +
+        (sel ? 'border-brand ring-1 ring-brand text-brand font-medium' : 'border-stroke text-ink hover:bg-hover');
+    }
+    var CHECK = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5 9-11" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+    (function () {
+      // Multi-select (goals)
+      var MULTI = ['Plan and track product roadmaps', 'Manage engineering sprints', 'Coordinate cross-functional projects'];
+      var chosen = [1];
+      var m = document.getElementById('ds-multi');
+      function box(on) {
+        return on
+          ? '<span class="h-5 w-5 rounded bg-brand grid place-items-center shrink-0">' + CHECK + '</span>'
+          : '<span class="h-5 w-5 rounded border border-stroke shrink-0"></span>';
+      }
+      function renderMulti() {
+        m.innerHTML = MULTI.map(function (g, i) {
+          var s = chosen.indexOf(i) > -1;
+          return '<button type="button" class="' + optClass(s) + '" data-i="' + i + '">' + box(s) + '<span>' + g + '</span></button>';
+        }).join('');
+        m.querySelectorAll('[data-i]').forEach(function (el) {
+          el.onclick = function () {
+            var i = +el.getAttribute('data-i'), at = chosen.indexOf(i);
+            if (at > -1) chosen.splice(at, 1); else chosen.push(i);
+            renderMulti();
+          };
+        });
+      }
+      renderMulti();
+
+      // Single-select (role)
+      var ROLES = [
+        { l: 'Product Manager',     d: 'M12 3l8 4-8 4-8-4 8-4z' },
+        { l: 'Engineering Manager', d: 'M12 3l8 4-8 4-8-4 8-4zM4 12l8 4 8-4' },
+        { l: 'Designer',            d: 'M4 7l5-3 6 3 5-2v13l-5 2-6-3-5 3V7z' }
+      ];
+      var sel = 1;
+      var s = document.getElementById('ds-single');
+      function renderSingle() {
+        s.innerHTML = ROLES.map(function (r, i) {
+          var on = sel === i;
+          return '<button type="button" class="' + optClass(on) + '" data-i="' + i + '">' +
+            '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" class="shrink-0"><path d="' + r.d + '" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+            '<span>' + r.l + '</span>' +
+            (on ? '<span class="ml-auto h-5 w-5 rounded bg-brand grid place-items-center">' + CHECK + '</span>' : '') +
+            '</button>';
+        }).join('');
+        s.querySelectorAll('[data-i]').forEach(function (el) {
+          el.onclick = function () { sel = +el.getAttribute('data-i'); renderSingle(); };
+        });
+      }
+      renderSingle();
+    })();
+
+    // Comboboxes (Tailwind Plus style) — Read only / Error / With image /
+    // With secondary text / With status indicator.
+    (function () {
+      function check() {
+        return '<span class="pb-combo-check hidden absolute inset-y-0 right-0 flex items-center pr-3 text-brand group-hover:text-white"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5 9-11" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>';
+      }
+      function li(inner) {
+        return '<li role="option" class="group relative flex items-center cursor-pointer select-none py-2 pl-3 pr-9 text-[14px] text-ink hover:bg-brand hover:text-white"><span class="pb-opt-content flex items-center gap-2.5 min-w-0">' + inner + '</span>' + check() + '</li>';
+      }
+      function rowInner(cfg, o) {
+        if (cfg.type === 'image') return '<span class="h-6 w-6 rounded-full grid place-items-center text-white text-[10px] font-semibold shrink-0" style="background:' + o.c + '">' + o.a + '</span><span class="truncate">' + o.l + '</span>';
+        if (cfg.type === 'secondary') return '<span class="truncate">' + o.l + '</span><span class="truncate text-sub group-hover:text-white/70">' + o.s + '</span>';
+        if (cfg.type === 'status') return '<span class="h-2 w-2 rounded-full shrink-0" style="background:' + (o.on ? '#22c55e' : '#9ca3af') + '"></span><span class="truncate">' + o.l + '</span>';
+        return '<span class="truncate">' + o + '</span>';
+      }
+      function initCombo(cfg) {
+        var el = document.getElementById('combo-' + cfg.id);
+        if (!el) return;
+        var btnCls = 'pb-combo-btn pb-input text-left cursor-pointer' + (cfg.readonly ? ' is-readonly' : '') + (cfg.error ? ' is-error' : '');
+        var valCls = 'pb-combo-value truncate flex items-center gap-2.5 min-w-0' + (cfg.value ? ' text-ink' : ' text-faint');
+        var placeholder = cfg.value || cfg.placeholder || 'Select…';
+        el.className = 'relative pb-combo';
+        el.innerHTML =
+          '<button type="button" class="' + btnCls + '" aria-haspopup="listbox" aria-expanded="false">' +
+            '<span class="flex items-center justify-between h-full">' +
+              '<span class="' + valCls + '">' + placeholder + '</span>' +
+              '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0 ml-2"><path d="M8 9l4-4 4 4M8 15l4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+            '</span>' +
+          '</button>' +
+          '<ul role="listbox" class="pb-combo-list hidden absolute z-40 mt-1 w-full max-h-60 overflow-auto rounded-md bg-white py-1 shadow-lg outline outline-1 outline-black/5">' +
+            cfg.opts.map(function (o) { return li(rowInner(cfg, o)); }).join('') +
+          '</ul>';
+      }
+      [
+        { id: 'ro', type: 'plain', readonly: true, value: 'Member', opts: ['Admin', 'Member', 'Viewer', 'Guest'] },
+        { id: 'err', type: 'plain', error: true, placeholder: 'Select a person', opts: ['Wade Cooper', 'Arlene Mccoy', 'Devon Webb', 'Tom Cook'] },
+        { id: 'img', type: 'image', placeholder: 'Assign a person', opts: [{ l: 'Wade Cooper', a: 'W', c: '#ef4444' }, { l: 'Arlene Mccoy', a: 'A', c: '#3b82f6' }, { l: 'Tom Cook', a: 'T', c: '#22c55e' }] },
+        { id: 'sec', type: 'secondary', placeholder: 'Select a user', opts: [{ l: 'Leslie Alexander', s: '@lesliealexander' }, { l: 'Michael Foster', s: '@michaelfoster' }, { l: 'Dries Vincent', s: '@driesvincent' }] },
+        { id: 'stat', type: 'status', placeholder: 'Select a person', opts: [{ l: 'Wade Cooper', on: true }, { l: 'Arlene Mccoy', on: false }, { l: 'Tom Cook', on: true }] }
+      ].forEach(initCombo);
+
+      var demos = document.getElementById('combobox-demos');
+      function closeAll() { demos.querySelectorAll('.pb-combo-list').forEach(function (u) { u.classList.add('hidden'); }); }
+      demos.addEventListener('click', function (e) {
+        var btn = e.target.closest('.pb-combo-btn');
+        if (btn) {
+          if (btn.classList.contains('is-readonly')) return;
+          e.stopPropagation();
+          var ul = btn.parentElement.querySelector('.pb-combo-list');
+          var open = ul.classList.contains('hidden');
+          closeAll();
+          if (open) ul.classList.remove('hidden');
+          return;
+        }
+        var opt = e.target.closest('.pb-combo-list li');
+        if (opt) {
+          var combo = opt.closest('.pb-combo');
+          var val = combo.querySelector('.pb-combo-value');
+          val.innerHTML = opt.querySelector('.pb-opt-content').innerHTML;
+          val.classList.remove('text-faint');
+          combo.querySelectorAll('.pb-combo-check').forEach(function (c) { c.classList.add('hidden'); });
+          opt.querySelector('.pb-combo-check').classList.remove('hidden');
+          combo.querySelector('.pb-combo-list').classList.add('hidden');
+        }
+      });
+      document.addEventListener('click', function (e) { if (!e.target.closest('.pb-combo')) closeAll(); });
+    })();
+
+    // Single date picker — calendar popover with combobox month/year dropdowns.
+    (function () {
+      var input = document.getElementById('dp-input');
+      var cal = document.getElementById('dp-cal');
+      var wrap = document.getElementById('dp-single');
+      if (!input) return;
+
+      var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+      var DOW = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+      var Y0 = 2015, Y1 = 2035;
+      var view = new Date(); view.setDate(1);
+      var selected = null;
+
+      function pad(n) { return (n < 10 ? '0' : '') + n; }
+      function fmt(d) { return pad(d.getMonth() + 1) + '/' + pad(d.getDate()) + '/' + d.getFullYear(); }
+      function same(a, b) { return a && b && a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate(); }
+      function tick(sel) { return sel ? '<span class="absolute right-2 text-brand group-hover:text-white"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5 9-11" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>' : ''; }
+      function optRow(attr, val, label, sel) {
+        return '<li ' + attr + '="' + val + '" class="group relative flex items-center cursor-pointer select-none py-1.5 pl-3 pr-8 text-[13px] ' + (sel ? 'text-brand font-medium' : 'text-ink') + ' hover:bg-brand hover:text-white"><span class="truncate">' + label + '</span>' + tick(sel) + '</li>';
+      }
+
+      function render() {
+        var y = view.getFullYear(), m = view.getMonth();
+        var mOpts = MONTHS.map(function (name, i) { return optRow('data-month', i, name, i === m); }).join('');
+        var yOpts = ''; for (var yr = Y0; yr <= Y1; yr++) yOpts += optRow('data-year', yr, yr, yr === y);
+
+        var start = new Date(y, m, 1); start.setDate(1 - start.getDay());
+        var today = new Date(), cells = '';
+        for (var i = 0; i < 42; i++) {
+          var d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
+          var inM = d.getMonth() === m, isSel = same(d, selected), isT = same(d, today);
+          var cls = 'h-8 w-8 grid place-items-center rounded-md text-[13px] cursor-pointer ';
+          if (isSel) cls += 'bg-brand text-white font-medium';
+          else if (!inM) cls += 'text-faint hover:bg-hover';
+          else cls += 'text-ink hover:bg-hover' + (isT ? ' ring-1 ring-brand' : '');
+          cells += '<button type="button" data-d="' + d.getFullYear() + '-' + d.getMonth() + '-' + d.getDate() + '" class="' + cls + '">' + d.getDate() + '</button>';
+        }
+
+        var mini = 'w-full flex items-center justify-between h-8 px-2.5 rounded-md text-[13px] text-ink outline outline-1 -outline-offset-1 outline-stroke hover:bg-hover cursor-pointer';
+        var chev = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0 ml-1"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        var listCls = 'hidden absolute z-50 mt-1 w-full max-h-52 overflow-auto rounded-md bg-white border border-line shadow-lg py-1';
+
+        cal.innerHTML =
+          '<div class="flex items-center gap-1.5 mb-3">' +
+            '<button type="button" data-nav="-1" class="h-8 w-8 grid place-items-center rounded-md hover:bg-hover text-sub shrink-0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
+            '<div class="relative flex-1 min-w-0"><button type="button" data-mopen class="' + mini + '"><span class="truncate">' + MONTHS[m] + '</span>' + chev + '</button><ul data-mlist class="' + listCls + '">' + mOpts + '</ul></div>' +
+            '<div class="relative w-[92px] shrink-0"><button type="button" data-yopen class="' + mini + '"><span class="shrink-0 whitespace-nowrap">' + y + '</span>' + chev + '</button><ul data-ylist class="' + listCls + '">' + yOpts + '</ul></div>' +
+            '<button type="button" data-nav="1" class="h-8 w-8 grid place-items-center rounded-md hover:bg-hover text-sub shrink-0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
+          '</div>' +
+          '<div class="grid grid-cols-7 gap-0.5 mb-1">' + DOW.map(function (x) { return '<div class="h-7 grid place-items-center text-[11px] font-medium text-faint">' + x + '</div>'; }).join('') + '</div>' +
+          '<div class="grid grid-cols-7 gap-0.5">' + cells + '</div>';
+      }
+
+      function toggleList(which) {
+        var ul = cal.querySelector('[' + which + ']');
+        var other = cal.querySelector(which === 'data-mlist' ? '[data-ylist]' : '[data-mlist]');
+        if (other) other.classList.add('hidden');
+        ul.classList.toggle('hidden');
+      }
+      function open() { if (selected) view = new Date(selected.getFullYear(), selected.getMonth(), 1); render(); cal.classList.remove('hidden'); }
+      function close() { cal.classList.add('hidden'); }
+
+      input.addEventListener('click', function (e) { e.stopPropagation(); if (cal.classList.contains('hidden')) open(); else close(); });
+      cal.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var nav = e.target.closest('[data-nav]');
+        if (nav) { view.setMonth(view.getMonth() + (nav.getAttribute('data-nav') === '1' ? 1 : -1)); render(); return; }
+        if (e.target.closest('[data-mopen]')) { toggleList('data-mlist'); return; }
+        if (e.target.closest('[data-yopen]')) { toggleList('data-ylist'); return; }
+        var mo = e.target.closest('[data-month]'); if (mo) { view.setMonth(+mo.getAttribute('data-month')); render(); return; }
+        var yr = e.target.closest('[data-year]'); if (yr) { view.setFullYear(+yr.getAttribute('data-year')); render(); return; }
+        var day = e.target.closest('[data-d]');
+        if (day) { var p = day.getAttribute('data-d').split('-'); selected = new Date(+p[0], +p[1], +p[2]); input.value = fmt(selected); close(); }
+      });
+      document.addEventListener('click', function (e) { if (!wrap.contains(e.target)) close(); });
+    })();
+
+    // Data table (Tabulator, skinned)
+    (function () {
+      if (!window.Tabulator || !document.getElementById('ds-table')) return;
+      function statusFmt(cell) {
+        var v = cell.getValue();
+        return '<span class="inline-flex items-center gap-1.5 text-ink"><span class="h-1.5 w-1.5 rounded-full ' + (v === 'Active' ? 'bg-success' : 'bg-faint') + '"></span>' + v + '</span>';
+      }
+      new Tabulator('#ds-table', {
+        layout: 'fitColumns',
+        columnDefaults: { vertAlign: 'middle' },
+        data: [
+          { name: 'Rohit Philip', email: 'zorainteractive@gmail.com', role: 'Owner', status: 'Active' },
+          { name: 'Leslie Alexander', email: 'lesliealexander@company.com', role: 'Admin', status: 'Active' },
+          { name: 'Michael Foster', email: 'michaelfoster@company.com', role: 'Member', status: 'Inactive' },
+          { name: 'Dries Vincent', email: 'driesvincent@company.com', role: 'Viewer', status: 'Active' },
+          { name: 'Courtney Henry', email: 'courtneyhenry@company.com', role: 'Guest', status: 'Active' },
+          { name: 'Tom Cook', email: 'tomcook@company.com', role: 'Member', status: 'Inactive' }
+        ],
+        columns: [
+          { title: 'Name', field: 'name', minWidth: 160, widthGrow: 2 },
+          { title: 'Email', field: 'email', minWidth: 200, widthGrow: 2 },
+          { title: 'Role', field: 'role', minWidth: 100 },
+          { title: 'Status', field: 'status', minWidth: 110, formatter: statusFmt }
+        ]
+      });
+    })();
+
+    // Date range picker demo — compact daterangepicker (interactive).
+    (function () {
+      var host = document.getElementById('ds-range'); if (!host) return;
+      var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+      var DOW = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'], MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      var TODAY = new Date(2026, 7, 9);
+      var view = new Date(2026, 7, 1);
+      var start = new Date(2026, 7, 8), end = new Date(2026, 7, 22), hover = null;
+      function addDays(d, n) { return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n); }
+      function ymd(d) { return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate(); }
+      function sameD(a, b) { return a && b && ymd(a) === ymd(b); }
+      function labelD(d) { return MON[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear(); }
+      var PRESETS = [
+        { k: 'today', label: 'Today', r: function () { return [TODAY, TODAY]; } },
+        { k: 'yesterday', label: 'Yesterday', r: function () { return [addDays(TODAY, -1), addDays(TODAY, -1)]; } },
+        { k: 'l7', label: 'Last 7 Days', r: function () { return [addDays(TODAY, -6), TODAY]; } },
+        { k: 'l30', label: 'Last 30 Days', r: function () { return [addDays(TODAY, -29), TODAY]; } },
+        { k: 'tm', label: 'This Month', r: function () { return [new Date(TODAY.getFullYear(), TODAY.getMonth(), 1), new Date(TODAY.getFullYear(), TODAY.getMonth() + 1, 0)]; } },
+        { k: 'lm', label: 'Last Month', r: function () { return [new Date(TODAY.getFullYear(), TODAY.getMonth() - 1, 1), new Date(TODAY.getFullYear(), TODAY.getMonth(), 0)]; } }
+      ];
+      function activePreset() { if (!start || !end) return null; for (var i = 0; i < PRESETS.length; i++) { var rr = PRESETS[i].r(); if (sameD(rr[0], start) && sameD(rr[1], end)) return PRESETS[i].k; } return 'custom'; }
+      function inRange(d) { if (!start) return false; var e = end || hover; if (!e) return false; var lo = Math.min(ymd(start), ymd(e)), hi = Math.max(ymd(start), ymd(e)); return ymd(d) > lo && ymd(d) < hi; }
+      function grid(base) {
+        var y = base.getFullYear(), m = base.getMonth(), first = new Date(y, m, 1).getDay(), days = new Date(y, m + 1, 0).getDate(), cells = '';
+        for (var i = 0; i < first; i++) cells += '<div class="h-7"></div>';
+        for (var d = 1; d <= days; d++) {
+          var dt = new Date(y, m, d), isS = sameD(dt, start), isE = sameD(dt, (end || hover)), isI = inRange(dt);
+          var cls = 'h-7 grid place-items-center text-[11px] cursor-pointer ';
+          if (isS || isE) cls += 'bg-brand text-white font-semibold ' + (isS && isE ? 'rounded-md' : isS ? 'rounded-l-md' : 'rounded-r-md');
+          else if (isI) cls += 'bg-sel text-brand'; else cls += 'text-ink rounded-md hover:bg-hover';
+          cells += '<div data-day="' + ymd(dt) + '" class="' + cls + '">' + d + '</div>';
+        }
+        return '<div class="w-[168px]"><div class="text-center text-[12px] font-semibold text-head mb-1.5">' + MONTHS[m] + ' ' + y + '</div><div class="grid grid-cols-7 mb-0.5">' + DOW.map(function (w) { return '<div class="h-5 grid place-items-center text-[10px] font-semibold text-faint">' + w + '</div>'; }).join('') + '</div><div class="grid grid-cols-7 gap-y-0.5">' + cells + '</div></div>';
+      }
+      function render() {
+        var next = new Date(view.getFullYear(), view.getMonth() + 1, 1), nb = 'h-6 w-6 grid place-items-center rounded-md text-sub hover:bg-hover', act = activePreset();
+        var side = PRESETS.map(function (p) { var on = act === p.k; return '<button type="button" data-preset="' + p.k + '" class="text-left h-7 px-2.5 rounded-md text-[12px] whitespace-nowrap ' + (on ? 'bg-brand text-white font-medium' : 'text-ink hover:bg-hover') + '">' + p.label + '</button>'; }).join('');
+        side += '<button type="button" data-preset="custom" class="text-left h-7 px-2.5 rounded-md text-[12px] whitespace-nowrap ' + (act === 'custom' ? 'bg-brand text-white font-medium' : 'text-ink hover:bg-hover') + '">Custom Range</button>';
+        host.innerHTML = '<div class="flex"><div class="w-[116px] shrink-0 border-r border-line pr-2 mr-3 flex flex-col gap-0.5">' + side + '</div><div class="min-w-0"><div class="flex items-center mb-1.5"><button type="button" data-nav="-1" class="' + nb + '"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button><div class="flex-1"></div><button type="button" data-nav="1" class="' + nb + '"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div><div class="flex gap-4">' + grid(view) + grid(next) + '</div></div></div>' +
+          '<div class="flex items-center justify-between mt-2.5 pt-2.5 border-t border-line"><div class="text-[11px] text-sub"><span class="text-ink font-medium">' + (start ? labelD(start) : 'Start') + '</span><span class="mx-1.5">→</span><span class="text-ink font-medium">' + (end ? labelD(end) : 'End') + '</span></div><div class="flex items-center gap-1.5"><button type="button" data-clear class="h-7 px-2.5 rounded-md text-[12px] text-sub hover:bg-hover">Clear</button><button type="button" class="h-7 px-3 rounded-md bg-brand hover:bg-brand-dark text-white text-[12px] font-semibold disabled:opacity-50"' + (start && end ? '' : ' disabled') + '>Apply</button></div></div>';
+      }
+      host.addEventListener('click', function (e) {
+        var pr = e.target.closest('[data-preset]');
+        if (pr) { var k = pr.getAttribute('data-preset'); if (k === 'custom') { start = end = hover = null; render(); return; } for (var i = 0; i < PRESETS.length; i++) { if (PRESETS[i].k === k) { var rr = PRESETS[i].r(); start = rr[0]; end = rr[1]; view = new Date(start.getFullYear(), start.getMonth(), 1); render(); return; } } return; }
+        var nav = e.target.closest('[data-nav]'); if (nav) { view.setMonth(view.getMonth() + (nav.getAttribute('data-nav') === '1' ? 1 : -1)); render(); return; }
+        var day = e.target.closest('[data-day]'); if (day) { var v = +day.getAttribute('data-day'), dt = new Date(Math.floor(v / 10000), Math.floor(v / 100) % 100 - 1, v % 100); if (!start || (start && end)) { start = dt; end = null; hover = null; } else { if (ymd(dt) < ymd(start)) { end = start; start = dt; } else { end = dt; } } render(); return; }
+        if (e.target.closest('[data-clear]')) { start = end = hover = null; render(); return; }
+      });
+      host.addEventListener('mouseover', function (e) { var day = e.target.closest('[data-day]'); if (day && start && !end) { var v = +day.getAttribute('data-day'); if (hover && ymd(hover) === v) return; hover = new Date(Math.floor(v / 10000), Math.floor(v / 100) % 100 - 1, v % 100); render(); } });
+      render();
+    })();
+  </script>
+</body>
+</html>

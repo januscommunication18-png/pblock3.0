@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Workspace settings · Initiatives — Project Block</title>
+
+  <!--
+    Project Block — Workspace settings · Initiatives (setting-initiatives.html)
+    Enable toggle gates the Labels section (locked when off, active when on).
+  -->
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="assets/js/tailwind.config.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/css/styles.css" />
+</head>
+<body class="bg-white text-ink text-[13px] h-screen flex flex-col overflow-hidden">
+
+  <header class="relative h-14 shrink-0 border-b border-line flex items-center px-4">
+    <a href="welcome.html" title="Back" class="h-9 w-9 grid place-items-center rounded-md text-sub hover:bg-hover">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </a>
+    <span class="absolute left-1/2 -translate-x-1/2 font-semibold text-[15px] text-head">Workspace settings</span>
+    <div class="ml-auto flex items-center gap-2">
+      <span class="h-6 w-px bg-line"></span>
+      <a href="welcome.html" title="Close" class="h-9 w-9 grid place-items-center rounded-md text-sub hover:bg-hover">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </a>
+    </div>
+  </header>
+
+  <div class="flex-1 flex min-h-0 relative">
+    <div id="settings-backdrop" class="hidden md:hidden fixed inset-0 bg-black/30 z-30"></div>
+
+    <aside id="settings-nav" class="w-64 shrink-0 border-r border-line bg-white flex flex-col
+           fixed md:relative inset-y-0 left-0 z-40 -translate-x-full md:translate-x-0 transition-transform duration-200">
+      <div class="md:hidden flex justify-end px-2 h-12 items-center shrink-0">
+        <button id="close-nav" class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+      <nav id="settings-list" class="flex-1 overflow-y-auto pt-2 pb-4"></nav>
+    </aside>
+
+    <main class="flex-1 min-w-0 flex flex-col">
+      <div class="h-12 shrink-0 border-b border-line flex items-center gap-2 px-4 sm:px-6">
+        <button id="open-nav" class="md:hidden h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover -ml-1">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+        <span class="flex items-center gap-1.5 text-[13px] text-sub">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.7"/></svg>
+          Initiatives
+        </span>
+      </div>
+
+      <div class="flex-1 overflow-auto">
+        <div class="max-w-[820px] mx-auto px-5 sm:px-8 py-8">
+          <h1 class="text-[24px] font-bold text-head">Initiatives</h1>
+          <p class="text-[14px] text-sub mt-1 mb-6">Group multiple projects and work items under one goal and track their combined progress. <a href="#" class="text-link hover:underline inline-flex items-center gap-1">Docs <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M14 4h6v6M20 4l-8 8M10 6H5a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1v-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></a></p>
+
+          <!-- Enable card -->
+          <div class="border border-line rounded-xl p-5 flex items-center gap-4">
+            <div class="min-w-0">
+              <div class="text-[14px] font-semibold text-head">Enable Initiatives</div>
+              <p class="text-[13px] text-sub mt-1">Group projects under shared goals and track their combined progress.</p>
+            </div>
+            <button id="init-toggle" role="switch" aria-checked="false" class="ml-auto shrink-0 relative inline-flex h-5 w-9 items-center rounded-full px-0.5 transition-colors bg-line">
+              <span id="init-knob" class="h-4 w-4 rounded-full bg-white shadow transition-transform translate-x-0"></span>
+            </button>
+          </div>
+
+          <!-- Labels -->
+          <div class="flex items-center gap-3 mt-8">
+            <h2 class="text-[18px] font-bold text-head">Labels</h2>
+            <button id="add-label-top" class="ml-auto h-9 px-3 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold opacity-50 cursor-not-allowed" disabled>Add label</button>
+          </div>
+          <p class="text-[14px] text-sub mt-1 mb-4">Labels help you group and filter initiatives.</p>
+
+          <!-- Add label form -->
+          <div id="label-form" class="hidden flex items-center gap-3 mb-4">
+            <button id="label-color" type="button" data-coloropener class="h-6 w-6 rounded-full border border-line shrink-0" style="background:#7DD3FC"></button>
+            <input id="label-name" type="text" placeholder="Label title" class="pb-input flex-1" />
+            <button id="label-cancel" type="button" class="h-9 px-4 rounded-md border border-stroke text-[13px] font-semibold text-ink hover:bg-hover shrink-0">Cancel</button>
+            <button id="label-add" type="button" class="h-9 px-4 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold shrink-0">Add</button>
+          </div>
+
+          <!-- Labels list -->
+          <div id="labels-list" class="hidden flex flex-wrap gap-2 border border-line rounded-xl p-4"></div>
+
+          <!-- Locked state (Initiatives OFF) -->
+          <div id="labels-locked" class="border border-line rounded-xl bg-[#f7f8f9] py-14 px-6 grid place-items-center text-center">
+            <svg width="56" height="56" viewBox="0 0 48 48" fill="none" class="text-faint mb-3"><rect x="15" y="11" width="18" height="24" rx="2" transform="rotate(-9 24 23)" stroke="currentColor" stroke-width="1.5"/><rect x="16" y="12" width="18" height="24" rx="2" fill="#f7f8f9" stroke="currentColor" stroke-width="1.5"/><path d="M25 20a2 2 0 11-2 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            <div class="text-[15px] font-semibold text-head">Enable initiatives to manage labels</div>
+            <p class="text-[13px] text-sub mt-1">Turn on initiatives to organize and track your initiative labels.</p>
+          </div>
+
+          <!-- Active empty state (Initiatives ON, no labels) -->
+          <div id="labels-empty" class="hidden border border-line rounded-xl py-14 px-6 grid place-items-center text-center">
+            <svg width="56" height="56" viewBox="0 0 48 48" fill="none" class="text-faint mb-3"><rect x="15" y="11" width="18" height="24" rx="2" transform="rotate(-9 24 23)" stroke="currentColor" stroke-width="1.5"/><rect x="16" y="12" width="18" height="24" rx="2" fill="#fff" stroke="currentColor" stroke-width="1.5"/><path d="M25 20a2 2 0 11-2 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            <div class="text-[15px] font-semibold text-head">No initiative labels yet</div>
+            <p class="text-[13px] text-sub mt-1 mb-4">Create your first label to get started</p>
+            <button id="add-label-empty" class="h-9 px-4 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold">Add label</button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Shared floating color picker -->
+  <div id="color-pop" class="hidden fixed z-50 w-[212px] bg-white border border-line rounded-lg shadow-lg p-2.5">
+    <div id="pop-swatches" class="grid grid-cols-6 gap-2"></div>
+    <input id="pop-hex" type="text" class="mt-2.5 w-full h-8 rounded-md px-2.5 text-[13px] text-ink outline outline-1 -outline-offset-1 outline-stroke focus:outline-2 focus:-outline-offset-2 focus:outline-brand" />
+  </div>
+
+  <script>
+    var NAV = [
+      { h: 'Administration', items: ['General', 'Members', 'Billing and plans', 'Imports', 'Exports'] },
+      { h: 'Products', items: ['Wiki', 'Project Block AI'] },
+      { h: 'Features', items: ['Projects', 'Teamspaces', 'Initiatives', 'Customers', 'Templates', 'Integrations', 'Connections', 'Releases'] },
+      { h: 'Developers', items: ['Webhooks', 'Access Tokens'] }
+    ];
+    var ACTIVE = 'Initiatives';
+    var LINKS = { 'General': 'setting-general.html', 'Members': 'setting-member.html', 'Wiki': 'setting-wiki.html', 'Projects': 'setting-projects.html', 'Teamspaces': 'setting-teamspaces.html', 'Initiatives': 'setting-initiatives.html', 'Customers': 'setting-customers.html', 'Releases': 'setting-releases.html' };
+    var SOON = ['Templates', 'Integrations'];
+    var ICONS = {
+      'General': '<path d="M6 4v6M6 14v6M12 4v1M12 9v11M18 4v9M18 17v3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="6" cy="12" r="2" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="7" r="2" stroke="currentColor" stroke-width="1.7"/><circle cx="18" cy="15" r="2" stroke="currentColor" stroke-width="1.7"/>',
+      'Members': '<circle cx="9" cy="8" r="3" stroke="currentColor" stroke-width="1.7"/><path d="M3 19a6 6 0 0112 0M16 6a3 3 0 010 6M21 19a6 6 0 00-3-5.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
+      'Billing and plans': '<rect x="3" y="6" width="18" height="12" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M3 10h18" stroke="currentColor" stroke-width="1.7"/>',
+      'Imports': '<path d="M12 3v10M8 9l4 4 4-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 17v2a1 1 0 001 1h14a1 1 0 001-1v-2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
+      'Exports': '<path d="M12 13V3M8 7l4-4 4 4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 17v2a1 1 0 001 1h14a1 1 0 001-1v-2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
+      'Wiki': '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>',
+      'Project Block AI': '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>',
+      'Projects': '<path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>',
+      'Teamspaces': '<circle cx="7" cy="8" r="2.4" stroke="currentColor" stroke-width="1.7"/><circle cx="17" cy="8" r="2.4" stroke="currentColor" stroke-width="1.7"/><path d="M2.5 18a4.5 4.5 0 019 0M12.5 18a4.5 4.5 0 019 0" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
+      'Initiatives': '<circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.7"/>',
+      'Customers': '<path d="M4 21V5a1 1 0 011-1h8a1 1 0 011 1v16" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M14 21V10h4a1 1 0 011 1v10" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M7 8h3M7 12h3M7 16h3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
+      'Templates': '<rect x="4" y="5" width="16" height="14" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M4 9h16M9 9v10" stroke="currentColor" stroke-width="1.7"/>',
+      'Integrations': '<rect x="4" y="4" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/><rect x="13" y="4" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/><rect x="4" y="13" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/><rect x="13" y="13" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/>',
+      'Connections': '<path d="M9 15l6-6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M10.5 6.5l1-1a3.5 3.5 0 015 5l-1 1M13.5 17.5l-1 1a3.5 3.5 0 01-5-5l1-1" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>',
+      'Releases': '<path d="M4 4h9l7 7-9 9-7-7V4z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="8.5" cy="8.5" r="1.3" fill="currentColor"/>',
+      'Webhooks': '<path d="M13 3L5 13h6l-1 8 8-11h-6l1-7z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>',
+      'Access Tokens': '<circle cx="8" cy="14" r="3.5" stroke="currentColor" stroke-width="1.7"/><path d="M10.5 11.5L20 2M17 5l2 2M14 8l2 2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>'
+    };
+    function navIcon(label) {
+      return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" class="shrink-0 text-head">' + (ICONS[label] || '<rect x="4" y="4" width="16" height="16" rx="3" stroke="currentColor" stroke-width="1.7"/>') + '</svg>';
+    }
+    document.getElementById('settings-list').innerHTML = NAV.map(function (sec) {
+      return '<div class="px-2 mt-4">' +
+        '<div class="px-2 h-6 flex items-center text-[11px] font-semibold text-faint uppercase tracking-wide">' + sec.h + '</div>' +
+        sec.items.map(function (it) {
+          var a = it === ACTIVE;
+          if (SOON.indexOf(it) > -1) {
+            return '<span class="flex items-center gap-2.5 px-2 h-8 rounded-md text-[13px] text-faint cursor-not-allowed select-none">' + navIcon(it).replace('text-head', 'text-faint') + '<span>' + it + '</span><span class="ml-auto text-[10px] font-medium text-sub bg-hover rounded px-1.5 py-0.5">Soon</span></span>';
+          }
+          return '<a href="' + (LINKS[it] || '#') + '" class="flex items-center gap-2.5 px-2 h-8 rounded-md text-[13px] cursor-pointer ' + (a ? 'bg-sel text-ink font-medium' : 'text-ink hover:bg-hover') + '">' + navIcon(it) + it + '</a>';
+        }).join('') +
+        '</div>';
+    }).join('');
+
+    // ---- Shared color picker ----
+    var PRESETS = ['#F97316', '#F59E0B', '#4ADE80', '#22C55E', '#7DD3FC', '#2563EB', '#9CA3AF', '#DC2626', '#F78DA7', '#7C3AED'];
+    var pop = document.getElementById('color-pop'), popHex = document.getElementById('pop-hex'), popCb = null;
+    document.getElementById('pop-swatches').innerHTML =
+      PRESETS.map(function (c) { return '<button type="button" data-color="' + c + '" class="h-7 w-7 rounded" style="background:' + c + '"></button>'; }).join('') +
+      '<button type="button" id="pop-hash" class="h-7 w-7 rounded grid place-items-center text-sub border border-line">#</button>';
+    function openColorPop(anchor, current, cb) {
+      popCb = cb; popHex.value = (current || '#000000').replace('#', '').toUpperCase();
+      pop.classList.remove('hidden');
+      var w = pop.offsetWidth || 212, r = anchor.getBoundingClientRect();
+      pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + 'px';
+      pop.style.top = (r.bottom + 6) + 'px';
+    }
+    function closeColorPop() { pop.classList.add('hidden'); popCb = null; }
+    document.getElementById('pop-swatches').addEventListener('click', function (e) {
+      var sw = e.target.closest('[data-color]');
+      if (sw) { var c = sw.getAttribute('data-color'); popHex.value = c.replace('#', '').toUpperCase(); if (popCb) popCb(c); closeColorPop(); return; }
+      if (e.target.closest('#pop-hash')) popHex.focus();
+    });
+    popHex.addEventListener('input', function () { var v = popHex.value.replace(/[^0-9a-fA-F]/g, '').slice(0, 6); if (v.length === 6 && popCb) popCb('#' + v); });
+    document.addEventListener('click', function (e) { if (!pop.contains(e.target) && !e.target.closest('[data-coloropener]')) closeColorPop(); });
+
+    // ---- Enable toggle gates the Labels section ----
+    (function () {
+      var t = document.getElementById('init-toggle'), knob = document.getElementById('init-knob'), enabled = false;
+      var addTop = document.getElementById('add-label-top');
+      var locked = document.getElementById('labels-locked');
+      var emptyEl = document.getElementById('labels-empty');
+      var listEl = document.getElementById('labels-list');
+      var form = document.getElementById('label-form');
+      var nameEl = document.getElementById('label-name');
+      var dot = document.getElementById('label-color');
+      var labels = [], curColor = '#7DD3FC';
+
+      function renderLabels() {
+        if (labels.length) {
+          emptyEl.classList.add('hidden'); listEl.classList.remove('hidden');
+          listEl.innerHTML = labels.map(function (l) { return '<span class="inline-flex items-center gap-1.5 border border-line rounded-full pl-2 pr-2.5 py-1 text-[13px] text-ink"><span class="h-2.5 w-2.5 rounded-full shrink-0" style="background:' + l.color + '"></span>' + l.name + '</span>'; }).join('');
+        } else { emptyEl.classList.remove('hidden'); listEl.classList.add('hidden'); }
+      }
+      function setEnabled(on) {
+        enabled = on;
+        t.setAttribute('aria-checked', on ? 'true' : 'false');
+        t.classList.toggle('bg-brand', on); t.classList.toggle('bg-line', !on);
+        knob.classList.toggle('translate-x-4', on); knob.classList.toggle('translate-x-0', !on);
+        addTop.disabled = !on;
+        addTop.classList.toggle('opacity-50', !on); addTop.classList.toggle('cursor-not-allowed', !on);
+        locked.classList.toggle('hidden', on);
+        if (on) { renderLabels(); } else { emptyEl.classList.add('hidden'); listEl.classList.add('hidden'); form.classList.add('hidden'); }
+      }
+      t.addEventListener('click', function () { setEnabled(!enabled); });
+
+      function openForm() { if (!enabled) return; nameEl.value = ''; curColor = '#7DD3FC'; dot.style.background = curColor; form.classList.remove('hidden'); emptyEl.classList.add('hidden'); nameEl.focus(); }
+      function closeForm() { form.classList.add('hidden'); renderLabels(); }
+      addTop.addEventListener('click', openForm);
+      document.getElementById('add-label-empty').addEventListener('click', openForm);
+      document.getElementById('label-cancel').addEventListener('click', closeForm);
+      dot.addEventListener('click', function () { openColorPop(dot, curColor, function (c) { curColor = c; dot.style.background = c; }); });
+      document.getElementById('label-add').addEventListener('click', function () {
+        var n = nameEl.value.trim(); if (!n) { nameEl.focus(); return; }
+        labels.push({ name: n, color: curColor }); form.classList.add('hidden'); renderLabels();
+      });
+
+      setEnabled(false);
+    })();
+
+    // ---- Mobile drawer ----
+    var nav = document.getElementById('settings-nav');
+    var bd = document.getElementById('settings-backdrop');
+    document.getElementById('open-nav').addEventListener('click', function () { nav.classList.remove('-translate-x-full'); bd.classList.remove('hidden'); });
+    document.getElementById('close-nav').addEventListener('click', function () { nav.classList.add('-translate-x-full'); bd.classList.add('hidden'); });
+    bd.addEventListener('click', function () { nav.classList.add('-translate-x-full'); bd.classList.add('hidden'); });
+  </script>
+</body>
+</html>

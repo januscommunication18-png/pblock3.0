@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Workspace settings · Customers — Project Block</title>
+
+  <!--
+    Project Block — Workspace settings · Customers (setting-customers.html)
+    Enable toggle + default/custom property accordions + create-property modal.
+  -->
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="assets/js/tailwind.config.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/css/styles.css" />
+</head>
+<body class="bg-white text-ink text-[13px] h-screen flex flex-col overflow-hidden">
+
+  <header class="relative h-14 shrink-0 border-b border-line flex items-center px-4">
+    <a href="welcome.html" title="Back" class="h-9 w-9 grid place-items-center rounded-md text-sub hover:bg-hover">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </a>
+    <span class="absolute left-1/2 -translate-x-1/2 font-semibold text-[15px] text-head">Workspace settings</span>
+    <div class="ml-auto flex items-center gap-2">
+      <span class="h-6 w-px bg-line"></span>
+      <a href="welcome.html" title="Close" class="h-9 w-9 grid place-items-center rounded-md text-sub hover:bg-hover">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </a>
+    </div>
+  </header>
+
+  <div class="flex-1 flex min-h-0 relative">
+    <div id="settings-backdrop" class="hidden md:hidden fixed inset-0 bg-black/30 z-30"></div>
+
+    <aside id="settings-nav" class="w-64 shrink-0 border-r border-line bg-white flex flex-col
+           fixed md:relative inset-y-0 left-0 z-40 -translate-x-full md:translate-x-0 transition-transform duration-200">
+      <div class="md:hidden flex justify-end px-2 h-12 items-center shrink-0">
+        <button id="close-nav" class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+      <nav id="settings-list" class="flex-1 overflow-y-auto pt-2 pb-4"></nav>
+    </aside>
+
+    <main class="flex-1 min-w-0 flex flex-col">
+      <div class="h-12 shrink-0 border-b border-line flex items-center gap-2 px-4 sm:px-6">
+        <button id="open-nav" class="md:hidden h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover -ml-1">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+        <span class="flex items-center gap-1.5 text-[13px] text-sub">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4 21V5a1 1 0 011-1h8a1 1 0 011 1v16" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M14 21V10h4a1 1 0 011 1v10" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M7 8h3M7 12h3M7 16h3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+          Customers
+        </span>
+      </div>
+
+      <div class="flex-1 overflow-auto">
+        <div class="max-w-[860px] mx-auto px-5 sm:px-8 py-8">
+          <h1 class="text-[24px] font-bold text-head">Customers</h1>
+          <p class="text-[14px] text-sub mt-1 mb-6">Link customer requests to work items and roll their state up into customer records. <a href="#" class="text-link hover:underline inline-flex items-center gap-1">Docs <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M14 4h6v6M20 4l-8 8M10 6H5a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1v-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></a></p>
+
+          <!-- Enable card -->
+          <div class="border border-line rounded-xl p-5 flex items-center gap-4">
+            <div class="min-w-0">
+              <div class="text-[14px] font-semibold text-head">Enable customers</div>
+              <p class="text-[13px] text-sub mt-1">Link customer requests to work items and track progress by customer.</p>
+            </div>
+            <button id="cust-toggle" role="switch" aria-checked="true" class="ml-auto shrink-0 relative inline-flex h-5 w-9 items-center rounded-full px-0.5 transition-colors bg-brand">
+              <span id="cust-knob" class="h-4 w-4 rounded-full bg-white shadow transition-transform translate-x-4"></span>
+            </button>
+          </div>
+
+          <h2 class="text-[18px] font-bold text-head mt-8">Custom properties</h2>
+          <p class="text-[14px] text-sub mt-1 mb-4">Custom properties let you capture the details that matter about each customer.</p>
+
+          <!-- Default properties (accordion) -->
+          <div class="border border-line rounded-xl bg-[#f7f8f9] overflow-hidden">
+            <button class="acc-head w-full flex items-center gap-2 px-4 h-12 text-left">
+              <svg class="chev shrink-0 text-sub transition-transform rotate-90" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span class="text-[14px] font-semibold text-head">Default properties</span>
+            </button>
+            <div class="acc-body px-4 pb-4">
+              <div id="default-props" class="flex flex-wrap gap-2"></div>
+            </div>
+          </div>
+
+          <!-- Custom properties (accordion) -->
+          <div class="border border-line rounded-xl bg-[#f7f8f9] overflow-hidden mt-4">
+            <button class="acc-head w-full flex items-start gap-2 px-4 py-3 text-left">
+              <svg class="chev shrink-0 mt-0.5 text-sub transition-transform rotate-90" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <div>
+                <div class="text-[14px] font-semibold text-head">Custom properties</div>
+                <div class="text-[13px] text-sub mt-0.5">Add your customers' unique attributes to Project Block so you can manage work items or customer records better.</div>
+              </div>
+            </button>
+            <div class="acc-body px-4 pb-4">
+              <div id="custom-chips" class="hidden flex flex-wrap gap-2 mb-2"></div>
+              <div id="custom-empty" class="border border-line rounded-lg bg-white py-12 px-6 grid place-items-center text-center">
+                <span class="h-14 w-14 rounded-lg bg-hover grid place-items-center text-faint mb-3"><svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M4 21V5a1 1 0 011-1h8a1 1 0 011 1v16" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M14 21V10h4a1 1 0 011 1v10" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M7 8h3M7 12h3M7 16h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span>
+                <div class="text-[15px] font-semibold text-head">You don't have any custom properties yet.</div>
+                <p class="text-[13px] text-sub mt-1 mb-4 max-w-[440px]">Custom properties that you'd like to see in work items, elsewhere in Project Block, or outside Project Block in a CRM or another tool, will show up here when you add them.</p>
+                <button id="add-prop-empty" class="h-9 px-4 rounded-md border border-stroke text-[13px] font-semibold text-ink hover:bg-hover inline-flex items-center gap-1.5"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Add new property</button>
+              </div>
+              <button id="add-prop-more" class="hidden mt-2 h-9 px-4 rounded-md border border-stroke text-[13px] font-semibold text-ink hover:bg-hover inline-flex items-center gap-1.5"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Add new property</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Create custom property modal -->
+  <div id="prop-modal" class="hidden fixed inset-0 z-50 flex items-start justify-center p-4 sm:pt-24">
+    <div class="absolute inset-0 bg-black/40" data-close></div>
+    <div class="relative w-full max-w-[560px] bg-white rounded-xl shadow-xl p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-[17px] font-semibold text-head">Create new custom property</h2>
+        <button data-close class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+      </div>
+      <label class="block text-[13px] font-medium text-ink mb-1.5">Title <span class="text-danger">*</span></label>
+      <input id="prop-title" type="text" placeholder="Title" class="pb-input" />
+      <label class="block text-[13px] font-medium text-ink mb-1.5 mt-4">Description</label>
+      <textarea id="prop-desc" rows="3" placeholder="Description" class="pb-textarea resize-none"></textarea>
+      <label class="block text-[13px] font-medium text-ink mb-1.5 mt-4">Property type <span class="text-danger">*</span></label>
+      <div id="prop-type"></div>
+      <div class="flex items-center justify-between mt-5">
+        <div class="flex items-center gap-4">
+          <label class="flex items-center gap-2 text-[13px] text-ink cursor-pointer"><input type="checkbox" class="pb-check" /> Mandatory property</label>
+          <label class="flex items-center gap-2 text-[13px] text-ink cursor-pointer"><input type="checkbox" class="pb-check" /> Active</label>
+        </div>
+        <div class="flex items-center gap-2">
+          <button data-close class="h-9 px-4 rounded-md border border-stroke text-[13px] font-semibold text-ink hover:bg-hover">Cancel</button>
+          <button id="prop-create" class="h-9 px-4 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold">Create</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    var NAV = [
+      { h: 'Administration', items: ['General', 'Members', 'Billing and plans', 'Imports', 'Exports'] },
+      { h: 'Products', items: ['Wiki', 'Project Block AI'] },
+      { h: 'Features', items: ['Projects', 'Teamspaces', 'Initiatives', 'Customers', 'Templates', 'Integrations', 'Connections', 'Releases'] },
+      { h: 'Developers', items: ['Webhooks', 'Access Tokens'] }
+    ];
+    var ACTIVE = 'Customers';
+    var LINKS = { 'General': 'setting-general.html', 'Members': 'setting-member.html', 'Wiki': 'setting-wiki.html', 'Projects': 'setting-projects.html', 'Teamspaces': 'setting-teamspaces.html', 'Initiatives': 'setting-initiatives.html', 'Customers': 'setting-customers.html', 'Releases': 'setting-releases.html' };
+    var SOON = ['Templates', 'Integrations'];
+    var ICONS = {
+      'General': '<path d="M6 4v6M6 14v6M12 4v1M12 9v11M18 4v9M18 17v3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="6" cy="12" r="2" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="7" r="2" stroke="currentColor" stroke-width="1.7"/><circle cx="18" cy="15" r="2" stroke="currentColor" stroke-width="1.7"/>',
+      'Members': '<circle cx="9" cy="8" r="3" stroke="currentColor" stroke-width="1.7"/><path d="M3 19a6 6 0 0112 0M16 6a3 3 0 010 6M21 19a6 6 0 00-3-5.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
+      'Billing and plans': '<rect x="3" y="6" width="18" height="12" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M3 10h18" stroke="currentColor" stroke-width="1.7"/>',
+      'Imports': '<path d="M12 3v10M8 9l4 4 4-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 17v2a1 1 0 001 1h14a1 1 0 001-1v-2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
+      'Exports': '<path d="M12 13V3M8 7l4-4 4 4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 17v2a1 1 0 001 1h14a1 1 0 001-1v-2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
+      'Wiki': '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>',
+      'Project Block AI': '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>',
+      'Projects': '<path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>',
+      'Teamspaces': '<circle cx="7" cy="8" r="2.4" stroke="currentColor" stroke-width="1.7"/><circle cx="17" cy="8" r="2.4" stroke="currentColor" stroke-width="1.7"/><path d="M2.5 18a4.5 4.5 0 019 0M12.5 18a4.5 4.5 0 019 0" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
+      'Initiatives': '<circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.7"/>',
+      'Customers': '<path d="M4 21V5a1 1 0 011-1h8a1 1 0 011 1v16" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M14 21V10h4a1 1 0 011 1v10" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M7 8h3M7 12h3M7 16h3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
+      'Templates': '<rect x="4" y="5" width="16" height="14" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M4 9h16M9 9v10" stroke="currentColor" stroke-width="1.7"/>',
+      'Integrations': '<rect x="4" y="4" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/><rect x="13" y="4" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/><rect x="4" y="13" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/><rect x="13" y="13" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/>',
+      'Connections': '<path d="M9 15l6-6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M10.5 6.5l1-1a3.5 3.5 0 015 5l-1 1M13.5 17.5l-1 1a3.5 3.5 0 01-5-5l1-1" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>',
+      'Releases': '<path d="M4 4h9l7 7-9 9-7-7V4z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="8.5" cy="8.5" r="1.3" fill="currentColor"/>',
+      'Webhooks': '<path d="M13 3L5 13h6l-1 8 8-11h-6l1-7z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>',
+      'Access Tokens': '<circle cx="8" cy="14" r="3.5" stroke="currentColor" stroke-width="1.7"/><path d="M10.5 11.5L20 2M17 5l2 2M14 8l2 2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>'
+    };
+    function navIcon(label) {
+      return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" class="shrink-0 text-head">' + (ICONS[label] || '<rect x="4" y="4" width="16" height="16" rx="3" stroke="currentColor" stroke-width="1.7"/>') + '</svg>';
+    }
+    document.getElementById('settings-list').innerHTML = NAV.map(function (sec) {
+      return '<div class="px-2 mt-4">' +
+        '<div class="px-2 h-6 flex items-center text-[11px] font-semibold text-faint uppercase tracking-wide">' + sec.h + '</div>' +
+        sec.items.map(function (it) {
+          var a = it === ACTIVE;
+          if (SOON.indexOf(it) > -1) {
+            return '<span class="flex items-center gap-2.5 px-2 h-8 rounded-md text-[13px] text-faint cursor-not-allowed select-none">' + navIcon(it).replace('text-head', 'text-faint') + '<span>' + it + '</span><span class="ml-auto text-[10px] font-medium text-sub bg-hover rounded px-1.5 py-0.5">Soon</span></span>';
+          }
+          return '<a href="' + (LINKS[it] || '#') + '" class="flex items-center gap-2.5 px-2 h-8 rounded-md text-[13px] cursor-pointer ' + (a ? 'bg-sel text-ink font-medium' : 'text-ink hover:bg-hover') + '">' + navIcon(it) + it + '</a>';
+        }).join('') +
+        '</div>';
+    }).join('');
+
+    // ---- Enable toggle ----
+    (function () {
+      var t = document.getElementById('cust-toggle'), knob = document.getElementById('cust-knob'), on = true;
+      t.addEventListener('click', function () {
+        on = !on;
+        t.setAttribute('aria-checked', on ? 'true' : 'false');
+        t.classList.toggle('bg-brand', on); t.classList.toggle('bg-line', !on);
+        knob.classList.toggle('translate-x-4', on); knob.classList.toggle('translate-x-0', !on);
+      });
+    })();
+
+    // ---- Property-type icons + default properties ----
+    function typeIco(t) {
+      var d;
+      if (t === 'number') d = '<path d="M9 4L7 20M17 4l-2 16M5 9h15M4 15h15" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>';
+      else if (t === 'select') d = '<circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.7"/><path d="M9 11l3 3 3-3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>';
+      else if (t === 'status') d = '<circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.7"/><path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>';
+      else d = '<path d="M4 7h16M4 12h11M4 17h14" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>';
+      return '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="shrink-0 text-sub">' + d + '</svg>';
+    }
+    function chip(name, t) {
+      return '<span class="inline-flex items-center gap-2 h-9 px-3 rounded-md border border-line bg-white text-[13px] text-ink">' + typeIco(t) + name + '</span>';
+    }
+    var DEFAULTS = [
+      ['Customer name', 'text'], ['Description', 'text'], ['Email', 'text'], ['Website', 'text'],
+      ['Employees', 'number'], ['Industry', 'text'], ['Stage', 'select'], ['Contract Status', 'status'], ['Revenue', 'number']
+    ];
+    document.getElementById('default-props').innerHTML = DEFAULTS.map(function (p) { return chip(p[0], p[1]); }).join('');
+
+    // ---- Accordions ----
+    document.querySelectorAll('.acc-head').forEach(function (h) {
+      h.addEventListener('click', function () {
+        var body = h.nextElementSibling;
+        var chev = h.querySelector('.chev');
+        var open = body.classList.contains('hidden');
+        body.classList.toggle('hidden', !open);
+        chev.classList.toggle('rotate-90', open);
+      });
+    });
+
+    // ---- Property type combobox (in modal) ----
+    var TYPES = ['Text', 'Number', 'Date', 'Dropdown', 'Checkbox', 'Member', 'URL', 'Email'];
+    (function initTypeCombo() {
+      var el = document.getElementById('prop-type');
+      el.className = 'relative pb-combo';
+      el.innerHTML =
+        '<button type="button" class="pb-combo-btn pb-input text-left cursor-pointer" aria-haspopup="listbox"><span class="flex items-center justify-between h-full"><span class="pb-combo-value text-faint truncate">Select type</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0 ml-2"><path d="M8 9l4-4 4 4M8 15l4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>' +
+        '<ul role="listbox" class="pb-combo-list hidden absolute z-50 mt-1 w-full max-h-56 overflow-auto rounded-md bg-white py-1 shadow-lg outline outline-1 outline-black/5">' +
+          TYPES.map(function (t) { return '<li role="option" class="group relative flex items-center cursor-pointer select-none py-2 pl-3 pr-9 text-[14px] text-ink hover:bg-brand hover:text-white"><span class="pb-opt-content truncate">' + t + '</span><span class="pb-combo-check hidden absolute inset-y-0 right-0 flex items-center pr-3 text-brand group-hover:text-white"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5 9-11" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span></li>'; }).join('') +
+        '</ul>';
+    })();
+    document.addEventListener('click', function (e) {
+      var btn = e.target.closest('#prop-type .pb-combo-btn');
+      if (btn) {
+        e.stopPropagation();
+        var ul = btn.parentElement.querySelector('.pb-combo-list');
+        ul.classList.toggle('hidden');
+        return;
+      }
+      var li = e.target.closest('#prop-type .pb-combo-list li');
+      if (li) {
+        var combo = li.closest('.pb-combo');
+        var v = combo.querySelector('.pb-combo-value');
+        v.textContent = li.querySelector('.pb-opt-content').textContent;
+        v.classList.remove('text-faint'); v.classList.add('text-ink');
+        combo.querySelectorAll('.pb-combo-check').forEach(function (c) { c.classList.add('hidden'); });
+        li.querySelector('.pb-combo-check').classList.remove('hidden');
+        combo.querySelector('.pb-combo-list').classList.add('hidden');
+        return;
+      }
+      if (!e.target.closest('#prop-type')) { var l = document.querySelector('#prop-type .pb-combo-list'); if (l) l.classList.add('hidden'); }
+    });
+
+    // ---- Create-property modal + custom props ----
+    (function () {
+      var modal = document.getElementById('prop-modal');
+      var title = document.getElementById('prop-title');
+      var chips = document.getElementById('custom-chips');
+      var empty = document.getElementById('custom-empty');
+      var more = document.getElementById('add-prop-more');
+      var props = [];
+      function open() {
+        title.value = ''; document.getElementById('prop-desc').value = '';
+        var v = document.querySelector('#prop-type .pb-combo-value');
+        v.textContent = 'Select type'; v.classList.add('text-faint'); v.classList.remove('text-ink');
+        document.querySelectorAll('#prop-type .pb-combo-check').forEach(function (c) { c.classList.add('hidden'); });
+        modal.querySelectorAll('.pb-check').forEach(function (c) { c.checked = false; });
+        modal.classList.remove('hidden'); title.focus();
+      }
+      function close() { modal.classList.add('hidden'); }
+      function render() {
+        if (props.length) {
+          empty.classList.add('hidden'); chips.classList.remove('hidden'); more.classList.remove('hidden');
+          chips.innerHTML = props.map(function (p) { return chip(p.name, p.type); }).join('');
+        } else { empty.classList.remove('hidden'); chips.classList.add('hidden'); more.classList.add('hidden'); }
+      }
+      document.getElementById('add-prop-empty').addEventListener('click', open);
+      more.addEventListener('click', open);
+      modal.addEventListener('click', function (e) { if (e.target.closest('[data-close]')) close(); });
+      document.getElementById('prop-create').addEventListener('click', function () {
+        var n = title.value.trim(); if (!n) { title.focus(); return; }
+        var typeText = document.querySelector('#prop-type .pb-combo-value').textContent;
+        var t = typeText === 'Select type' ? 'text' : (typeText === 'Number' ? 'number' : typeText === 'Dropdown' ? 'select' : typeText === 'Checkbox' ? 'status' : 'text');
+        props.push({ name: n, type: t }); render(); close();
+      });
+    })();
+
+    // ---- Mobile drawer ----
+    var nav = document.getElementById('settings-nav');
+    var bd = document.getElementById('settings-backdrop');
+    document.getElementById('open-nav').addEventListener('click', function () { nav.classList.remove('-translate-x-full'); bd.classList.remove('hidden'); });
+    document.getElementById('close-nav').addEventListener('click', function () { nav.classList.add('-translate-x-full'); bd.classList.add('hidden'); });
+    bd.addEventListener('click', function () { nav.classList.add('-translate-x-full'); bd.classList.add('hidden'); });
+  </script>
+</body>
+</html>

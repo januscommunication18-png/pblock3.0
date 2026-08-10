@@ -1,0 +1,132 @@
+@extends('layouts.auth')
+@section('title', 'Onboarding · Workspace — Project Block')
+
+@section('body')
+  <div class="h-1 w-full bg-line"><div class="h-full bg-brand" style="width:80%"></div></div>
+
+  <header class="flex items-center justify-between px-5 sm:px-10 py-5">
+    <div class="flex items-center gap-3">
+      <a href="{{ route('onboarding.goals') }}" class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a>
+      <a class="flex items-center gap-2" href="#">
+        <svg width="24" height="24" viewBox="0 0 32 32" fill="#0f0f10"><path d="M5 21 L15 4 L20.5 4 L10.5 21 Z"/><path d="M13 28 L23 11 L28.5 11 L18.5 28 Z"/></svg>
+        <span class="text-[18px] font-bold tracking-tight text-head">Project Block</span>
+      </a>
+    </div>
+    <div class="flex items-center gap-2">
+      <div class="flex items-center gap-2 border border-line rounded-full pl-1 pr-3 py-1 text-[13px] text-ink">
+        <span class="h-5 w-5 rounded-full bg-brand grid place-items-center text-white text-[9px] font-bold">{{ $user->initial() }}</span>
+        <span>{{ $user->displayName() }}</span>
+      </div>
+      <form method="POST" action="{{ route('logout') }}">
+        @csrf
+        <button type="submit" title="Log out" aria-label="Log out" class="flex items-center gap-1.5 h-8 px-3 rounded-full border border-line text-[13px] text-sub hover:bg-hover hover:text-ink transition-colors">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 21H6a2 2 0 01-2-2V5a2 2 0 012-2h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 17l5-5-5-5M21 12H9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span class="hidden sm:inline">Log out</span>
+        </button>
+      </form>
+    </div>
+  </header>
+
+  <main class="flex-1 flex justify-center px-5">
+    <div class="w-full max-w-[430px] py-6 sm:py-12">
+      <h1 class="text-[24px] font-bold text-head">Create your workspace</h1>
+      <p class="text-[15px] text-sub mb-7">All your work — unified.</p>
+
+      <form method="POST" action="{{ route('onboarding.workspace.store') }}" id="ws-form">
+        @csrf
+        <label class="block text-[13px] font-medium text-ink mb-1.5" for="ws-name">Name your workspace <span class="text-danger">*</span></label>
+        <input id="ws-name" name="name" type="text" value="{{ old('name') }}" placeholder="Acme Inc" class="pb-input" autocomplete="off" />
+        @error('name') <p class="text-[12px] text-danger mt-1.5">{{ $message }}</p> @enderror
+
+        <label class="block text-[13px] font-medium text-ink mb-1.5 mt-5">Set your workspace's URL <span class="text-danger">*</span></label>
+        <div class="pb-group">
+          <span class="pb-group__prefix">app.projectblock.so/</span>
+          <input id="ws-slug" name="slug" type="text" value="{{ old('slug') }}" placeholder="acme-inc" class="pb-group__field" autocomplete="off" />
+        </div>
+        <p class="text-[12px] text-sub mt-1.5">You can only edit the slug of the URL</p>
+        @error('slug') <p class="text-[12px] text-danger mt-1">{{ $message }}</p> @enderror
+
+        <p class="text-[13px] font-medium text-ink mb-3 mt-5">How many people will use this workspace? <span class="text-danger">*</span></p>
+        <input type="hidden" name="team_size" id="team_size" value="{{ old('team_size') }}" />
+        <div id="size-list" class="flex flex-wrap gap-2.5"
+             data-sizes='@json($teamSizes)'></div>
+        @error('team_size') <p class="text-[12px] text-danger mt-2">{{ $message }}</p> @enderror
+
+        {{-- Enable apps (multi-select). Projects is on today; the rest are Coming Soon. --}}
+        <p class="text-[13px] font-medium text-ink mb-1 mt-5">Enable apps <span class="text-danger">*</span></p>
+        <p class="text-[12px] text-sub mb-3">Choose what this workspace can do. You can turn more on later as they launch.</p>
+        <div class="grid gap-3">
+          @foreach (config('workspace.apps') as $appKey => $app)
+            @if ($app['available'])
+              <div class="w-full flex items-start gap-3 p-4 rounded-lg border border-brand/40 bg-sel/40 text-left cursor-default" title="Projects is the default app and can’t be turned off">
+                <span class="mt-0.5 h-5 w-5 rounded-md bg-brand grid place-items-center shrink-0"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5 9-11" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                <div class="min-w-0">
+                  <div class="flex items-center gap-2">
+                    <span class="text-[14px] font-semibold text-head">{{ $app['label'] }}</span>
+                    <span class="text-[10px] uppercase tracking-wide bg-brand/10 text-brand rounded px-1.5 py-0.5">Default</span>
+                  </div>
+                  <div class="text-[12px] text-sub mt-0.5">{{ $app['description'] }}</div>
+                </div>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="ml-auto mt-0.5 shrink-0 text-faint" aria-label="Read only"><rect x="5" y="11" width="14" height="9" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M8 11V8a4 4 0 018 0v3" stroke="currentColor" stroke-width="1.7"/></svg>
+                <input type="hidden" name="apps[]" value="{{ $appKey }}" />
+              </div>
+            @else
+              <div class="w-full flex items-start gap-3 p-4 rounded-lg border border-dashed border-stroke bg-hover/40 text-left opacity-70 cursor-not-allowed select-none" aria-disabled="true">
+                <span class="mt-0.5 h-5 w-5 rounded-md border border-line shrink-0"></span>
+                <div class="min-w-0">
+                  <div class="flex items-center gap-2">
+                    <span class="text-[14px] font-medium text-sub">{{ $app['label'] }}</span>
+                    <span class="text-[10px] uppercase tracking-wide bg-amber-100 text-amber-700 rounded px-1.5 py-0.5">Coming soon</span>
+                  </div>
+                  <div class="text-[12px] text-faint mt-0.5">{{ $app['description'] }}</div>
+                </div>
+              </div>
+            @endif
+          @endforeach
+        </div>
+
+        <button id="continue" type="submit" disabled class="mt-7 w-full h-11 rounded-lg text-[14px] font-semibold bg-hover text-faint cursor-not-allowed transition-colors">Create workspace</button>
+      </form>
+    </div>
+  </main>
+
+  <script>
+    (function () {
+      var SIZES = JSON.parse(document.getElementById('size-list').getAttribute('data-sizes'));
+      var nameEl = document.getElementById('ws-name');
+      var slugEl = document.getElementById('ws-slug');
+      var sizeEl = document.getElementById('team_size');
+      var cont = document.getElementById('continue');
+      var slugTouched = {{ old('slug') ? 'true' : 'false' }};
+
+      function render() {
+        document.getElementById('size-list').innerHTML = SIZES.map(function (s) {
+          var sel = sizeEl.value === s;
+          return '<button type="button" data-size="' + s + '" class="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg border text-[13px] ' +
+            (sel ? 'border-brand ring-1 ring-brand text-brand font-medium' : 'border-stroke text-ink hover:bg-hover') + '">' +
+            '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/>' +
+            (sel ? '<path d="M8 12l2.5 2.5L16 9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>' : '') +
+            '</svg>' + s + '</button>';
+        }).join('');
+        document.querySelectorAll('#size-list [data-size]').forEach(function (el) {
+          el.onclick = function () { sizeEl.value = el.getAttribute('data-size'); render(); gate(); };
+        });
+      }
+      function gate() {
+        var ok = nameEl.value.trim().length > 0 && slugEl.value.trim().length > 0 && !!sizeEl.value;
+        cont.disabled = !ok;
+        cont.className = 'mt-7 w-full h-11 rounded-lg text-[14px] font-semibold transition-colors ' +
+          (ok ? 'bg-brand hover:bg-brand-dark text-white cursor-pointer' : 'bg-hover text-faint cursor-not-allowed');
+      }
+      function slugify(v) { return v.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
+      nameEl.addEventListener('input', function () {
+        if (!slugTouched) slugEl.value = slugify(nameEl.value);
+        gate();
+      });
+      slugEl.addEventListener('input', function () { slugTouched = true; slugEl.value = slugify(slugEl.value); gate(); });
+      render(); gate();
+    })();
+  </script>
+@endsection

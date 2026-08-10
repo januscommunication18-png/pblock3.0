@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Page — Project Block</title>
+  <!--
+    Project Block — Page editor (Pages)
+    Component boundaries for the Laravel + Vue build:
+      component: AppTopbar / AppRail / AppSidebar / ProjectHeader
+      component: PageActionBar (breadcrumb + publish + actions + more menu)
+      component: PageToolbar (rich-text formatting)
+      component: PageEditor (title + body)
+      component: PageSidePanel (Outline / Info / Assets / Comments)
+  -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="assets/js/tailwind.config.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/css/styles.css" />
+  <style>
+    [contenteditable][data-ph]:empty::before { content: attr(data-ph); color: #9ca3af; pointer-events: none; }
+    #pg-title:empty::before { content: attr(data-ph); color: #d1d5db; }
+    #pg-body { line-height: 1.7; }
+  </style>
+</head>
+<body class="bg-white text-ink h-screen flex flex-col overflow-hidden text-[13px]">
+
+  <!-- ============ component: AppTopbar ============ -->
+  <header class="h-14 shrink-0 border-b border-line flex items-center gap-2 px-3 sm:px-4">
+    <button id="open-sidebar" class="lg:hidden h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+    <div class="flex items-center gap-2 shrink-0">
+      <span class="flex items-center gap-2 px-2 h-9"><span class="h-6 w-6 rounded-md bg-slate-700 text-white grid place-items-center text-[11px] font-semibold">J</span><span class="font-medium text-[13px] max-w-[110px] sm:max-w-[150px] truncate">Janus Communicaiton</span></span>
+      <button class="inline-flex items-center h-7 px-2.5 rounded-md border border-brand text-[12px] text-brand hover:bg-hover whitespace-nowrap">Switch workspace</button>
+    </div>
+    <div class="flex-1 flex justify-center px-2"><div class="relative w-full max-w-md"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="absolute left-3 top-1/2 -translate-y-1/2 text-faint"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><input type="text" placeholder="Search" class="w-full h-9 rounded-md bg-hover pl-9 pr-3 text-[13px] text-ink placeholder:text-faint outline outline-1 -outline-offset-1 outline-transparent focus:bg-white focus:outline-stroke" /></div></div>
+    <div class="flex items-center gap-1.5 shrink-0">
+      <button class="hidden sm:inline-flex items-center h-8 px-3 rounded-md border border-line text-[13px] text-ink hover:bg-hover">Get started</button>
+      <button class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover" title="Inbox"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M3 13h4l2 3h6l2-3h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 6h14l2 7v4a1 1 0 01-1 1H4a1 1 0 01-1-1v-4l2-7z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></button>
+      <button class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover" title="Help"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M9.5 9.5a2.5 2.5 0 114 2c-1 .7-1.5 1.2-1.5 2.5M12 17.5v.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+      <span class="h-7 w-7 rounded-full bg-emerald-500 grid place-items-center text-white text-[11px] font-bold ml-1">Z</span>
+    </div>
+  </header>
+
+  <div class="flex-1 flex min-h-0 relative">
+    <!-- ============ component: AppRail ============ -->
+    <nav class="hidden lg:flex w-16 shrink-0 border-r border-line bg-[#f6f7f8] flex-col items-center py-3 gap-1">
+      <a href="projects.html" class="flex flex-col items-center gap-1 w-full px-0.5 py-2 rounded-lg bg-sel text-brand"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.8"/><rect x="13" y="4" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.8"/><rect x="4" y="13" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.8"/><rect x="13" y="13" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.8"/></svg><span class="text-[10px] text-center leading-tight">Projects</span></a>
+      <a class="flex flex-col items-center gap-1 w-full px-0.5 py-2 rounded-lg text-ink hover:bg-hover"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg><span class="text-[10px] text-center leading-tight">Wiki</span></a>
+      <a class="flex flex-col items-center gap-1 w-full px-0.5 py-2 rounded-lg text-ink hover:bg-hover"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 13v-1a8 8 0 0116 0v1" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><rect x="3" y="12.5" width="4" height="6" rx="1.6" stroke="currentColor" stroke-width="1.7"/><rect x="17" y="12.5" width="4" height="6" rx="1.6" stroke="currentColor" stroke-width="1.7"/><path d="M19 18.5v.5a2.5 2.5 0 01-2.5 2.5H13" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg><span class="text-[10px] text-center leading-tight">Help Desk</span></a>
+      <a href="setting-member.html" class="mt-auto flex flex-col items-center gap-1 w-full px-0.5 py-2 rounded-lg text-ink hover:bg-hover"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M10.3 3.2a1 1 0 011.4 0l.9.9a1 1 0 00.9.3l1.2-.2a1 1 0 011.1.7l.4 1.2a1 1 0 00.6.6l1.2.4a1 1 0 01.7 1.1l-.2 1.2a1 1 0 00.3.9l.9.9a1 1 0 010 1.4l-.9.9a1 1 0 00-.3.9l.2 1.2a1 1 0 01-.7 1.1l-1.2.4a1 1 0 00-.6.6l-.4 1.2a1 1 0 01-1.1.7l-1.2-.2a1 1 0 00-.9.3l-.9.9a1 1 0 01-1.4 0l-.9-.9a1 1 0 00-.9-.3l-1.2.2a1 1 0 01-1.1-.7l-.4-1.2a1 1 0 00-.6-.6l-1.2-.4a1 1 0 01-.7-1.1l.2-1.2a1 1 0 00-.3-.9l-.9-.9a1 1 0 010-1.4l.9-.9a1 1 0 00.3-.9l-.2-1.2a1 1 0 01.7-1.1l1.2-.4a1 1 0 00.6-.6l.4-1.2a1 1 0 011.1-.7l1.2.2a1 1 0 00.9-.3l.9-.9z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.6"/></svg><span class="text-[10px] text-center leading-tight">Settings</span></a>
+    </nav>
+
+    <!-- backdrop for mobile drawer -->
+    <div id="sidebar-backdrop" class="hidden lg:hidden fixed inset-0 bg-black/30 z-30"></div>
+
+    <!-- ============ component: AppSidebar ============ -->
+    <aside id="sidebar" class="w-60 shrink-0 border-r border-line bg-white flex flex-col fixed lg:relative inset-y-0 left-0 z-40 -translate-x-full lg:translate-x-0 transition-transform duration-200">
+      <div class="flex items-center gap-2 px-4 h-12 shrink-0"><span class="font-semibold text-ink">Projects</span><div class="ml-auto flex items-center gap-1 text-faint"><button class="h-7 w-7 grid place-items-center rounded hover:bg-hover"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4 7h9M17 7h3M4 17h7M15 17h5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="15" cy="7" r="2.1" stroke="currentColor" stroke-width="1.7"/><circle cx="13" cy="17" r="2.1" stroke="currentColor" stroke-width="1.7"/></svg></button><button id="close-sidebar" class="lg:hidden h-7 w-7 grid place-items-center rounded hover:bg-hover"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></div></div>
+      <div class="px-2 overflow-y-auto flex-1">
+        <a href="work-items.html" class="w-full flex items-center justify-center gap-2 px-2 h-9 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold mb-2 transition-colors"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>New work item</a>
+        <a class="flex items-center gap-2 px-2 h-8 rounded-md text-ink hover:bg-hover"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4 11l8-6 8 6v8a1 1 0 01-1 1h-4v-6H9v6H5a1 1 0 01-1-1v-8z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>Home</a>
+        <a class="flex items-center gap-2 px-2 h-8 rounded-md text-ink hover:bg-hover"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4 12.5-12.5z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>Drafts</a>
+        <a class="flex items-center gap-2 px-2 h-8 rounded-md text-ink hover:bg-hover"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.2" stroke="currentColor" stroke-width="1.7"/><path d="M5 20a7 7 0 0114 0" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>Your work</a>
+        <a class="flex items-center gap-2 px-2 h-8 rounded-md text-ink hover:bg-hover"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M5 4h14v11l-5 5H5V4z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M14 20v-5h5" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>Stickies</a>
+        <div class="flex items-center gap-1 px-2 h-8 mt-3 text-[11px] font-semibold text-faint uppercase tracking-wide">Workspace</div>
+        <a href="projects.html" class="flex items-center gap-2 px-2 h-8 rounded-md bg-sel text-ink font-medium"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>Projects</a>
+        <button class="w-full flex items-center gap-2 px-2 h-8 rounded-md text-ink hover:bg-hover"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="5" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="19" cy="12" r="1.6" fill="currentColor"/></svg>More</button>
+        <div class="flex items-center gap-1 px-2 h-8 mt-3 text-[11px] font-semibold text-faint uppercase tracking-wide">Projects</div>
+        <a href="work-items.html" class="flex items-center gap-2 px-2 h-8 rounded-md bg-sel text-ink font-medium"><span>🖐️</span>Testing</a>
+      </div>
+    </aside>
+
+    <!-- ============ MAIN ============ -->
+    <main class="flex-1 min-w-0 flex flex-col overflow-hidden">
+      <!-- component: ProjectHeader -->
+      <div class="border-b border-line px-6 shrink-0">
+        <div class="flex items-center gap-2 h-12 overflow-x-auto">
+          <span class="inline-flex items-center gap-1.5 text-[14px] font-medium text-ink shrink-0"><span>🖐️</span>Testing</span>
+          <button class="h-7 w-7 grid place-items-center rounded-md text-sub hover:bg-hover shrink-0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="5" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="19" cy="12" r="1.6" fill="currentColor"/></svg></button>
+          <nav class="ml-3 flex items-center gap-1 h-12 shrink-0">
+            <a href="#" class="px-2.5 h-12 flex items-center text-[13px] text-sub hover:text-ink border-b-2 border-transparent">Overview</a>
+            <a href="work-items.html" class="px-2.5 h-12 flex items-center text-[13px] text-sub hover:text-ink border-b-2 border-transparent">Work items</a>
+            <a href="cycles.html" class="px-2.5 h-12 flex items-center text-[13px] text-sub hover:text-ink border-b-2 border-transparent">Cycles</a>
+            <a href="modules.html" class="px-2.5 h-12 flex items-center text-[13px] text-sub hover:text-ink border-b-2 border-transparent">Modules</a>
+            <a href="#" class="px-2.5 h-12 flex items-center text-[13px] text-sub hover:text-ink border-b-2 border-transparent">Views</a>
+            <a href="pages.html" class="px-2.5 h-12 flex items-center text-[13px] text-ink font-medium border-b-2 border-brand">Pages</a>
+          </nav>
+        </div>
+      </div>
+
+      <!-- component: PageActionBar -->
+      <div class="flex items-center gap-2 px-4 sm:px-6 h-14 border-b border-line shrink-0">
+        <div class="flex items-center gap-1.5 min-w-0">
+          <a href="pages.html" class="inline-flex items-center gap-1.5 text-[13px] text-sub hover:text-ink shrink-0"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M8 3h6l4 4v13a1 1 0 01-1 1H8a1 1 0 01-1-1V4a1 1 0 011-1z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M14 3v4h4" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>Pages</a>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span class="inline-flex items-center gap-1.5 text-[13px] text-ink font-medium min-w-0"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-sub shrink-0"><path d="M8 3h6l4 4v13a1 1 0 01-1 1H8a1 1 0 01-1-1V4a1 1 0 011-1z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M14 3v4h4" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg><span id="pg-bc-title" class="truncate">Untitled</span></span>
+        </div>
+        <div class="ml-auto flex items-center gap-1.5">
+          <span class="h-7 w-7 rounded-full bg-brand text-white grid place-items-center text-[10px] font-bold">Z</span>
+          <button class="inline-flex items-center h-8 px-3 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold">Publish</button>
+          <button class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover" title="Lock page"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="5" y="11" width="14" height="9" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M8 11V8a4 4 0 018 0v3" stroke="currentColor" stroke-width="1.7"/></svg></button>
+          <button class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover" title="Move"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg></button>
+          <button class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover" title="Copy link"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 15l6-6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M10.5 6.5l1-1a3.5 3.5 0 015 5l-1 1M13.5 17.5l-1 1a3.5 3.5 0 01-5-5l1-1" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <button id="pg-star" class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover" title="Favorite"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9 6.8 19.2l1-5.8L3.5 9.2l5.9-.9L12 3z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></button>
+          <button id="pg-comments-btn" class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover" title="Comments"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 5h16v10H8l-4 4V5z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg></button>
+          <button id="pg-more-btn" class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover" title="More"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="5" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="19" cy="12" r="1.6" fill="currentColor"/></svg></button>
+          <button id="pg-panel-btn" class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover" title="Toggle panel"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M15 4v16" stroke="currentColor" stroke-width="1.7"/></svg></button>
+        </div>
+      </div>
+
+      <!-- component: PageToolbar -->
+      <div id="pg-toolbar" class="flex items-center gap-1 px-4 sm:px-6 h-12 border-b border-line shrink-0 overflow-x-auto">
+        <button class="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border border-stroke text-[13px] text-ink hover:bg-hover">Text<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <span class="w-px h-5 bg-line mx-1"></span>
+        <span class="inline-flex items-center gap-1 text-[13px] text-sub px-1">Color <span class="inline-grid place-items-center h-6 w-6 rounded border border-stroke font-semibold text-ink">A</span></span>
+        <span class="w-px h-5 bg-line mx-1"></span>
+        <button data-cmd="bold" class="h-8 w-8 grid place-items-center rounded hover:bg-hover font-semibold">B</button>
+        <button data-cmd="italic" class="h-8 w-8 grid place-items-center rounded hover:bg-hover italic">I</button>
+        <button data-cmd="underline" class="h-8 w-8 grid place-items-center rounded hover:bg-hover underline">U</button>
+        <button data-cmd="strikeThrough" class="h-8 w-8 grid place-items-center rounded hover:bg-hover line-through">S</button>
+        <span class="w-px h-5 bg-line mx-1"></span>
+        <button class="h-8 w-8 grid place-items-center rounded hover:bg-hover text-sub" title="Align left"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 6h16M4 12h10M4 18h13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+        <button class="h-8 w-8 grid place-items-center rounded hover:bg-hover text-sub" title="Align center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 6h16M7 12h10M6 18h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+        <button class="h-8 w-8 grid place-items-center rounded hover:bg-hover text-sub" title="Align right"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 6h16M10 12h10M7 18h13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+        <span class="w-px h-5 bg-line mx-1"></span>
+        <button data-cmd="insertOrderedList" class="h-8 w-8 grid place-items-center rounded hover:bg-hover text-sub" title="Numbered list"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6h11M9 12h11M9 18h11M4 6h.5M4 12h.5M4 18h.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>
+        <button data-cmd="insertUnorderedList" class="h-8 w-8 grid place-items-center rounded hover:bg-hover text-sub" title="Bullet list"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+        <button class="h-8 w-8 grid place-items-center rounded hover:bg-hover text-sub" title="Checklist"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M10 6h10M10 12h10M10 18h10M3 6l1.5 1.5L7 5M3.5 12l1.5 1.5L7 11M3.5 18l1.5 1.5L7 17" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <button class="h-8 w-8 grid place-items-center rounded hover:bg-hover text-sub" title="Quote"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+        <button class="h-8 w-8 grid place-items-center rounded hover:bg-hover text-sub" title="Code"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M8 9l-4 3 4 3M16 9l4 3-4 3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <span class="w-px h-5 bg-line mx-1"></span>
+        <button class="h-8 w-8 grid place-items-center rounded hover:bg-hover text-sub" title="Table"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M4 10h16M10 4v16" stroke="currentColor" stroke-width="1.6"/></svg></button>
+        <button class="h-8 w-8 grid place-items-center rounded hover:bg-hover text-sub" title="Image"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" stroke-width="1.6"/><circle cx="8.5" cy="10" r="1.5" stroke="currentColor" stroke-width="1.4"/><path d="M5 17l4-4 4 3 3-2 3 3" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></button>
+        <button class="h-8 w-8 grid place-items-center rounded hover:bg-hover text-sub" title="Attach"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M21 11l-9 9a5 5 0 01-7-7l9-9a3.5 3.5 0 015 5l-9 9a2 2 0 01-3-3l8-8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <button class="ml-auto inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-stroke text-[13px] text-ink hover:bg-hover shrink-0"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>AI summary</button>
+      </div>
+
+      <!-- content + side panel -->
+      <div class="flex-1 min-h-0 flex overflow-hidden">
+        <div class="flex-1 min-w-0 overflow-y-auto">
+          <div id="pg-editor" class="mx-auto max-w-3xl px-6 py-10">
+            <div id="pg-newmeta" class="flex items-center gap-5 text-[13px] text-sub mb-4">
+              <button class="inline-flex items-center gap-1.5 hover:text-ink"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/><path d="M9 14s1 1.5 3 1.5 3-1.5 3-1.5M9 9.5h.01M15 9.5h.01" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>Icon</button>
+              <button id="pg-template" class="inline-flex items-center gap-1.5 hover:text-ink"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.6"/><rect x="13" y="4" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.6"/><rect x="4" y="13" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.6"/><rect x="13" y="13" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.6"/></svg>Choose from template</button>
+            </div>
+            <h1 id="pg-title" contenteditable="true" data-ph="Untitled" class="text-[30px] font-bold text-head outline-none"></h1>
+            <div id="pg-body" contenteditable="true" data-ph="Press '/' for commands..." class="text-[15px] text-ink outline-none mt-3 min-h-[320px]"></div>
+          </div>
+        </div>
+
+        <!-- component: PageSidePanel -->
+        <aside id="pg-panel" class="hidden w-[300px] shrink-0 border-l border-line flex-col overflow-hidden">
+          <div id="pg-panel-head" class="flex items-center gap-4 px-4 h-12 border-b border-line shrink-0"></div>
+          <div id="pg-panel-body" class="p-4 overflow-y-auto flex-1"></div>
+        </aside>
+      </div>
+    </main>
+  </div>
+
+  <!-- Floating "more" menu -->
+  <div id="pg-menu" class="hidden fixed z-50 w-56 rounded-md bg-white py-1 shadow-lg outline outline-1 outline-black/5 text-[13px]"></div>
+
+  <script>
+    // Mobile sidebar drawer
+    (function () {
+      var sb = document.getElementById('sidebar'), bd = document.getElementById('sidebar-backdrop');
+      function openSb() { sb.classList.remove('-translate-x-full'); bd.classList.remove('hidden'); }
+      function closeSb() { sb.classList.add('-translate-x-full'); bd.classList.add('hidden'); }
+      var o = document.getElementById('open-sidebar'); if (o) o.addEventListener('click', openSb);
+      var c = document.getElementById('close-sidebar'); if (c) c.addEventListener('click', closeSb);
+      if (bd) bd.addEventListener('click', closeSb);
+    })();
+  </script>
+  <script>
+    (function () {
+      var title = new URLSearchParams(location.search).get('title') || 'Untitled';
+      var isNew = title === 'Untitled';
+      document.getElementById('pg-bc-title').textContent = title;
+      var titleEl = document.getElementById('pg-title');
+      var bodyEl = document.getElementById('pg-body');
+      if (!isNew) { titleEl.textContent = title; document.getElementById('pg-template').classList.add('hidden'); }
+
+      // ---- side panel (Outline / Info / Assets / Comments) ----
+      var panel = document.getElementById('pg-panel');
+      var panelHead = document.getElementById('pg-panel-head');
+      var panelBody = document.getElementById('pg-panel-body');
+      var pane = 'outline';
+      function emptyState(icon, t, s) { return '<div class="py-12 flex flex-col items-center text-center"><div class="h-16 w-16 rounded-full bg-hover grid place-items-center text-brand">' + icon + '</div><div class="text-[14px] font-semibold text-head mt-3">' + t + '</div><div class="text-[13px] text-sub mt-1 max-w-[220px]">' + s + '</div></div>'; }
+      var IC_DOC = '<svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M8 3h6l4 4v13a1 1 0 01-1 1H8a1 1 0 01-1-1V4a1 1 0 011-1z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M14 3v4h4M9.5 12h5M9.5 15.5h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      var IC_IMG = '<svg width="26" height="26" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" stroke-width="1.5"/><circle cx="8.5" cy="10" r="1.6" stroke="currentColor" stroke-width="1.4"/><path d="M5 17l4-4 4 3 3-2 3 3" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>';
+      var IC_CHAT = '<svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M4 5h16v10H8l-4 4V5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>';
+      function stats() {
+        var txt = (bodyEl.innerText || '').trim();
+        var words = txt ? txt.split(/\s+/).length : 0;
+        var chars = txt.length;
+        var paras = txt ? txt.split(/\n+/).filter(Boolean).length : 0;
+        var read = Math.round(words / 200) + 's';
+        return { words: words, chars: chars, paras: paras, read: read };
+      }
+      function renderPanel() {
+        if (pane === 'comments') {
+          panelHead.innerHTML = '<span class="text-[14px] font-semibold text-head">Comments</span><button class="ml-auto inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md border border-stroke text-[12px] text-ink hover:bg-hover"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M4 5h16l-6 8v5l-4 2v-7L4 5z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>Filters</button>';
+          panelBody.innerHTML = emptyState(IC_CHAT, 'No comments yet', 'Select text in the editor and add a comment to get started.');
+          return;
+        }
+        panelHead.innerHTML = ['outline', 'info', 'assets'].map(function (k) {
+          var on = k === pane;
+          var label = k.charAt(0).toUpperCase() + k.slice(1);
+          return '<button data-pane="' + k + '" class="pb-2.5 -mb-px border-b-2 text-[13px] ' + (on ? 'border-brand text-ink font-medium' : 'border-transparent text-sub hover:text-ink') + '">' + label + '</button>';
+        }).join('');
+        if (pane === 'outline') panelBody.innerHTML = emptyState(IC_DOC, 'Missing headings', "Let's put some headings in this page to see them here.");
+        else if (pane === 'assets') panelBody.innerHTML = emptyState(IC_IMG, 'Missing images', 'Add images to see them here.');
+        else {
+          var s = stats();
+          panelBody.innerHTML = '<div class="grid grid-cols-2 gap-y-5 gap-x-4">' +
+            '<div><div class="text-[16px] font-semibold text-head">' + s.words + '</div><div class="text-[12px] text-sub">Words</div></div>' +
+            '<div><div class="text-[16px] font-semibold text-head">' + s.chars + '</div><div class="text-[12px] text-sub">Characters</div></div>' +
+            '<div><div class="text-[16px] font-semibold text-head">' + s.paras + '</div><div class="text-[12px] text-sub">Paragraphs</div></div>' +
+            '<div><div class="text-[16px] font-semibold text-head">' + s.read + '</div><div class="text-[12px] text-sub">Read time</div></div>' +
+          '</div>' +
+          '<div class="mt-6"><div class="text-[12px] text-sub mb-1.5">Labels</div><button class="inline-flex items-center gap-1.5 text-[13px] text-sub hover:text-ink"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Add label</button></div>' +
+          '<div class="mt-6"><div class="text-[12px] text-sub">Edited by</div><div class="flex items-center gap-2 mt-1"><span class="h-6 w-6 rounded-full bg-brand text-white grid place-items-center text-[10px] font-bold">Z</span><span class="text-[13px] text-ink">zorainteractive</span><span class="ml-auto text-[12px] text-faint">1m ago</span></div></div>' +
+          '<div class="mt-4"><div class="text-[12px] text-sub">Created by</div><div class="flex items-center gap-2 mt-1"><span class="h-6 w-6 rounded-full bg-brand text-white grid place-items-center text-[10px] font-bold">Z</span><span class="text-[13px] text-ink">zorainteractive</span><span class="ml-auto text-[12px] text-faint">Aug 09, 2026</span></div></div>';
+        }
+      }
+      function openPanel(which) { pane = which; panel.classList.remove('hidden'); panel.classList.add('flex'); renderPanel(); }
+      function togglePanel() { if (panel.classList.contains('hidden')) openPanel('outline'); else { panel.classList.add('hidden'); panel.classList.remove('flex'); } }
+      document.getElementById('pg-panel-btn').addEventListener('click', togglePanel);
+      document.getElementById('pg-comments-btn').addEventListener('click', function () { openPanel('comments'); });
+      panelHead.addEventListener('click', function (e) { var b = e.target.closest('[data-pane]'); if (b) { pane = b.getAttribute('data-pane'); renderPanel(); } });
+      bodyEl.addEventListener('input', function () { if (!panel.classList.contains('hidden') && pane === 'info') renderPanel(); });
+
+      // ---- formatting (bold/italic/underline/strike) ----
+      document.getElementById('pg-toolbar').addEventListener('click', function (e) {
+        var b = e.target.closest('[data-cmd]'); if (!b) return;
+        bodyEl.focus();
+        try { document.execCommand(b.getAttribute('data-cmd'), false, null); } catch (err) {}
+      });
+
+      // ---- more menu (Full width / Sticky toolbar / Copy markdown / Version history / Make a copy / Archive) ----
+      var menu = document.getElementById('pg-menu');
+      var fullWidth = false, sticky = true;
+      function toggleRow(label, on) { return '<button data-m="' + label + '" class="w-full text-left flex items-center gap-2.5 px-3 h-9 text-ink hover:bg-hover"><span class="flex-1">' + label + '</span><span class="relative inline-flex h-5 w-9 items-center rounded-full px-0.5 transition-colors ' + (on ? 'bg-brand' : 'bg-stroke') + '"><span class="h-4 w-4 rounded-full bg-white shadow transition-transform ' + (on ? 'translate-x-4' : 'translate-x-0') + '"></span></span></button>'; }
+      function actRow(label, icon) { return '<button data-m="' + label + '" class="w-full text-left flex items-center gap-2.5 px-3 h-9 text-ink hover:bg-hover"><span class="grid place-items-center text-sub">' + icon + '</span>' + label + '</button>'; }
+      function renderMenu() {
+        menu.innerHTML = toggleRow('Full width', fullWidth) + toggleRow('Sticky toolbar', sticky) +
+          '<div class="my-1 border-t border-line"></div>' +
+          actRow('Copy markdown', '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><rect x="9" y="9" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M5 15V5a2 2 0 012-2h10" stroke="currentColor" stroke-width="1.7"/></svg>') +
+          actRow('Version history', '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.7"/><path d="M12 8v4l3 2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>') +
+          actRow('Make a copy', '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><rect x="9" y="9" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M5 15V5a2 2 0 012-2h10" stroke="currentColor" stroke-width="1.7"/></svg>') +
+          actRow('Archive', '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="5" rx="1.5" stroke="currentColor" stroke-width="1.6"/><path d="M5 9v9a1 1 0 001 1h12a1 1 0 001-1V9M10 13h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>');
+      }
+      document.getElementById('pg-more-btn').addEventListener('click', function (e) {
+        e.stopPropagation();
+        if (!menu.classList.contains('hidden')) { menu.classList.add('hidden'); return; }
+        renderMenu(); menu.classList.remove('hidden');
+        var r = this.getBoundingClientRect();
+        menu.style.top = (r.bottom + 4) + 'px';
+        menu.style.left = Math.max(8, r.right - menu.offsetWidth) + 'px';
+      });
+      menu.addEventListener('click', function (e) {
+        var b = e.target.closest('[data-m]'); if (!b) return;
+        var m = b.getAttribute('data-m');
+        if (m === 'Full width') { fullWidth = !fullWidth; document.getElementById('pg-editor').className = 'mx-auto px-6 py-10 ' + (fullWidth ? 'max-w-none' : 'max-w-3xl'); renderMenu(); return; }
+        if (m === 'Sticky toolbar') { sticky = !sticky; renderMenu(); return; }
+        menu.classList.add('hidden');
+      });
+      document.addEventListener('click', function (e) { if (!menu.contains(e.target)) menu.classList.add('hidden'); });
+
+      // ---- favorite toggle ----
+      var starred = false, starBtn = document.getElementById('pg-star');
+      starBtn.addEventListener('click', function () {
+        starred = !starred;
+        starBtn.innerHTML = starred
+          ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" class="text-warning"><path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9 6.8 19.2l1-5.8L3.5 9.2l5.9-.9L12 3z"/></svg>'
+          : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9 6.8 19.2l1-5.8L3.5 9.2l5.9-.9L12 3z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>';
+      });
+
+      titleEl.focus();
+    })();
+  </script>
+</body>
+</html>

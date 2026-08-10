@@ -1,0 +1,104 @@
+/* Tabulator skin — Project Block design system
+   Load AFTER the Tabulator base CSS so these rules win.
+   Tokens: line #e5e7eb · stroke #d1d5db · sub #6b7280 · ink #23272f
+           faint #9ca3af · hover #f3f4f6 · zebra #fafbfc · brand #1b5f8a */
+
+.tabulator {
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+  overflow: hidden;
+}
+
+/* Header */
+.tabulator .tabulator-header {
+  background: #fafbfc;
+  border-bottom: 1px solid #e5e7eb;
+  color: #6b7280;
+  font-weight: 500;
+}
+.tabulator .tabulator-header .tabulator-col {
+  background: transparent;
+  border-right: none;
+}
+.tabulator .tabulator-header .tabulator-col .tabulator-col-content {
+  padding: 10px 16px;
+}
+.tabulator .tabulator-header .tabulator-col .tabulator-col-title {
+  color: #6b7280;
+  font-weight: 500;
+}
+/* Sortable header hover (was a dark grey by default) */
+.tabulator .tabulator-header .tabulator-col.tabulator-sortable:hover {
+  background-color: #f3f4f6 !important;
+}
+
+/* Body rows + cells */
+.tabulator .tabulator-tableholder .tabulator-table { background: #fff; }
+.tabulator-row {
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+  min-height: 44px;
+}
+.tabulator-row.tabulator-row-even { background: #fafbfc; }
+.tabulator-row.tabulator-selectable:hover,
+.tabulator-row:hover { background: #f3f4f6 !important; }
+.tabulator-row .tabulator-cell {
+  border-right: none;
+  padding: 8px 16px;
+  color: #23272f;
+}
+.tabulator-row .tabulator-cell .tbl-act { height: 28px; }
+
+/* Sort arrows -> brand when active */
+.tabulator .tabulator-col .tabulator-col-sorter .tabulator-arrow { opacity: .55; }
+.tabulator .tabulator-col[aria-sort="ascending"] .tabulator-col-sorter .tabulator-arrow,
+.tabulator .tabulator-col[aria-sort="asc"] .tabulator-col-sorter .tabulator-arrow {
+  border-bottom-color: #1b5f8a !important; opacity: 1;
+}
+.tabulator .tabulator-col[aria-sort="descending"] .tabulator-col-sorter .tabulator-arrow,
+.tabulator .tabulator-col[aria-sort="desc"] .tabulator-col-sorter .tabulator-arrow {
+  border-top-color: #1b5f8a !important; opacity: 1;
+}
+
+/* Footer / pagination */
+.tabulator .tabulator-footer {
+  background: #fff;
+  border-top: 1px solid #e5e7eb;
+  color: #6b7280;
+  font-weight: 400;
+}
+.tabulator .tabulator-footer .tabulator-paginator label { color: #6b7280; }
+.tabulator .tabulator-footer .tabulator-page {
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #fff;
+  color: #23272f;
+  margin: 0 2px;
+  padding: 4px 10px;
+}
+.tabulator .tabulator-footer .tabulator-page:not(.disabled):hover {
+  background: #f3f4f6;
+  color: #23272f;
+}
+.tabulator .tabulator-footer .tabulator-page.active {
+  background: #1b5f8a;
+  color: #fff;
+  border-color: #1b5f8a;
+}
+.tabulator .tabulator-footer .tabulator-page.disabled { opacity: .5; }
+
+/* Empty-state placeholder ("No members match your search.") */
+.tabulator .tabulator-placeholder .tabulator-placeholder-contents {
+  font-size: 16px;
+  font-weight: 700;
+  color: #000;
+}
+
+/* Collapse the body to its rows so there is no empty gap between the last row
+   and the pagination footer when the page has fewer than paginationSize rows. */
+.tabulator, .tabulator .tabulator-tableholder { min-height: 0 !important; }
+.tabulator .tabulator-tableholder { height: auto !important; }
+.tabulator-row:last-child { border-bottom: none; }

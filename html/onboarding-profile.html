@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Onboarding · Profile — Project Block</title>
+
+  <!--
+    Project Block — Onboarding · Step 1 of 5 · Create your profile
+    Standalone page. component: OnboardingProfile (future Vue route /onboarding/profile).
+    Continue -> onboarding-role.html
+  -->
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="assets/js/tailwind.config.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/css/styles.css" />
+</head>
+<body class="bg-white text-ink min-h-screen flex flex-col">
+
+  <!-- Progress: step 1 / 5 -->
+  <div class="h-1 w-full bg-line"><div class="h-full bg-brand" style="width:20%"></div></div>
+
+  <!-- Header -->
+  <header class="flex items-center justify-between px-5 sm:px-10 py-5">
+    <div class="flex items-center gap-3">
+      <span class="h-8 w-8 invisible"></span>
+      <a class="flex items-center gap-2" href="#">
+        <svg width="24" height="24" viewBox="0 0 32 32" fill="#0f0f10"><path d="M5 21 L15 4 L20.5 4 L10.5 21 Z"/><path d="M13 28 L23 11 L28.5 11 L18.5 28 Z"/></svg>
+        <span class="text-[18px] font-bold tracking-tight text-head">Project Block</span>
+      </a>
+    </div>
+    <div class="flex items-center gap-2">
+      <div class="flex items-center gap-2 border border-line rounded-full pl-1 pr-3 py-1 text-[13px] text-ink">
+        <span class="h-5 w-5 rounded-full bg-emerald-500 grid place-items-center text-white text-[9px] font-bold">Z</span>
+        <span>zorainteractive</span>
+      </div>
+      <button onclick="location.href='signup.html'" title="Log out" aria-label="Log out"
+        class="flex items-center gap-1.5 h-8 px-3 rounded-full border border-line text-[13px] text-sub hover:bg-hover hover:text-ink transition-colors">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 21H6a2 2 0 01-2-2V5a2 2 0 012-2h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 17l5-5-5-5M21 12H9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="hidden sm:inline">Log out</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="flex-1 flex justify-center px-5">
+    <div class="w-full max-w-[430px] py-6 sm:py-12">
+      <h1 class="text-[24px] font-bold text-head">Create your profile.</h1>
+      <p class="text-[15px] text-sub mb-7">This is how you will appear in Project Block.</p>
+
+      <div class="flex items-center gap-4 mb-5">
+        <span id="avatar" class="h-14 w-14 rounded-full bg-brand grid place-items-center text-white text-[20px] font-semibold bg-cover bg-center shrink-0">R</span>
+        <button id="upload-btn" type="button" class="flex items-center gap-2 text-[14px] text-sub hover:text-ink">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.8"/><circle cx="9" cy="10" r="2" stroke="currentColor" stroke-width="1.8"/><path d="M4 18l5-4 4 3 3-2 4 3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Upload image
+        </button>
+        <input id="avatar-input" type="file" accept="image/*" class="hidden" />
+      </div>
+
+      <!-- Upload progress (shown while an image uploads) -->
+      <div id="upload-progress" class="hidden mb-5">
+        <div class="flex items-center justify-between mb-1">
+          <span id="upload-name" class="text-[12px] text-sub truncate max-w-[280px]">Uploading…</span>
+          <span id="upload-pct" class="text-[12px] text-sub tabular-nums">0%</span>
+        </div>
+        <div class="h-1.5 w-full rounded-full bg-line overflow-hidden">
+          <div id="upload-bar" class="h-full bg-brand rounded-full transition-all duration-150" style="width:0%"></div>
+        </div>
+      </div>
+
+      <label class="block text-[13px] font-medium text-ink mb-1.5" for="fullname">Name <span class="text-danger">*</span></label>
+      <input id="fullname" type="text" placeholder="Enter your full name" class="pb-input" />
+
+      <div class="mt-4 border border-line rounded-lg">
+        <button id="pw-toggle" class="w-full flex items-center gap-2 h-11 px-3.5 text-[14px] text-sub">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="4" y="10" width="16" height="10" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M8 10V7a4 4 0 018 0v3" stroke="currentColor" stroke-width="1.8"/></svg>
+          Set a password (Optional)
+          <svg id="pw-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" class="ml-auto transition-transform"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div id="pw-body" class="hidden px-3.5 pb-3.5 space-y-3">
+          <div>
+            <label class="block text-[13px] text-sub mb-1.5">Set a password</label>
+            <div class="relative">
+              <input type="password" placeholder="Set a password" class="pw-input pb-input has-suffix" />
+              <button class="pw-eye absolute right-3 top-1/2 -translate-y-1/2 text-faint hover:text-sub"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="2.5" stroke="currentColor" stroke-width="1.8"/></svg></button>
+            </div>
+          </div>
+          <div>
+            <label class="block text-[13px] text-sub mb-1.5">Confirm password</label>
+            <div class="relative">
+              <input type="password" placeholder="Confirm password" class="pw-input pb-input has-suffix" />
+              <button class="pw-eye absolute right-3 top-1/2 -translate-y-1/2 text-faint hover:text-sub"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="2.5" stroke="currentColor" stroke-width="1.8"/></svg></button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <button id="continue" disabled
+        class="mt-6 w-full h-11 rounded-lg text-[14px] font-semibold bg-hover text-faint cursor-not-allowed transition-colors">
+        Continue
+      </button>
+
+      <label class="mt-5 flex items-start gap-2.5 text-[13px] text-ink cursor-pointer">
+        <input type="checkbox" checked class="mt-0.5 h-4 w-4 accent-[#1b5f8a]" />
+        <span>I agree to Project Block marketing communications
+          <span class="block text-[12px] text-sub">You may unsubscribe anytime. <a href="#" class="text-link hover:underline">Read our privacy policy.</a></span>
+        </span>
+      </label>
+    </div>
+  </main>
+
+  <script>
+    // NOTE: use nameEl, not `name` — a bare global `name` aliases window.name
+    // (always a string), which silently breaks the rest of the script.
+    var nameEl = document.getElementById('fullname');
+    var cont = document.getElementById('continue');
+    nameEl.addEventListener('input', function () {
+      var ok = nameEl.value.trim().length > 0;
+      cont.disabled = !ok;
+      cont.className = 'mt-6 w-full h-11 rounded-lg text-[14px] font-semibold transition-colors ' +
+        (ok ? 'bg-brand hover:bg-brand-dark text-white cursor-pointer' : 'bg-hover text-faint cursor-not-allowed');
+    });
+    cont.addEventListener('click', function () { if (!cont.disabled) location.href = 'onboarding-role.html'; });
+
+    // Collapsible "Set a password"
+    document.getElementById('pw-toggle').addEventListener('click', function () {
+      document.getElementById('pw-body').classList.toggle('hidden');
+      document.getElementById('pw-chevron').classList.toggle('rotate-180');
+    });
+    document.querySelectorAll('.pw-eye').forEach(function (eye) {
+      eye.addEventListener('click', function (e) {
+        e.preventDefault();
+        var inp = eye.parentElement.querySelector('.pw-input');
+        inp.type = inp.type === 'password' ? 'text' : 'password';
+      });
+    });
+
+    // Avatar upload with progress bar.
+    // Progress is simulated here (no backend in the POC); in the Laravel+Vue
+    // build, drive #upload-bar from the real XHR/fetch upload progress event.
+    (function () {
+      var input = document.getElementById('avatar-input');
+      var btn = document.getElementById('upload-btn');
+      var avatar = document.getElementById('avatar');
+      var wrap = document.getElementById('upload-progress');
+      var bar = document.getElementById('upload-bar');
+      var pct = document.getElementById('upload-pct');
+      var lbl = document.getElementById('upload-name');
+      var timer, dataUrl = null;
+
+      btn.addEventListener('click', function () { input.click(); });
+
+      input.addEventListener('change', function () {
+        var file = input.files && input.files[0];
+        if (!file) return;
+
+        // read the file so we can preview it once "upload" finishes
+        var reader = new FileReader();
+        reader.onload = function (e) { dataUrl = e.target.result; };
+        reader.readAsDataURL(file);
+
+        // show + animate progress
+        lbl.textContent = file.name;
+        wrap.classList.remove('hidden');
+        var p = 0;
+        bar.style.width = '0%';
+        pct.textContent = '0%';
+        clearInterval(timer);
+        timer = setInterval(function () {
+          p += Math.floor(Math.random() * 14) + 6;
+          if (p >= 100) {
+            p = 100;
+            clearInterval(timer);
+            bar.style.width = '100%';
+            pct.textContent = '100%';
+            setTimeout(function () {
+              if (dataUrl) {
+                avatar.style.backgroundImage = 'url(' + dataUrl + ')';
+                avatar.textContent = '';
+              }
+              wrap.classList.add('hidden');
+            }, 500);
+          } else {
+            bar.style.width = p + '%';
+            pct.textContent = p + '%';
+          }
+        }, 150);
+      });
+    })();
+  </script>
+</body>
+</html>

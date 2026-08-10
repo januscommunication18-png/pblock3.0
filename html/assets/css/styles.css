@@ -1,0 +1,166 @@
+/* Project Block — shared styles
+   ------------------------------------------------------------------
+   Font + scrollbars, plus the form-control component classes.
+   Form controls follow the Tailwind Plus "Input groups" style:
+   an inset outline (not border + ring) that thickens to 2px in the
+   brand color on focus. Written as plain CSS so it works with the
+   Tailwind Play CDN and maps 1:1 to a future Vue <TextField> / <Textarea>.
+   Tokens: stroke #d1d5db · brand #1b5f8a · faint #9ca3af · ink #23272f
+   ------------------------------------------------------------------ */
+
+html,
+body {
+  font-family: 'Inter', sans-serif;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: #d6d6d9; border-radius: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* ------------------------------------------------------------------
+   Form controls (Tailwind Plus input-groups style)
+   ------------------------------------------------------------------ */
+
+/* Base input / select */
+.pb-input {
+  display: block;
+  width: 100%;
+  height: 2.75rem;                 /* h-11 */
+  border-radius: 0.375rem;         /* rounded-md */
+  background-color: #fff;
+  padding: 0 0.875rem;             /* px-3.5 */
+  font-size: 14px;
+  line-height: 1.25rem;
+  color: #23272f;                  /* ink */
+  outline: 1px solid #d1d5db;      /* stroke */
+  outline-offset: -1px;
+  transition: outline-color 0.12s ease;
+}
+
+.pb-input::placeholder { color: #9ca3af; }  /* faint */
+
+.pb-input:focus {
+  outline: 2px solid #1b5f8a;      /* brand */
+  outline-offset: -2px;
+}
+
+/* Select: room for the native chevron + secondary text color */
+select.pb-input { padding-right: 2rem; color: #6b7280; }
+
+/* Textarea */
+.pb-textarea {
+  display: block;
+  width: 100%;
+  border-radius: 0.375rem;
+  background-color: #fff;
+  padding: 0.625rem 0.875rem;      /* py-2.5 px-3.5 */
+  font-size: 14px;
+  line-height: 1.5rem;
+  color: #23272f;
+  outline: 1px solid #d1d5db;
+  outline-offset: -1px;
+  transition: outline-color 0.12s ease;
+}
+
+.pb-textarea::placeholder { color: #9ca3af; }
+
+.pb-textarea:focus {
+  outline: 2px solid #1b5f8a;
+  outline-offset: -2px;
+}
+
+/* Suffix icon room (fields with a trailing icon/clear/eye button) */
+.pb-input.has-suffix { padding-right: 2.5rem; }
+
+/* Read-only */
+.pb-input:read-only {
+  background-color: #f3f4f6;        /* hover */
+  color: #6b7280;                   /* sub */
+  cursor: default;
+  outline-color: #e5e7eb;           /* line */
+}
+.pb-input:read-only:focus { outline: 1px solid #e5e7eb; outline-offset: -1px; }
+
+/* Error */
+.pb-input.is-error { outline-color: #ef4444; background-color: rgba(254, 242, 242, 0.4); }
+.pb-input.is-error:focus { outline: 2px solid #ef4444; outline-offset: -2px; }
+
+/* ------------------------------------------------------------------
+   Input group: leading add-on (e.g. app.projectblock.so/ + slug).
+   The wrapper owns the outline; the inner input is transparent.
+   ------------------------------------------------------------------ */
+.pb-group {
+  display: flex;
+  align-items: center;
+  height: 2.75rem;
+  border-radius: 0.375rem;
+  background-color: #fff;
+  outline: 1px solid #d1d5db;
+  outline-offset: -1px;
+  overflow: hidden;
+  transition: outline-color 0.12s ease;
+}
+.pb-group:focus-within { outline: 2px solid #1b5f8a; outline-offset: -2px; }
+
+.pb-group__prefix {
+  padding-left: 0.875rem;
+  padding-right: 0.125rem;
+  font-size: 14px;
+  color: #9ca3af;                   /* faint */
+  user-select: none;
+  white-space: nowrap;
+}
+
+.pb-group__field {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  outline: none;
+  background: transparent;
+  padding-right: 0.875rem;
+  font-size: 14px;
+  color: #23272f;
+}
+.pb-group__field::placeholder { color: #9ca3af; }
+
+/* ------------------------------------------------------------------
+   Checkboxes & radios
+   ------------------------------------------------------------------ */
+.pb-check,
+.pb-radio {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  accent-color: #1b5f8a;            /* brand fill when checked */
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* Read-only / disabled */
+.pb-check:disabled,
+.pb-radio:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* Error (red ring that respects the control shape) */
+.pb-check.is-error { box-shadow: 0 0 0 2px #ef4444; border-radius: 4px; }
+.pb-radio.is-error { box-shadow: 0 0 0 2px #ef4444; border-radius: 9999px; }
+
+/* ------------------------------------------------------------------
+   Combobox button states (built on .pb-input)
+   ------------------------------------------------------------------ */
+.pb-combo-btn.is-error { outline-color: #ef4444; }
+.pb-combo-btn.is-error:focus { outline: 2px solid #ef4444; outline-offset: -2px; }
+.pb-combo-btn.is-readonly { background-color: #f3f4f6; color: #6b7280; outline-color: #e5e7eb; cursor: not-allowed; }
+.pb-combo-btn.is-readonly:focus { outline: 1px solid #e5e7eb; outline-offset: -1px; }
+
+/* Date-picker field: readonly (no typing) but keeps the active look */
+.pb-input.is-picker:read-only { background-color: #fff; color: #23272f; outline-color: #d1d5db; cursor: pointer; }
+.pb-input.is-picker:read-only:focus { outline: 2px solid #1b5f8a; outline-offset: -2px; }

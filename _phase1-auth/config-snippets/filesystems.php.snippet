@@ -1,0 +1,38 @@
+<?php
+/*
+ |----------------------------------------------------------------------------
+ | ADD to config/filesystems.php
+ |----------------------------------------------------------------------------
+ | 1) Add this top-level key (chooses where avatars go per environment):
+ */
+
+    // local -> 'assets'; production -> 'spaces'
+    'avatar_disk' => env('AVATAR_DISK', 'assets'),
+
+/*
+ | 2) Add these two disks inside the 'disks' => [ ... ] array:
+ */
+
+        // Local public uploads -> public/assets (served at /assets/...).
+        'assets' => [
+            'driver'     => 'local',
+            'root'       => public_path('assets'),
+            'url'        => env('APP_URL').'/assets',
+            'visibility' => 'public',
+            'throw'      => false,
+        ],
+
+        // Production object storage: DigitalOcean Spaces (S3-compatible).
+        // Requires: composer require league/flysystem-aws-s3-v3 "^3.0"
+        'spaces' => [
+            'driver'                  => 's3',
+            'key'                     => env('DO_SPACES_KEY'),
+            'secret'                  => env('DO_SPACES_SECRET'),
+            'region'                  => env('DO_SPACES_REGION', 'nyc3'),
+            'bucket'                  => env('DO_SPACES_BUCKET'),
+            'endpoint'                => env('DO_SPACES_ENDPOINT'),   // e.g. https://nyc3.digitaloceanspaces.com
+            'url'                     => env('DO_SPACES_URL'),        // CDN/public base, e.g. https://<bucket>.nyc3.cdn.digitaloceanspaces.com
+            'use_path_style_endpoint' => false,
+            'visibility'              => 'public',
+            'throw'                   => false,
+        ],

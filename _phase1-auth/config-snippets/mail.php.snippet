@@ -1,0 +1,10 @@
+<?php
+/*
+ |----------------------------------------------------------------------------
+ | ADD to config/mail.php (top level of the returned array)
+ |----------------------------------------------------------------------------
+ | When true, App\Listeners\CaptureOutgoingEmail stores a copy of each outbound
+ | message in email_logs for the /emaillog viewer. Default: on for local only.
+ */
+
+    'capture_to_db' => env('MAIL_CAPTURE_TO_DB', env('APP_ENV') === 'local'),

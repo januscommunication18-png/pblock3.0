@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Onboarding — Project Block</title>
+
+  <!--
+    Project Block — Onboarding (5-step flow)
+    Stack today: static HTML + Tailwind (CDN). Migration target: Laravel + Vue.
+    Each step maps to a future Vue component / route:
+      component: OnboardingProfile   (step 1)
+      component: OnboardingRole      (step 2)
+      component: OnboardingGoals     (step 3)
+      component: OnboardingWorkspace (step 4)
+      component: OnboardingInvite    (step 5)
+    Shared frame: ProgressBar + OnboardingHeader + Toast.
+    Look & feel: Project Block. Tokens in assets/js/tailwind.config.js.
+  -->
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="assets/js/tailwind.config.js"></script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/css/styles.css" />
+</head>
+<body class="bg-white text-ink min-h-screen flex flex-col">
+
+  <!-- component: ProgressBar -->
+  <div class="h-1 w-full bg-line">
+    <div id="progress" class="h-full bg-brand transition-all duration-300" style="width:20%"></div>
+  </div>
+
+  <!-- component: OnboardingHeader -->
+  <header class="flex items-center justify-between px-5 sm:px-10 py-5">
+    <div class="flex items-center gap-3">
+      <button id="back" class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover invisible">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <a class="flex items-center gap-2" href="#">
+        <svg width="24" height="24" viewBox="0 0 32 32" fill="#0f0f10"><path d="M5 21 L15 4 L20.5 4 L10.5 21 Z"/><path d="M13 28 L23 11 L28.5 11 L18.5 28 Z"/></svg>
+        <span class="text-[18px] font-bold tracking-tight text-head">Project Block</span>
+      </a>
+    </div>
+    <div id="userchip" class="flex items-center gap-2 border border-line rounded-full pl-1 pr-3 py-1 text-[13px] text-ink">
+      <span class="h-5 w-5 rounded-full bg-emerald-500 grid place-items-center text-white text-[9px] font-bold">Z</span>
+      <span id="userchip-name">zorainteractive</span>
+    </div>
+  </header>
+
+  <!-- Steps -->
+  <main class="flex-1 flex justify-center px-5">
+    <div class="w-full max-w-[430px] py-6 sm:py-12">
+
+      <!-- ============ STEP 1 · component: OnboardingProfile ============ -->
+      <section data-step="1">
+        <h1 class="text-[24px] font-bold text-head">Create your profile.</h1>
+        <p class="text-[15px] text-sub mb-7">This is how you will appear in Project Block.</p>
+
+        <div class="flex items-center gap-4 mb-7">
+          <span class="h-14 w-14 rounded-full bg-brand grid place-items-center text-white text-[20px] font-semibold">R</span>
+          <button class="flex items-center gap-2 text-[14px] text-sub hover:text-ink">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.8"/><circle cx="9" cy="10" r="2" stroke="currentColor" stroke-width="1.8"/><path d="M4 18l5-4 4 3 3-2 4 3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Upload image
+          </button>
+        </div>
+
+        <label class="block text-[13px] font-medium text-ink mb-1.5" for="fullname">Name <span class="text-danger">*</span></label>
+        <input id="fullname" type="text" placeholder="Enter your full name"
+          class="w-full h-11 rounded-lg border border-stroke px-3.5 text-[14px] placeholder:text-faint outline-none focus:border-brand focus:ring-1 focus:ring-brand" />
+
+        <!-- Collapsible password -->
+        <div class="mt-4 border border-line rounded-lg">
+          <button id="pw-toggle" class="w-full flex items-center gap-2 h-11 px-3.5 text-[14px] text-sub">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="4" y="10" width="16" height="10" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M8 10V7a4 4 0 018 0v3" stroke="currentColor" stroke-width="1.8"/></svg>
+            Set a password (Optional)
+            <svg id="pw-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" class="ml-auto transition-transform"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <div id="pw-body" class="hidden px-3.5 pb-3.5 space-y-3">
+            <div>
+              <label class="block text-[13px] text-sub mb-1.5">Set a password</label>
+              <div class="relative">
+                <input type="password" placeholder="Set a password" class="pw-input w-full h-11 rounded-lg border border-stroke pl-3.5 pr-10 text-[14px] placeholder:text-faint outline-none focus:border-brand focus:ring-1 focus:ring-brand" />
+                <button class="pw-eye absolute right-3 top-1/2 -translate-y-1/2 text-faint hover:text-sub"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="2.5" stroke="currentColor" stroke-width="1.8"/></svg></button>
+              </div>
+            </div>
+            <div>
+              <label class="block text-[13px] text-sub mb-1.5">Confirm password</label>
+              <div class="relative">
+                <input type="password" placeholder="Confirm password" class="pw-input w-full h-11 rounded-lg border border-stroke pl-3.5 pr-10 text-[14px] placeholder:text-faint outline-none focus:border-brand focus:ring-1 focus:ring-brand" />
+                <button class="pw-eye absolute right-3 top-1/2 -translate-y-1/2 text-faint hover:text-sub"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="2.5" stroke="currentColor" stroke-width="1.8"/></svg></button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <button class="next-btn mt-6 w-full h-11 rounded-lg text-[14px] font-semibold" data-next>Continue</button>
+
+        <label class="mt-5 flex items-start gap-2.5 text-[13px] text-ink cursor-pointer">
+          <input type="checkbox" checked class="mt-0.5 h-4 w-4 accent-[#1b5f8a]" />
+          <span>I agree to Project Block marketing communications
+            <span class="block text-[12px] text-sub">You may unsubscribe anytime. <a href="#" class="text-link hover:underline">Read our privacy policy.</a></span>
+          </span>
+        </label>
+      </section>
+
+      <!-- ============ STEP 2 · component: OnboardingRole ============ -->
+      <section data-step="2" class="hidden">
+        <h1 class="text-[24px] font-bold text-head">What's your role?</h1>
+        <p class="text-[15px] text-sub mb-7">Let's set up Project Block for how you work.</p>
+
+        <p class="text-[13px] font-medium text-ink mb-3">Select one</p>
+        <div id="role-list" class="space-y-2.5">
+          <!-- options injected by JS -->
+        </div>
+
+        <button class="next-btn mt-6 w-full h-11 rounded-lg text-[14px] font-semibold" data-next>Continue</button>
+        <button class="skip-btn w-full h-9 mt-3 text-[14px] font-semibold text-ink" data-skip>Skip</button>
+      </section>
+
+      <!-- ============ STEP 3 · component: OnboardingGoals ============ -->
+      <section data-step="3" class="hidden">
+        <h1 class="text-[24px] font-bold text-head">What brings you to Project Block?</h1>
+        <p class="text-[15px] text-sub mb-7">Tell us your goals and team size.</p>
+
+        <p class="text-[13px] font-medium text-ink mb-3">Select one or more</p>
+        <div id="goal-list" class="space-y-2.5">
+          <!-- options injected by JS -->
+        </div>
+
+        <button class="next-btn mt-6 w-full h-11 rounded-lg text-[14px] font-semibold" data-next>Continue</button>
+        <button class="skip-btn w-full h-9 mt-3 text-[14px] font-semibold text-ink" data-skip>Skip</button>
+      </section>
+
+      <!-- ============ STEP 4 · component: OnboardingWorkspace ============ -->
+      <section data-step="4" class="hidden">
+        <h1 class="text-[24px] font-bold text-head">Create your workspace</h1>
+        <p class="text-[15px] text-sub mb-7">All your work — unified.</p>
+
+        <label class="block text-[13px] font-medium text-ink mb-1.5" for="ws-name">Name your workspace <span class="text-danger">*</span></label>
+        <input id="ws-name" type="text" placeholder="Acme Inc"
+          class="w-full h-11 rounded-lg border border-stroke px-3.5 text-[14px] placeholder:text-faint outline-none focus:border-brand focus:ring-1 focus:ring-brand" />
+
+        <label class="block text-[13px] font-medium text-ink mb-1.5 mt-5">Set your workspace's URL <span class="text-danger">*</span></label>
+        <div class="flex items-center h-11 rounded-lg border border-stroke overflow-hidden focus-within:border-brand focus-within:ring-1 focus-within:ring-brand">
+          <span class="pl-3.5 pr-1 text-[14px] text-faint select-none">app.projectblock.so/</span>
+          <input id="ws-slug" type="text" placeholder="acme-inc" class="flex-1 h-full pr-3.5 text-[14px] outline-none" />
+        </div>
+        <p class="text-[12px] text-sub mt-1.5">You can only edit the slug of the URL</p>
+
+        <p class="text-[13px] font-medium text-ink mb-3 mt-5">How many people will use this workspace? <span class="text-danger">*</span></p>
+        <div id="size-list" class="flex flex-wrap gap-2.5">
+          <!-- pills injected by JS -->
+        </div>
+
+        <button class="next-btn mt-7 w-full h-11 rounded-lg text-[14px] font-semibold" data-next>Create workspace</button>
+      </section>
+
+      <!-- ============ STEP 5 · component: OnboardingInvite ============ -->
+      <section data-step="5" class="hidden">
+        <h1 class="text-[24px] font-bold text-head">Invite your teammates</h1>
+        <p class="text-[15px] text-sub mb-7">Work in Project Block happens best with your team. Invite them now to use Project Block to its potential.</p>
+
+        <div class="grid grid-cols-[1fr_130px] gap-3 mb-2">
+          <span class="text-[13px] font-medium text-ink">Email</span>
+          <span class="text-[13px] font-medium text-ink">Role</span>
+        </div>
+        <div id="invite-list" class="space-y-3">
+          <!-- rows injected by JS -->
+        </div>
+        <button id="add-invite" class="flex items-center gap-1.5 mt-4 text-[14px] font-semibold text-link hover:underline">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          Add another
+        </button>
+
+        <button class="next-btn mt-7 w-full h-11 rounded-lg text-[14px] font-semibold" data-next>Continue</button>
+        <button class="skip-btn w-full h-9 mt-3 text-[14px] font-semibold text-ink" data-skip>I'll do it later</button>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- component: Toast -->
+  <div id="toast" class="hidden fixed bottom-5 right-5 flex items-start gap-3 bg-white border border-line shadow-lg rounded-lg px-4 py-3 max-w-[320px]">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" class="mt-0.5 shrink-0"><circle cx="12" cy="12" r="9" fill="#22c55e"/><path d="M8 12l2.5 2.5L16 9" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <div>
+      <div id="toast-title" class="text-[13px] font-semibold text-head">Success</div>
+      <div id="toast-msg" class="text-[13px] text-sub"></div>
+    </div>
+    <button onclick="document.getElementById('toast').classList.add('hidden')" class="ml-2 text-faint hover:text-sub"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+  </div>
+
+  <script>
+    /* ------------------------------------------------------------------
+       Onboarding controller. In the Vue build this becomes a router with
+       one component per step + a shared store for the collected answers.
+       ------------------------------------------------------------------ */
+    var TOTAL = 5;
+    var state = { step: 1, name: '', role: null, goals: [], wsName: '', wsSize: null, invites: 3 };
+
+    var ROLES = [
+      { key: 'pm',   label: 'Product Manager',     icon: 'M12 3l8 4-8 4-8-4 8-4zM4 12l8 4 8-4M4 16l8 4 8-4' },
+      { key: 'em',   label: 'Engineering Manager',  icon: 'M12 3l8 4-8 4-8-4 8-4zM4 12l8 4 8-4' },
+      { key: 'des',  label: 'Designer',             icon: 'M4 7l5-3 6 3 5-2v13l-5 2-6-3-5 3V7z' },
+      { key: 'dev',  label: 'Developer',            icon: 'M4 5h16v11H4zM2 20h20' },
+      { key: 'fnd',  label: 'Founder/Executive',    icon: 'M5 19l3-9 4 3 4-7 3 13' },
+      { key: 'ops',  label: 'Operations Manager',   icon: 'M4 12a8 8 0 018-8M20 12a8 8 0 01-8 8M8 4L5 7M16 20l3-3' },
+      { key: 'oth',  label: 'Others',               icon: 'M12 3l8 4-8 4-8-4 8-4z' },
+    ];
+    var GOALS = [
+      'Plan and track product roadmaps',
+      'Manage engineering sprints',
+      'Coordinate cross-functional projects',
+      'Replace our current tool',
+      'Just exploring',
+    ];
+    var SIZES = ['Just myself', '2-10', '11-50', '51-200', '201-500', '500+'];
+    var INVITE_PLACEHOLDERS = ['charlie.taylor@company.com', 'octave.chanute@company.com', 'george.spratt@company.com'];
+
+    /* ---- primary button styling helper ---- */
+    function setPrimary(btn, enabled) {
+      btn.disabled = !enabled;
+      btn.className = 'next-btn mt-6 w-full h-11 rounded-lg text-[14px] font-semibold transition-colors ' +
+        (enabled ? 'bg-brand hover:bg-brand-dark text-white cursor-pointer'
+                 : 'bg-hover text-faint cursor-not-allowed');
+    }
+
+    /* ---- render option lists ---- */
+    function iconSvg(d) {
+      return '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" class="shrink-0"><path d="' + d + '" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    }
+    function checkbox(on) {
+      return on
+        ? '<span class="ml-auto h-5 w-5 rounded bg-brand grid place-items-center"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5 9-11" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>'
+        : '<span class="ml-auto h-5 w-5 rounded border border-stroke"></span>';
+    }
+    function optionClass(sel) {
+      return 'option w-full flex items-center gap-3 h-12 px-4 rounded-lg border text-left text-[14px] ' +
+        (sel ? 'border-brand ring-1 ring-brand text-brand font-medium' : 'border-stroke text-ink hover:bg-hover');
+    }
+
+    function renderRoles() {
+      document.getElementById('role-list').innerHTML = ROLES.map(function (r) {
+        var sel = state.role === r.key;
+        return '<button type="button" class="' + optionClass(sel) + '" data-role="' + r.key + '">' +
+          iconSvg(r.icon) + '<span>' + r.label + '</span>' + (sel ? checkbox(true) : '') + '</button>';
+      }).join('');
+      document.querySelectorAll('#role-list [data-role]').forEach(function (el) {
+        el.onclick = function () { state.role = el.getAttribute('data-role'); renderRoles(); refresh(); };
+      });
+    }
+    function renderGoals() {
+      document.getElementById('goal-list').innerHTML = GOALS.map(function (g, i) {
+        var sel = state.goals.indexOf(i) > -1;
+        return '<button type="button" class="' + optionClass(sel) + '" data-goal="' + i + '">' +
+          checkbox(sel).replace('ml-auto', 'mr-0') + '<span>' + g + '</span></button>';
+      }).join('');
+      document.querySelectorAll('#goal-list [data-goal]').forEach(function (el) {
+        el.onclick = function () {
+          var i = +el.getAttribute('data-goal');
+          var at = state.goals.indexOf(i);
+          if (at > -1) state.goals.splice(at, 1); else state.goals.push(i);
+          renderGoals(); refresh();
+        };
+      });
+    }
+    function renderSizes() {
+      document.getElementById('size-list').innerHTML = SIZES.map(function (s) {
+        var sel = state.wsSize === s;
+        return '<button type="button" data-size="' + s + '" class="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg border text-[13px] ' +
+          (sel ? 'border-brand ring-1 ring-brand text-brand font-medium' : 'border-stroke text-ink hover:bg-hover') + '">' +
+          '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/>' +
+          (sel ? '<path d="M8 12l2.5 2.5L16 9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>' : '') +
+          '</svg>' + s + '</button>';
+      }).join('');
+      document.querySelectorAll('#size-list [data-size]').forEach(function (el) {
+        el.onclick = function () { state.wsSize = el.getAttribute('data-size'); renderSizes(); refresh(); };
+      });
+    }
+    function inviteRow(i) {
+      return '<div class="grid grid-cols-[1fr_130px] gap-3">' +
+        '<input type="email" placeholder="' + (INVITE_PLACEHOLDERS[i] || 'name@company.com') + '" class="h-11 rounded-lg border border-stroke px-3.5 text-[14px] placeholder:text-faint outline-none focus:border-brand focus:ring-1 focus:ring-brand" />' +
+        '<select class="h-11 rounded-lg border border-stroke px-3 text-[14px] text-sub outline-none focus:border-brand focus:ring-1 focus:ring-brand bg-white">' +
+        '<option value="">Select role</option><option>Admin</option><option>Member</option><option>Viewer</option><option>Guest</option></select></div>';
+    }
+    function renderInvites() {
+      var html = '';
+      for (var i = 0; i < state.invites; i++) html += inviteRow(i);
+      document.getElementById('invite-list').innerHTML = html;
+    }
+
+    /* ---- step navigation ---- */
+    function refresh() {
+      // show current step
+      document.querySelectorAll('[data-step]').forEach(function (s) {
+        s.classList.toggle('hidden', +s.getAttribute('data-step') !== state.step);
+      });
+      // progress + back button
+      document.getElementById('progress').style.width = (state.step / TOTAL * 100) + '%';
+      document.getElementById('back').classList.toggle('invisible', state.step === 1);
+
+      // gate the primary button of the visible step
+      var sec = document.querySelector('[data-step="' + state.step + '"]');
+      var btn = sec.querySelector('[data-next]');
+      var ok = true;
+      if (state.step === 1) ok = state.name.trim().length > 0;
+      else if (state.step === 2) ok = !!state.role;
+      else if (state.step === 3) ok = state.goals.length > 0;
+      else if (state.step === 4) ok = state.wsName.trim().length > 0 && !!state.wsSize;
+      setPrimary(btn, ok);
+    }
+
+    function toast(title, msg) {
+      document.getElementById('toast-title').textContent = title;
+      document.getElementById('toast-msg').textContent = msg;
+      var t = document.getElementById('toast');
+      t.classList.remove('hidden');
+      setTimeout(function () { t.classList.add('hidden'); }, 3200);
+    }
+
+    function goNext() {
+      if (state.step === 3) toast('Success', 'Profile setup completed!');
+      if (state.step === 4) toast('Success', 'Workspace created successfully');
+      if (state.step < TOTAL) { state.step++; refresh(); window.scrollTo(0, 0); }
+      else toast('All set', "You're ready to go 🎉");
+    }
+    function goSkip() { goNext(); }
+    function goBack() { if (state.step > 1) { state.step--; refresh(); window.scrollTo(0, 0); } }
+
+    /* ---- wire everything ---- */
+    document.addEventListener('DOMContentLoaded', function () {
+      renderRoles(); renderGoals(); renderSizes(); renderInvites();
+
+      // name -> chip + gating
+      document.getElementById('fullname').addEventListener('input', function (e) {
+        state.name = e.target.value;
+        if (state.name.trim()) {
+          document.getElementById('userchip-name').textContent = state.name;
+          document.querySelector('#userchip span').textContent = state.name.trim()[0].toUpperCase();
+        }
+        refresh();
+      });
+
+      // workspace name -> auto slug + gating
+      document.getElementById('ws-name').addEventListener('input', function (e) {
+        state.wsName = e.target.value;
+        document.getElementById('ws-slug').value =
+          e.target.value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        refresh();
+      });
+      document.getElementById('ws-slug').addEventListener('input', refresh);
+
+      // password collapsible
+      document.getElementById('pw-toggle').addEventListener('click', function () {
+        document.getElementById('pw-body').classList.toggle('hidden');
+        document.getElementById('pw-chevron').classList.toggle('rotate-180');
+      });
+      // password eye toggles (delegated)
+      document.addEventListener('click', function (e) {
+        var eye = e.target.closest && e.target.closest('.pw-eye');
+        if (!eye) return;
+        e.preventDefault();
+        var inp = eye.parentElement.querySelector('.pw-input');
+        inp.type = inp.type === 'password' ? 'text' : 'password';
+      });
+
+      // add invite row
+      document.getElementById('add-invite').addEventListener('click', function () {
+        state.invites++; renderInvites();
+      });
+
+      // nav buttons (delegated)
+      document.addEventListener('click', function (e) {
+        if (e.target.closest('[data-next]')) { if (!e.target.closest('[data-next]').disabled) goNext(); }
+        else if (e.target.closest('[data-skip]')) goSkip();
+        else if (e.target.closest('#back')) goBack();
+      });
+
+      refresh();
+    });
+  </script>
+</body>
+</html>

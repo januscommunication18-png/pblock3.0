@@ -1,0 +1,33 @@
+<?php
+/*
+ |----------------------------------------------------------------------------
+ | ADD to config/services.php (inside the returned array)
+ |----------------------------------------------------------------------------
+ | Postmark is Laravel's built-in transport; 'postmark' key + MAIL_MAILER=postmark
+ | is all that's needed for production email (requires symfony/postmark-mailer).
+ */
+
+    'postmark' => [
+        'token' => env('POSTMARK_TOKEN'),
+        // Optional: pin a Postmark Message Stream
+        // 'message_stream_id' => env('POSTMARK_MESSAGE_STREAM_ID'),
+    ],
+
+    'google' => [
+        'client_id'     => env('GOOGLE_CLIENT_ID'),
+        'client_secret' => env('GOOGLE_CLIENT_SECRET'),
+        'redirect'      => env('GOOGLE_REDIRECT_URI', env('APP_URL').'/auth/google/callback'),
+    ],
+
+    'github' => [
+        'client_id'     => env('GITHUB_CLIENT_ID'),
+        'client_secret' => env('GITHUB_CLIENT_SECRET'),
+        'redirect'      => env('GITHUB_REDIRECT_URI', env('APP_URL').'/auth/github/callback'),
+    ],
+
+    // Progressive SSO: map an email domain to its IdP entry URL.
+    'sso' => [
+        'domains' => [
+            // 'acme.com' => 'https://idp.acme.com/sso/start',
+        ],
+    ],

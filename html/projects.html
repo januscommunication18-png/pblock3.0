@@ -1,0 +1,1153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Projects — Project Block</title>
+
+  <!--
+    Project Block — Projects listing screen
+    This is the app shell. Component boundaries for the Laravel + Vue build:
+      component: AppTopbar          (workspace switcher + search + actions)
+      component: AppRail            (far-left icon nav)
+      component: AppSidebar         (projects sidebar; off-canvas drawer on mobile)
+      component: SidebarMoreFlyout  (pick which optional items load in the left menu)
+      component: ProjectsToolbar
+      component: ProjectCard
+    Look & feel: Project Block. Tokens in assets/js/tailwind.config.js.
+  -->
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="assets/js/tailwind.config.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/css/styles.css" />
+</head>
+<body class="bg-white text-ink h-screen flex flex-col overflow-hidden text-[13px]">
+
+  <!-- ============ component: AppTopbar ============ -->
+  <header class="h-14 shrink-0 border-b border-line flex items-center gap-2 px-3 sm:px-4">
+    <button id="open-sidebar" class="lg:hidden h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+
+    <!-- component: WorkspaceSwitcher (label + Switch workspace) -->
+    <div class="flex items-center gap-2 shrink-0">
+      <span class="flex items-center gap-2 px-2 h-9">
+        <span class="h-6 w-6 rounded-md bg-slate-700 text-white grid place-items-center text-[11px] font-semibold">J</span>
+        <span class="font-medium text-[13px] max-w-[110px] sm:max-w-[150px] truncate">Janus Communicaiton</span>
+      </span>
+      <button id="switch-ws-btn" class="inline-flex items-center h-7 px-2.5 rounded-md border border-brand text-[12px] text-brand hover:bg-hover whitespace-nowrap">Switch workspace</button>
+    </div>
+
+    <!-- Search -->
+    <div class="flex-1 flex justify-center px-2">
+      <div class="relative w-full max-w-md">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="absolute left-3 top-1/2 -translate-y-1/2 text-faint"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <input type="text" placeholder="Search" class="w-full h-9 rounded-md bg-hover pl-9 pr-3 text-[13px] text-ink placeholder:text-faint outline outline-1 -outline-offset-1 outline-transparent focus:bg-white focus:outline-stroke" />
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="flex items-center gap-1.5 shrink-0">
+      <button id="expand-sidebar" title="Expand sidebar" class="hidden h-8 w-8 place-items-center rounded-md text-sub hover:bg-hover"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M9 4v16" stroke="currentColor" stroke-width="1.8"/><path d="M13 9.5L15.5 12L13 14.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button class="hidden sm:inline-flex items-center h-8 px-3 rounded-md border border-line text-[13px] text-ink hover:bg-hover">Get started</button>
+      <button id="ws-modal-btn" class="hidden sm:inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-line text-[13px] text-ink hover:bg-hover">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/><rect x="13" y="4" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/><rect x="4" y="13" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/><rect x="13" y="13" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/></svg>
+        Workspace
+      </button>
+      <button class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover" title="Inbox"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M3 13h4l2 3h6l2-3h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 6h14l2 7v4a1 1 0 01-1 1H4a1 1 0 01-1-1v-4l2-7z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></button>
+      <button class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover" title="Help"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M9.5 9.5a2.5 2.5 0 114 2c-1 .7-1.5 1.2-1.5 2.5M12 17.5v.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+      <!-- component: UserMenu (avatar + account card) -->
+      <div class="relative ml-1">
+        <button id="user-btn" class="h-7 w-7 rounded-full bg-emerald-500 grid place-items-center text-white text-[11px] font-bold ring-2 ring-transparent focus:outline-none">Z</button>
+
+        <!-- Account dropdown card -->
+        <div id="user-menu" class="hidden absolute right-0 top-full mt-2 w-64 bg-white border border-line rounded-xl shadow-lg z-50 p-1.5">
+          <!-- Profile banner -->
+          <div class="relative rounded-lg overflow-hidden px-4 pt-7 pb-4 text-center" style="background-color:#9ca3af;background-image:url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E&quot;);">
+            <span class="h-14 w-14 rounded-full bg-brand text-white grid place-items-center text-[20px] font-semibold mx-auto shadow-sm">Z</span>
+            <div class="text-[14px] font-semibold text-white mt-2.5 drop-shadow-sm">Rohit Philip</div>
+            <div class="text-[12px] text-white/90 drop-shadow-sm">zorainteractive@gmail.com</div>
+          </div>
+
+          <!-- Menu items -->
+          <div class="pt-1.5">
+            <button id="acct-open-settings" class="w-full text-left flex items-center gap-2.5 px-2.5 h-9 rounded-lg text-[13px] text-ink hover:bg-hover">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" class="text-sub"><path d="M10.3 3.2a1 1 0 011.4 0l.9.9a1 1 0 00.9.3l1.2-.2a1 1 0 011.1.7l.4 1.2a1 1 0 00.6.6l1.2.4a1 1 0 01.7 1.1l-.2 1.2a1 1 0 00.3.9l.9.9a1 1 0 010 1.4l-.9.9a1 1 0 00-.3.9l.2 1.2a1 1 0 01-.7 1.1l-1.2.4a1 1 0 00-.6.6l-.4 1.2a1 1 0 01-1.1.7l-1.2-.2a1 1 0 00-.9.3l-.9.9a1 1 0 01-1.4 0l-.9-.9a1 1 0 00-.9-.3l-1.2.2a1 1 0 01-1.1-.7l-.4-1.2a1 1 0 00-.6-.6l-1.2-.4a1 1 0 01-.7-1.1l.2-1.2a1 1 0 00-.3-.9l-.9-.9a1 1 0 010-1.4l.9-.9a1 1 0 00.3-.9l-.2-1.2a1 1 0 01.7-1.1l1.2-.4a1 1 0 00.6-.6l.4-1.2a1 1 0 011.1-.7l1.2.2a1 1 0 00.9-.3l.9-.9z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.6"/></svg>
+              Settings
+            </button>
+            <button id="acct-open-prefs" class="w-full text-left flex items-center gap-2.5 px-2.5 h-9 rounded-lg text-[13px] text-ink hover:bg-hover">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" class="text-sub"><path d="M4 7h9M17 7h3M4 17h3M11 17h9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="15" cy="7" r="2.2" stroke="currentColor" stroke-width="1.7"/><circle cx="9" cy="17" r="2.2" stroke="currentColor" stroke-width="1.7"/></svg>
+              Preferences
+            </button>
+            <a href="signup.html" class="flex items-center gap-2.5 px-2.5 h-9 rounded-lg text-[13px] text-ink hover:bg-hover">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" class="text-sub"><path d="M9 21H6a2 2 0 01-2-2V5a2 2 0 012-2h3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 17l5-5-5-5M21 12H9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Sign out
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="flex-1 flex min-h-0 relative">
+
+    <!-- ============ component: AppRail ============ -->
+    <nav class="hidden lg:flex w-16 shrink-0 border-r border-line bg-[#f6f7f8] flex-col items-center py-3 gap-1">
+      <a href="projects.html" class="flex flex-col items-center gap-1 w-full px-0.5 py-2 rounded-lg bg-sel text-brand">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.8"/><rect x="13" y="4" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.8"/><rect x="4" y="13" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.8"/><rect x="13" y="13" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.8"/></svg>
+        <span class="text-[10px] text-center leading-tight">Projects</span>
+      </a>
+      <a class="flex flex-col items-center gap-1 w-full px-0.5 py-2 rounded-lg text-ink hover:bg-hover">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+        <span class="text-[10px] text-center leading-tight">Wiki</span>
+      </a>
+      <a class="flex flex-col items-center gap-1 w-full px-0.5 py-2 rounded-lg text-ink hover:bg-hover">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 13v-1a8 8 0 0116 0v1" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><rect x="3" y="12.5" width="4" height="6" rx="1.6" stroke="currentColor" stroke-width="1.7"/><rect x="17" y="12.5" width="4" height="6" rx="1.6" stroke="currentColor" stroke-width="1.7"/><path d="M19 18.5v.5a2.5 2.5 0 01-2.5 2.5H13" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+        <span class="text-[10px] text-center leading-tight">Help Desk</span>
+      </a>
+      <a href="setting-member.html" class="mt-auto flex flex-col items-center gap-1 w-full px-0.5 py-2 rounded-lg text-ink hover:bg-hover">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M10.3 3.2a1 1 0 011.4 0l.9.9a1 1 0 00.9.3l1.2-.2a1 1 0 011.1.7l.4 1.2a1 1 0 00.6.6l1.2.4a1 1 0 01.7 1.1l-.2 1.2a1 1 0 00.3.9l.9.9a1 1 0 010 1.4l-.9.9a1 1 0 00-.3.9l.2 1.2a1 1 0 01-.7 1.1l-1.2.4a1 1 0 00-.6.6l-.4 1.2a1 1 0 01-1.1.7l-1.2-.2a1 1 0 00-.9.3l-.9.9a1 1 0 01-1.4 0l-.9-.9a1 1 0 00-.9-.3l-1.2.2a1 1 0 01-1.1-.7l-.4-1.2a1 1 0 00-.6-.6l-1.2-.4a1 1 0 01-.7-1.1l.2-1.2a1 1 0 00-.3-.9l-.9-.9a1 1 0 010-1.4l.9-.9a1 1 0 00.3-.9l-.2-1.2a1 1 0 01.7-1.1l1.2-.4a1 1 0 00.6-.6l.4-1.2a1 1 0 011.1-.7l1.2.2a1 1 0 00.9-.3l.9-.9z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.6"/></svg>
+        <span class="text-[10px] text-center leading-tight">Settings</span>
+      </a>
+    </nav>
+
+    <!-- backdrop for mobile drawer -->
+    <div id="sidebar-backdrop" class="hidden lg:hidden fixed inset-0 bg-black/30 z-30"></div>
+
+    <!-- ============ component: AppSidebar ============ -->
+    <aside id="sidebar" class="relative w-60 shrink-0 border-r border-line bg-white flex flex-col
+           fixed lg:relative inset-y-0 left-0 z-40 -translate-x-full lg:translate-x-0 transition-transform duration-200">
+      <div class="flex items-center gap-2 px-4 h-12 shrink-0">
+        <span class="font-semibold text-ink">Projects</span>
+        <div class="ml-auto flex items-center gap-1 text-faint">
+          <button title="Display settings" class="h-7 w-7 grid place-items-center rounded hover:bg-hover"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4 7h9M17 7h3M4 17h7M15 17h5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="15" cy="7" r="2.1" stroke="currentColor" stroke-width="1.7"/><circle cx="13" cy="17" r="2.1" stroke="currentColor" stroke-width="1.7"/></svg></button>
+          <button id="collapse-sidebar" title="Collapse sidebar" class="hidden lg:grid h-7 w-7 place-items-center rounded hover:bg-hover"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M9 4v16" stroke="currentColor" stroke-width="1.8"/><path d="M15.5 9.5L13 12l2.5 2.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <button id="close-sidebar" class="lg:hidden h-7 w-7 grid place-items-center rounded hover:bg-hover"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+        </div>
+      </div>
+
+      <div class="px-2 overflow-y-auto flex-1">
+        <button id="new-work-item-btn" class="w-full flex items-center justify-center gap-2 px-2 h-9 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold mb-2 transition-colors">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          New work item
+        </button>
+
+        <a class="flex items-center gap-2 px-2 h-8 rounded-md text-ink hover:bg-hover"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4 11l8-6 8 6v8a1 1 0 01-1 1h-4v-6H9v6H5a1 1 0 01-1-1v-8z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>Home</a>
+        <a class="flex items-center gap-2 px-2 h-8 rounded-md text-ink hover:bg-hover"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4 12.5-12.5z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>Drafts</a>
+        <a class="flex items-center gap-2 px-2 h-8 rounded-md text-ink hover:bg-hover"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.2" stroke="currentColor" stroke-width="1.7"/><path d="M5 20a7 7 0 0114 0" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>Your work</a>
+        <a class="flex items-center gap-2 px-2 h-8 rounded-md text-ink hover:bg-hover"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M5 4h14v11l-5 5H5V4z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M14 20v-5h5" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>Stickies</a>
+
+        <div class="flex items-center gap-1 px-2 h-8 mt-3 text-[11px] font-semibold text-faint uppercase tracking-wide">Workspace <svg width="10" height="10" viewBox="0 0 24 24" fill="none" class="ml-auto"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <a href="projects.html" class="flex items-center gap-2 px-2 h-8 rounded-md bg-sel text-ink font-medium"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>Projects</a>
+        <!-- Pinned optional items (rendered by JS) -->
+        <div id="pinned-items"></div>
+        <button id="more-btn" class="w-full flex items-center gap-2 px-2 h-8 rounded-md text-ink hover:bg-hover"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="5" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="19" cy="12" r="1.6" fill="currentColor"/></svg><span id="more-label">More</span></button>
+
+        <div class="flex items-center gap-1 px-2 h-8 mt-3 text-[11px] font-semibold text-faint uppercase tracking-wide">Projects <svg width="10" height="10" viewBox="0 0 24 24" fill="none" class="ml-auto"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <a href="work-items.html" class="flex items-center gap-2 px-2 h-8 rounded-md text-ink font-medium hover:bg-hover"><span>🖐️</span>Testing</a>
+
+        <div class="flex items-center gap-1 px-2 h-8 mt-3 text-[11px] font-semibold text-faint uppercase tracking-wide">Try <svg width="10" height="10" viewBox="0 0 24 24" fill="none" class="ml-auto"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <a class="flex items-center gap-2 px-2 h-8 rounded-md text-ink hover:bg-hover"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.58 2 12.25c0 4.53 2.87 8.37 6.84 9.73.5.09.68-.22.68-.49v-1.7c-2.78.62-3.37-1.37-3.37-1.37-.45-1.18-1.1-1.5-1.1-1.5-.9-.63.07-.62.07-.62 1 .07 1.53 1.05 1.53 1.05.89 1.56 2.34 1.11 2.91.85.09-.66.35-1.11.63-1.37-2.22-.26-4.55-1.14-4.55-5.05 0-1.12.39-2.03 1.03-2.74-.1-.26-.45-1.3.1-2.71 0 0 .84-.28 2.75 1.05a9.4 9.4 0 015 0c1.91-1.33 2.75-1.05 2.75-1.05.55 1.41.2 2.45.1 2.71.64.71 1.03 1.62 1.03 2.74 0 3.92-2.34 4.79-4.57 5.04.36.32.68.94.68 1.9v2.82c0 .27.18.59.69.49A10.26 10.26 0 0022 12.25C22 6.58 17.52 2 12 2z"/></svg>Connect to GitHub</a>
+        <a class="flex items-center gap-2 px-2 h-8 rounded-md text-ink hover:bg-hover"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M6 13a2 2 0 100 4 2 2 0 000-4zm0 0V9m0 4h4m1-7a2 2 0 104 0 2 2 0 00-4 0zm0 0h-1m8 5a2 2 0 100 4 2 2 0 000-4zm0 0V9m0 4h-4m-1 5a2 2 0 10-4 0 2 2 0 004 0zm0 0h1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Connect to Slack</a>
+        <a class="flex items-center gap-2 px-2 h-8 rounded-md text-ink hover:bg-hover"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>Try Project Block AI</a>
+        <div class="h-2"></div>
+      </div>
+
+    </aside>
+
+    <!-- ============ MAIN ============ -->
+    <main class="flex-1 min-w-0 overflow-y-auto">
+      <!-- component: ProjectsToolbar -->
+      <div class="flex items-center gap-2 px-5 sm:px-8 h-12 border-b border-line">
+        <span class="flex items-center gap-2 text-[14px] font-medium text-ink">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" class="text-sub"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+          Projects
+        </span>
+        <div class="ml-auto flex items-center gap-1.5 sm:gap-2">
+          <button class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover" title="Search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+          <button class="hidden sm:inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-stroke text-[13px] text-ink hover:bg-hover whitespace-nowrap"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="text-faint"><path d="M4 7h16M7 12h10M10 17h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Created date<svg width="12" height="12" viewBox="0 0 24 24" fill="none" class="text-faint"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <button class="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-stroke text-[13px] text-ink hover:bg-hover whitespace-nowrap"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="text-faint"><path d="M4 5h16l-6 8v5l-4 2v-7L4 5z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>Filters</button>
+          <button id="add-project-btn" class="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold whitespace-nowrap"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Add Project</button>
+        </div>
+      </div>
+
+      <!-- component: ProjectCard grid -->
+      <div id="projects-grid" class="px-5 sm:px-8 py-6 grid gap-5 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3"></div>
+    </main>
+  </div>
+
+  <!-- component: SidebarMoreModal (choose which items load in the left menu) -->
+  <div id="more-modal" class="hidden fixed inset-0 z-[70] flex items-start justify-center p-4 sm:pt-28">
+    <div class="absolute inset-0 bg-black/40" data-more-close></div>
+    <div class="relative w-full max-w-[440px] bg-white rounded-xl shadow-xl flex flex-col max-h-[80vh]">
+      <div class="flex items-center justify-between px-5 py-4 border-b border-line shrink-0">
+        <div>
+          <h2 class="text-[15px] font-semibold text-head">Add to sidebar</h2>
+          <p class="text-[12px] text-sub mt-0.5">Choose what loads in your left menu.</p>
+        </div>
+        <button data-more-close class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover" title="Close">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+      <div id="more-list" class="p-2 overflow-y-auto"></div>
+    </div>
+  </div>
+
+  <!-- component: AddProjectModal -->
+  <div id="add-project-modal" class="hidden fixed inset-0 z-[70] flex items-start justify-center p-4 sm:pt-24">
+    <div class="absolute inset-0 bg-black/40" data-proj-close></div>
+    <div class="relative w-full max-w-[860px] bg-white rounded-xl shadow-xl flex flex-col max-h-[88vh]">
+      <!-- Cover -->
+      <div id="proj-cover" class="relative h-32 rounded-t-xl bg-center bg-cover shrink-0" style="background:linear-gradient(120deg,#f6d5b8 0%,#eaa987 55%,#d98a68 100%)">
+        <button data-proj-close class="absolute top-3 right-3 h-8 w-8 grid place-items-center rounded-md bg-white/85 text-sub hover:bg-white shadow-sm" title="Close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+        <button id="proj-change-cover" class="absolute bottom-3 right-3 h-8 px-3 rounded-md bg-white/90 text-[12px] font-medium text-ink hover:bg-white shadow-sm">Change cover</button>
+        <input id="proj-cover-input" type="file" accept="image/*" class="hidden" />
+        <!-- Upload progress (shown while a cover uploads) -->
+        <div id="proj-cover-progress" class="hidden absolute inset-x-3 bottom-3 bg-white/95 rounded-md px-3 py-2 shadow">
+          <div class="flex items-center justify-between mb-1">
+            <span id="proj-cover-name" class="text-[12px] text-sub truncate max-w-[70%]">Uploading…</span>
+            <span id="proj-cover-pct" class="text-[12px] text-sub tabular-nums">0%</span>
+          </div>
+          <div class="h-1.5 w-full bg-line rounded-full overflow-hidden"><div id="proj-cover-bar" class="h-full bg-brand rounded-full transition-all duration-150" style="width:0%"></div></div>
+        </div>
+      </div>
+
+      <!-- Body -->
+      <div class="px-5 sm:px-6 pt-5 pb-1 overflow-visible">
+        <div class="flex flex-col sm:flex-row gap-3">
+          <input id="proj-name" type="text" placeholder="Project name" class="pb-input flex-1" />
+          <div class="relative sm:w-44">
+            <input id="proj-id" type="text" placeholder="Project ID" class="pb-input pr-9 uppercase" maxlength="12" />
+            <span class="absolute right-2.5 top-1/2 -translate-y-1/2 text-faint" title="Project identifier — used to prefix work item IDs"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/><path d="M12 11v5M12 8v.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>
+          </div>
+        </div>
+
+        <textarea id="proj-desc" rows="3" placeholder="Description" class="pb-textarea mt-3"></textarea>
+
+        <div class="flex flex-wrap items-center gap-2 mt-3">
+          <!-- Access (Public / Private) -->
+          <div class="relative">
+            <button id="proj-access-btn" type="button" class="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-stroke text-[13px] text-ink hover:bg-hover">
+              <span id="proj-access-icon" class="grid place-items-center"></span>
+              <span id="proj-access-label">Public</span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" class="text-faint"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <div id="proj-access-menu" class="pb-combo-list hidden absolute left-0 top-full mt-1 w-72 rounded-md bg-white py-1 shadow-lg outline outline-1 outline-black/5 z-50"></div>
+          </div>
+
+          <!-- Lead -->
+          <div class="relative">
+            <button id="proj-lead-btn" type="button" class="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-stroke text-[13px] text-ink hover:bg-hover">
+              <span id="proj-lead-icon" class="grid place-items-center"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.2" stroke="currentColor" stroke-width="1.7"/><path d="M5 20a7 7 0 0114 0" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></span>
+              <span id="proj-lead-label">Lead</span>
+            </button>
+            <div id="proj-lead-menu" class="pb-combo-list hidden absolute left-0 top-full mt-1 w-72 rounded-md bg-white p-2 shadow-lg outline outline-1 outline-black/5 z-50">
+              <div class="relative mb-1">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-faint"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                <input id="proj-lead-search" type="text" placeholder="Search members..." class="w-full h-9 pl-8 pr-3 rounded-md bg-hover text-[13px] text-ink placeholder:text-faint outline outline-1 -outline-offset-1 outline-transparent focus:bg-white focus:outline-stroke" />
+              </div>
+              <div id="proj-lead-list" class="max-h-48 overflow-y-auto"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="flex items-center justify-end gap-2 px-5 sm:px-6 py-4 border-t border-line shrink-0">
+        <button data-proj-close class="h-9 px-4 rounded-md border border-stroke text-[13px] font-semibold text-ink hover:bg-hover">Cancel</button>
+        <button class="h-9 px-4 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold">Create project</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- component: CreateWorkItemModal -->
+  <div id="work-item-modal" class="hidden fixed inset-0 z-[70] flex items-start justify-center p-4 sm:pt-20">
+    <div class="absolute inset-0 bg-black/40" data-wi-close></div>
+    <div class="relative w-full max-w-[720px] bg-white rounded-xl shadow-xl flex flex-col max-h-[90vh]">
+      <!-- Header -->
+      <div class="px-6 pt-5 pb-3 shrink-0">
+        <h2 class="text-[18px] font-semibold text-head">Create new work item</h2>
+        <div class="flex items-center gap-1.5 mt-3">
+          <span class="inline-flex items-center gap-1.5 h-7 px-2 rounded-md border border-stroke text-[13px] text-ink"><span>🖐️</span>Testing</span>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" class="text-faint"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span class="inline-flex items-center justify-center h-7 w-7 rounded-md border border-stroke text-sub" title="Project"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 3l2 3.5h-4L12 3z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><circle cx="7" cy="16" r="2.5" stroke="currentColor" stroke-width="1.5"/><rect x="13.5" y="13.5" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/></svg></span>
+        </div>
+      </div>
+
+      <!-- Body -->
+      <div class="px-6 overflow-visible">
+        <input id="wi-title" type="text" placeholder="Title" class="pb-input h-11 text-[15px]" />
+        <textarea id="wi-desc" rows="6" placeholder="Click to add description" class="pb-textarea mt-3"></textarea>
+
+        <!-- Attribute chips -->
+        <div class="flex flex-wrap items-center gap-2 mt-4 pb-4">
+          <!-- State -->
+          <div class="relative">
+            <button id="wi-state-btn" type="button" class="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border border-stroke text-[13px] text-ink hover:bg-hover"><span id="wi-state-icon" class="grid place-items-center"></span><span id="wi-state-label">Backlog</span></button>
+            <div id="wi-state-menu" class="pb-combo-list hidden absolute left-0 bottom-full mb-1 w-48 rounded-md bg-white py-1 shadow-lg outline outline-1 outline-black/5 z-50"></div>
+          </div>
+          <!-- Priority -->
+          <div class="relative">
+            <button id="wi-priority-btn" type="button" class="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border border-stroke text-[13px] text-ink hover:bg-hover"><span id="wi-priority-icon" class="grid place-items-center"></span><span id="wi-priority-label">None</span></button>
+            <div id="wi-priority-menu" class="pb-combo-list hidden absolute left-0 bottom-full mb-1 w-44 rounded-md bg-white py-1 shadow-lg outline outline-1 outline-black/5 z-50"></div>
+          </div>
+          <!-- Assignees -->
+          <div class="relative">
+            <button id="wi-assignees-btn" type="button" class="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border border-stroke text-[13px] text-ink hover:bg-hover"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3" stroke="currentColor" stroke-width="1.7"/><path d="M3 19a6 6 0 0112 0M16 6a3 3 0 010 6M18 19a6 6 0 00-3-5.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg><span id="wi-assignees-label">Assignees</span></button>
+            <div id="wi-assignees-menu" class="pb-combo-list hidden absolute left-0 bottom-full mb-1 w-64 rounded-md bg-white p-2 shadow-lg outline outline-1 outline-black/5 z-50"></div>
+          </div>
+          <!-- Labels -->
+          <div class="relative">
+            <button id="wi-labels-btn" type="button" class="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border border-stroke text-[13px] text-ink hover:bg-hover"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M3 12l7-7h7a2 2 0 012 2v7l-7 7-9-9z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="14.5" cy="9.5" r="1.3" fill="currentColor"/></svg><span id="wi-labels-label">Labels</span></button>
+            <div id="wi-labels-menu" class="pb-combo-list hidden absolute left-0 bottom-full mb-1 w-64 rounded-md bg-white p-2 shadow-lg outline outline-1 outline-black/5 z-50"></div>
+          </div>
+          <!-- Start date -->
+          <div class="relative">
+            <button id="wi-start-btn" type="button" class="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border border-stroke text-[13px] text-ink hover:bg-hover"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="4" y="5" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span id="wi-start-label">Start date</span></button>
+            <div id="wi-start-menu" class="pb-combo-list hidden absolute left-0 bottom-full mb-1 w-[300px] rounded-lg bg-white p-2 shadow-lg outline outline-1 outline-black/5 z-50"></div>
+          </div>
+          <!-- Due date -->
+          <div class="relative">
+            <button id="wi-due-btn" type="button" class="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border border-stroke text-[13px] text-ink hover:bg-hover"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="4" y="5" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span id="wi-due-label">Due date</span></button>
+            <div id="wi-due-menu" class="pb-combo-list hidden absolute left-0 bottom-full mb-1 w-[300px] rounded-lg bg-white p-2 shadow-lg outline outline-1 outline-black/5 z-50"></div>
+          </div>
+          <!-- Cycle -->
+          <div class="relative">
+            <button id="wi-cycle-btn" type="button" class="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border border-stroke text-[13px] text-ink hover:bg-hover"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.6"/><path d="M12 3.5a8.5 8.5 0 018.5 8.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span id="wi-cycle-label">Cycle</span></button>
+            <div id="wi-cycle-menu" class="pb-combo-list hidden absolute right-0 bottom-full mb-1 w-72 rounded-md bg-white p-2 shadow-lg outline outline-1 outline-black/5 z-50"></div>
+          </div>
+          <!-- Modules -->
+          <div class="relative">
+            <button id="wi-modules-btn" type="button" class="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border border-stroke text-[13px] text-ink hover:bg-hover"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.6"/><rect x="13" y="4" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.6"/><rect x="4" y="13" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.6"/><rect x="13" y="13" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.6"/></svg><span id="wi-modules-label">Modules</span></button>
+            <div id="wi-modules-menu" class="pb-combo-list hidden absolute right-0 bottom-full mb-1 w-72 rounded-md bg-white p-2 shadow-lg outline outline-1 outline-black/5 z-50"></div>
+          </div>
+          <!-- Add parent (opens work item search modal) -->
+          <button id="wi-parent-btn" type="button" class="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border border-stroke text-[13px] text-ink hover:bg-hover"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span id="wi-parent-label">Add parent</span></button>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="flex items-center gap-3 px-6 py-4 border-t border-line shrink-0">
+        <button id="wi-createmore" type="button" role="switch" aria-checked="false" class="ml-auto shrink-0 relative inline-flex h-5 w-9 items-center rounded-full px-0.5 transition-colors bg-stroke"><span class="pb-toggle-knob h-4 w-4 rounded-full bg-white shadow transition-transform translate-x-0"></span></button>
+        <span class="text-[13px] text-sub">Create more</span>
+        <button data-wi-close class="h-9 px-4 rounded-md border border-stroke text-[13px] font-semibold text-ink hover:bg-hover">Discard</button>
+        <button class="h-9 px-4 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- component: ParentSearchModal (pick a parent work item) -->
+  <div id="parent-modal" class="hidden fixed inset-0 z-[80] flex items-start justify-center p-4 sm:pt-24">
+    <div class="absolute inset-0 bg-black/40" data-parent-close></div>
+    <div class="relative w-full max-w-[720px] bg-white rounded-xl shadow-xl flex flex-col max-h-[70vh]">
+      <div class="flex items-center gap-3 px-5 py-3 border-b border-line shrink-0">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <input id="parent-search" type="text" placeholder="Type to search" class="flex-1 h-8 text-[14px] text-ink placeholder:text-faint outline-none bg-transparent" />
+        <span class="h-5 w-px bg-line"></span>
+        <button id="parent-ws-toggle" type="button" role="switch" aria-checked="false" class="shrink-0 relative inline-flex h-5 w-9 items-center rounded-full px-0.5 transition-colors bg-stroke"><span class="pb-toggle-knob h-4 w-4 rounded-full bg-white shadow transition-transform translate-x-0"></span></button>
+        <span class="text-[13px] text-sub shrink-0">Workspace level</span>
+      </div>
+      <div id="parent-list" class="p-2 overflow-y-auto"></div>
+    </div>
+  </div>
+
+  <!-- component: WorkspaceListModal -->
+  <div id="ws-modal" class="hidden fixed inset-0 z-[60] flex items-start justify-center p-4 sm:pt-24">
+    <div class="absolute inset-0 bg-black/40" data-ws-close></div>
+    <div class="relative w-full max-w-[560px] bg-white rounded-xl shadow-xl flex flex-col max-h-[80vh]">
+      <!-- Header (fixed) -->
+      <div class="flex items-center justify-between px-6 py-4 border-b border-line shrink-0">
+        <div>
+          <h2 class="text-[16px] font-semibold text-head">Your workspaces</h2>
+          <p class="text-[13px] text-sub mt-0.5">Switch, manage settings, or invite teammates.</p>
+        </div>
+        <button data-ws-close class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover" title="Close">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+      <!-- Scrollable list -->
+      <div id="ws-modal-list" class="overflow-y-auto px-4 py-3 space-y-2"></div>
+      <!-- Footer (fixed) -->
+      <div class="px-6 py-4 border-t border-line shrink-0">
+        <button onclick="location.href='create-workspace.html'" class="w-full inline-flex items-center justify-center gap-2 h-9 rounded-md border border-stroke text-[13px] font-semibold text-ink hover:bg-hover">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          Create workspace
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- component: AccountModal (Profile / Preferences / Notifications / Security / Tokens) -->
+  <div id="account-modal" class="hidden fixed inset-0 z-[70] flex p-2 sm:p-6">
+    <div class="absolute inset-0 bg-black/40" data-acct-close></div>
+    <div class="relative w-full max-w-[1080px] mx-auto bg-white rounded-xl shadow-xl flex flex-col sm:flex-row overflow-hidden max-h-full">
+
+      <!-- Sidebar -->
+      <aside class="w-full sm:w-64 shrink-0 border-b sm:border-b-0 sm:border-r border-line flex flex-col sm:overflow-y-auto">
+        <div class="flex items-center gap-3 px-4 py-4">
+          <span class="h-9 w-9 rounded-full bg-brand text-white grid place-items-center text-[14px] font-semibold shrink-0 ring-2 ring-brand/20">Z</span>
+          <div class="min-w-0">
+            <div class="text-[14px] font-semibold text-ink truncate">Rohit Philip</div>
+            <div class="text-[12px] text-sub truncate">zorainteractive@gmail.com</div>
+          </div>
+        </div>
+        <nav id="acct-nav" class="flex sm:flex-col gap-1 overflow-x-auto sm:overflow-visible px-3 pb-3"></nav>
+      </aside>
+
+      <!-- Content -->
+      <div class="flex-1 min-w-0 relative overflow-y-auto">
+        <button data-acct-close class="absolute top-4 right-4 z-10 h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover" title="Close">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+
+        <!-- Panel: Profile -->
+        <section data-acct-panel="Profile" class="acct-panel px-6 sm:px-10 py-8 max-w-[860px]">
+          <div class="flex items-start justify-between gap-4 pt-6">
+            <div class="h-16 w-16 rounded-lg bg-hover border border-line grid place-items-center text-faint">
+              <svg width="30" height="30" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="10" r="3" stroke="currentColor" stroke-width="1.6"/><path d="M6.5 18.5a6 6 0 0111 0" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+            </div>
+            <button class="h-8 px-3 rounded-md border border-stroke text-[13px] text-ink hover:bg-hover whitespace-nowrap">Change cover</button>
+          </div>
+          <div class="mt-3">
+            <div class="text-[18px] font-semibold text-head">Rohit Philip</div>
+            <div class="text-[13px] text-sub">zorainteractive@gmail.com</div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-8">
+            <div>
+              <label class="block text-[13px] font-medium text-ink mb-1.5">First name <span class="text-danger">*</span></label>
+              <input type="text" value="Rohit Philip" class="pb-input" />
+            </div>
+            <div>
+              <label class="block text-[13px] font-medium text-ink mb-1.5">Last name</label>
+              <input type="text" placeholder="Enter your last name" class="pb-input" />
+            </div>
+            <div>
+              <label class="block text-[13px] font-medium text-ink mb-1.5">Display name <span class="text-danger">*</span></label>
+              <input type="text" value="zorainteractive" class="pb-input" />
+            </div>
+          </div>
+          <div class="mt-4 max-w-[380px]">
+            <label class="block text-[13px] font-medium text-ink mb-1.5">Email <span class="text-danger">*</span></label>
+            <input type="email" value="zorainteractive@gmail.com" class="pb-input" readonly />
+            <a href="#" class="inline-block mt-1.5 text-[12px] text-ink underline hover:text-link">Change email</a>
+          </div>
+          <button class="mt-6 h-9 px-4 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold">Save changes</button>
+
+          <div class="mt-10 border border-line rounded-lg px-4 py-4 flex items-center gap-4">
+            <div class="min-w-0">
+              <div class="text-[14px] font-semibold text-head">Deactivate account</div>
+              <div class="text-[13px] text-sub mt-0.5">When deactivating an account, all of the data and resources within that account will be permanently removed and cannot be recovered.</div>
+            </div>
+            <button class="ml-auto h-9 px-3 rounded-md border border-danger text-[13px] font-semibold text-danger hover:bg-red-50 whitespace-nowrap shrink-0">Deactivate account</button>
+          </div>
+        </section>
+
+        <!-- Panel: Preferences -->
+        <section data-acct-panel="Preferences" class="acct-panel hidden px-6 sm:px-10 py-8 max-w-[900px]">
+          <h2 class="text-[18px] font-semibold text-head pt-1">Preferences</h2>
+          <p class="text-[13px] text-sub mt-1">Customize your app experience the way you work</p>
+
+          <div class="mt-6 divide-y divide-line">
+            <div class="flex items-center gap-4 py-4">
+              <div class="min-w-0"><div class="text-[14px] font-medium text-ink">Theme</div><div class="text-[13px] text-sub">Select or customize your interface color scheme.</div></div>
+              <button class="acct-combo ml-auto shrink-0 inline-flex items-center gap-2 h-9 px-3 rounded-md border border-stroke text-[13px] text-ink hover:bg-hover whitespace-nowrap"><span class="text-brand">&#9998;</span>System Preference<svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="text-faint"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            </div>
+            <div class="flex items-center gap-4 py-4">
+              <div class="min-w-0"><div class="text-[14px] font-medium text-ink">Smooth Cursor</div><div class="text-[13px] text-sub">Select the cursor motion style that feels right for you.</div></div>
+              <button class="pb-toggle ml-auto shrink-0 relative inline-flex h-5 w-9 items-center rounded-full px-0.5 transition-colors bg-stroke" role="switch" aria-checked="false"><span class="pb-toggle-knob h-4 w-4 rounded-full bg-white shadow transition-transform translate-x-0"></span></button>
+            </div>
+            <div class="flex items-center gap-4 py-4">
+              <div class="min-w-0"><div class="text-[14px] font-medium text-ink">Comment submit shortcut</div><div class="text-[13px] text-sub">Choose the keyboard shortcut to submit comments.</div></div>
+              <button class="acct-combo ml-auto shrink-0 inline-flex items-center gap-2 h-9 px-3 rounded-md border border-stroke text-[13px] text-ink hover:bg-hover whitespace-nowrap">Enter<svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="text-faint"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            </div>
+          </div>
+
+          <h3 class="text-[16px] font-semibold text-head mt-8">Language &amp; Time</h3>
+          <div class="mt-3 divide-y divide-line">
+            <div class="flex items-center gap-4 py-4">
+              <div class="min-w-0"><div class="text-[14px] font-medium text-ink">Timezone</div><div class="text-[13px] text-sub">Current timezone setting.</div></div>
+              <button class="acct-combo ml-auto shrink-0 inline-flex items-center gap-2 h-9 px-3 rounded-md border border-stroke text-[13px] text-ink hover:bg-hover whitespace-nowrap">UTC<svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="text-faint"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            </div>
+            <div class="flex items-center gap-4 py-4">
+              <div class="min-w-0"><div class="text-[14px] font-medium text-ink">Language</div><div class="text-[13px] text-sub">Choose the language used in the user interface.</div></div>
+              <button class="acct-combo ml-auto shrink-0 inline-flex items-center gap-2 h-9 px-3 rounded-md border border-stroke text-[13px] text-ink hover:bg-hover whitespace-nowrap">English<svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="text-faint"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            </div>
+            <div class="flex items-center gap-4 py-4">
+              <div class="min-w-0"><div class="text-[14px] font-medium text-ink">First day of the week</div><div class="text-[13px] text-sub">Choose which day your week starts on.</div></div>
+              <button class="acct-combo ml-auto shrink-0 inline-flex items-center gap-2 h-9 px-3 rounded-md border border-stroke text-[13px] text-ink hover:bg-hover whitespace-nowrap">Sunday<svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="text-faint"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            </div>
+            <div class="flex items-center gap-4 py-4">
+              <div class="min-w-0"><div class="text-[14px] font-medium text-ink">Weekend days</div><div class="text-[13px] text-sub">Sets which days are treated as non-working time.</div></div>
+              <button class="acct-combo ml-auto shrink-0 inline-flex items-center gap-2 h-9 px-3 rounded-md border border-stroke text-[13px] text-ink hover:bg-hover whitespace-nowrap">Saturday, Sunday<svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="text-faint"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Panel: Notifications -->
+        <section data-acct-panel="Notifications" class="acct-panel hidden px-6 sm:px-10 py-8 max-w-[900px]">
+          <h2 class="text-[18px] font-semibold text-head pt-1">Email notifications</h2>
+          <p class="text-[13px] text-sub mt-1">Stay in the loop on Work items you are subscribed to. Enable this to get notified.</p>
+          <div class="mt-6 space-y-6">
+            <div class="flex items-start gap-4">
+              <div class="min-w-0"><div class="text-[14px] font-medium text-ink">Property changes</div><div class="text-[13px] text-sub">Notify me when work items' properties like assignees, priority, estimates or anything else changes.</div></div>
+              <button class="pb-toggle ml-auto shrink-0 mt-1 relative inline-flex h-5 w-9 items-center rounded-full px-0.5 transition-colors bg-brand" role="switch" aria-checked="true"><span class="pb-toggle-knob h-4 w-4 rounded-full bg-white shadow transition-transform translate-x-4"></span></button>
+            </div>
+            <div class="flex items-start gap-4">
+              <div class="min-w-0"><div class="text-[14px] font-medium text-ink">State change</div><div class="text-[13px] text-sub">Notify me when the work items moves to a different state</div></div>
+              <button class="pb-toggle ml-auto shrink-0 mt-1 relative inline-flex h-5 w-9 items-center rounded-full px-0.5 transition-colors bg-brand" role="switch" aria-checked="true"><span class="pb-toggle-knob h-4 w-4 rounded-full bg-white shadow transition-transform translate-x-4"></span></button>
+            </div>
+            <div class="flex items-start gap-4 pl-4 border-l-2 border-line">
+              <div class="min-w-0"><div class="text-[14px] font-medium text-ink">Work item completed</div><div class="text-[13px] text-sub">Notify me only when a work item is completed</div></div>
+              <button class="pb-toggle ml-auto shrink-0 mt-1 relative inline-flex h-5 w-9 items-center rounded-full px-0.5 transition-colors bg-brand" role="switch" aria-checked="true"><span class="pb-toggle-knob h-4 w-4 rounded-full bg-white shadow transition-transform translate-x-4"></span></button>
+            </div>
+            <div class="flex items-start gap-4">
+              <div class="min-w-0"><div class="text-[14px] font-medium text-ink">Comments</div><div class="text-[13px] text-sub">Notify me when someone leaves a comment on the work item</div></div>
+              <button class="pb-toggle ml-auto shrink-0 mt-1 relative inline-flex h-5 w-9 items-center rounded-full px-0.5 transition-colors bg-brand" role="switch" aria-checked="true"><span class="pb-toggle-knob h-4 w-4 rounded-full bg-white shadow transition-transform translate-x-4"></span></button>
+            </div>
+            <div class="flex items-start gap-4">
+              <div class="min-w-0"><div class="text-[14px] font-medium text-ink">Mentions</div><div class="text-[13px] text-sub">Notify me only when someone mentions me in the comments or description</div></div>
+              <button class="pb-toggle ml-auto shrink-0 mt-1 relative inline-flex h-5 w-9 items-center rounded-full px-0.5 transition-colors bg-brand" role="switch" aria-checked="true"><span class="pb-toggle-knob h-4 w-4 rounded-full bg-white shadow transition-transform translate-x-4"></span></button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Panel: Security -->
+        <section data-acct-panel="Security" class="acct-panel hidden px-6 sm:px-10 py-8 max-w-[900px]">
+          <h2 class="text-[18px] font-semibold text-head pt-1">Change password</h2>
+          <div class="mt-6 max-w-[820px]">
+            <label class="block text-[13px] font-medium text-ink mb-1.5">Current password</label>
+            <div class="relative">
+              <input type="password" placeholder="Old password" class="pb-input pr-10" />
+              <button type="button" class="acct-eye absolute right-2.5 top-1/2 -translate-y-1/2 text-faint hover:text-ink"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="12" r="2.5" stroke="currentColor" stroke-width="1.7"/></svg></button>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4 max-w-[820px]">
+            <div>
+              <label class="block text-[13px] font-medium text-ink mb-1.5">New password</label>
+              <div class="relative">
+                <input type="password" placeholder="Enter new password" class="pb-input pr-10" />
+                <button type="button" class="acct-eye absolute right-2.5 top-1/2 -translate-y-1/2 text-faint hover:text-ink"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="12" r="2.5" stroke="currentColor" stroke-width="1.7"/></svg></button>
+              </div>
+            </div>
+            <div>
+              <label class="block text-[13px] font-medium text-ink mb-1.5">Confirm password</label>
+              <div class="relative">
+                <input type="password" placeholder="Confirm password" class="pb-input pr-10" />
+                <button type="button" class="acct-eye absolute right-2.5 top-1/2 -translate-y-1/2 text-faint hover:text-ink"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="12" r="2.5" stroke="currentColor" stroke-width="1.7"/></svg></button>
+              </div>
+            </div>
+          </div>
+          <button class="mt-6 h-9 px-4 rounded-md bg-hover text-faint text-[13px] font-semibold cursor-not-allowed" disabled>Change password</button>
+        </section>
+
+        <!-- Panel: Personal Access Tokens -->
+        <section data-acct-panel="Personal Access Tokens" class="acct-panel hidden px-6 sm:px-10 py-8 max-w-[900px]">
+          <div class="flex items-center gap-3 pt-1">
+            <div><h2 class="text-[18px] font-semibold text-head">Personal access tokens</h2><p class="text-[13px] text-sub mt-1">Generate tokens to access the API on your behalf.</p></div>
+            <button class="ml-auto h-9 px-3 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold whitespace-nowrap">Add token</button>
+          </div>
+          <div class="mt-10 flex flex-col items-center justify-center text-center py-10">
+            <div class="h-12 w-12 rounded-full bg-hover grid place-items-center text-faint mb-3"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="8" cy="14" r="3.5" stroke="currentColor" stroke-width="1.7"/><path d="M10.5 11.5L20 2M17 5l2 2M14 8l2 2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="text-[14px] font-medium text-ink">No personal access tokens yet</div>
+            <div class="text-[13px] text-sub mt-1">Create a token to start using the Project Block API.</div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Mobile sidebar drawer
+    var sb = document.getElementById('sidebar');
+    var bd = document.getElementById('sidebar-backdrop');
+    function openSb() { sb.classList.remove('-translate-x-full'); bd.classList.remove('hidden'); }
+    function closeSb() { sb.classList.add('-translate-x-full'); bd.classList.add('hidden'); }
+    document.getElementById('open-sidebar').addEventListener('click', openSb);
+    document.getElementById('close-sidebar').addEventListener('click', closeSb);
+    bd.addEventListener('click', closeSb);
+
+    // Desktop sidebar collapse/expand (icon moves to the top header)
+    var collapseBtn = document.getElementById('collapse-sidebar');
+    var expandBtn = document.getElementById('expand-sidebar');
+    collapseBtn.addEventListener('click', function () {
+      sb.classList.add('lg:hidden');
+      expandBtn.classList.remove('hidden');
+      expandBtn.classList.add('grid');
+    });
+    expandBtn.addEventListener('click', function () {
+      sb.classList.remove('lg:hidden');
+      expandBtn.classList.add('hidden');
+      expandBtn.classList.remove('grid');
+    });
+
+    // ---- Projects grid ----
+    var PROJECTS = [
+      { name: 'Testing', id: 'TESTI', lead: null, joined: true, cover: 'linear-gradient(120deg,#0b0b0d 0%,#7f1d1d 55%,#0e7490 100%)', emoji: '🖐️' }
+    ];
+    function projectCard(p) {
+      var lead = p.lead
+        ? '<span class="h-5 w-5 rounded-full bg-brand text-white grid place-items-center text-[9px] font-bold">' + p.lead.charAt(0) + '</span><span class="text-ink">' + p.lead + '</span>'
+        : '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-faint"><circle cx="12" cy="8" r="3.2" stroke="currentColor" stroke-width="1.7"/><path d="M5 20a7 7 0 0114 0" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg><span class="text-sub">No lead</span>';
+      return '<a href="work-items.html" class="group block border border-line rounded-xl overflow-hidden hover:shadow-md transition-shadow">' +
+        '<div class="relative h-24" style="background:' + p.cover + '">' +
+          '<span class="absolute top-2.5 left-2.5 h-7 w-7 rounded-md bg-white/90 grid place-items-center text-[15px] shadow-sm">' + p.emoji + '</span>' +
+        '</div>' +
+        '<div class="p-4">' +
+          '<div class="text-[15px] font-semibold text-head">' + p.name + '</div>' +
+          '<div class="text-[12px] text-sub mt-0.5">' + p.id + '</div>' +
+          '<div class="flex items-center gap-1.5 text-[13px] mt-3">' + lead + '</div>' +
+        '</div>' +
+        '<div class="px-4 py-3 border-t border-line">' +
+          (p.joined ? '<span class="inline-flex items-center text-[12px] font-medium text-green-700 bg-green-50 rounded px-2 py-0.5">Joined</span>' : '<button class="h-7 px-3 rounded-md border border-stroke text-[12px] font-semibold text-ink hover:bg-hover">Join</button>') +
+        '</div>' +
+      '</a>';
+    }
+    document.getElementById('projects-grid').innerHTML = PROJECTS.map(projectCard).join('');
+
+    // ---- Sidebar "More" modal: choose what loads in the left menu ----
+    (function () {
+      var moreBtn = document.getElementById('more-btn');
+      var modal = document.getElementById('more-modal');
+      var list = document.getElementById('more-list');
+      var pinnedWrap = document.getElementById('pinned-items');
+
+      var OPTIONAL = [
+        { key: 'views', label: 'Views', pinned: false, icon: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="2.5" stroke="currentColor" stroke-width="1.6"/>' },
+        { key: 'cycles', label: 'Cycles', pinned: false, icon: '<circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.6"/><path d="M12 3.5a8.5 8.5 0 018.5 8.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>' },
+        { key: 'analytics', label: 'Analytics', pinned: false, icon: '<path d="M5 20V10M12 20V4M19 20v-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>' },
+        { key: 'archives', label: 'Archives', pinned: false, icon: '<rect x="3" y="4" width="18" height="5" rx="1.5" stroke="currentColor" stroke-width="1.6"/><path d="M5 9v9a1 1 0 001 1h12a1 1 0 001-1V9M10 13h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>' },
+        { key: 'dashboards', label: 'Dashboards', pinned: false, icon: '<rect x="4" y="4" width="7" height="9" rx="1.5" stroke="currentColor" stroke-width="1.6"/><rect x="13" y="4" width="7" height="5" rx="1.5" stroke="currentColor" stroke-width="1.6"/><rect x="4" y="15" width="7" height="5" rx="1.5" stroke="currentColor" stroke-width="1.6"/><rect x="13" y="11" width="7" height="9" rx="1.5" stroke="currentColor" stroke-width="1.6"/>' }
+      ];
+      function icon(inner) { return '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="shrink-0">' + inner + '</svg>'; }
+      function pinIcon(on) {
+        return on
+          ? '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" class="text-brand"><path d="M14 2l1 5 3 3-4 1-2 8-2-8-4-1 3-3 1-5z" transform="rotate(45 12 12)"/></svg>'
+          : '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-faint"><path d="M9 4h6l-1 6 3 3H7l3-3-1-6zM12 16v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      }
+
+      function renderPinned() {
+        pinnedWrap.innerHTML = OPTIONAL.filter(function (o) { return o.pinned; }).map(function (o) {
+          return '<a href="#" class="flex items-center gap-2 px-2 h-8 rounded-md text-ink hover:bg-hover">' + icon(o.icon) + o.label + '</a>';
+        }).join('');
+      }
+      function renderList() {
+        list.innerHTML = OPTIONAL.map(function (o) {
+          return '<div class="flex items-center gap-2.5 px-3 h-11 rounded-md text-[14px] text-ink hover:bg-hover">' +
+            icon(o.icon) + '<span class="flex-1">' + o.label + '</span>' +
+            '<button data-pin="' + o.key + '" title="' + (o.pinned ? 'Unpin from sidebar' : 'Pin to sidebar') + '" class="h-7 w-7 grid place-items-center rounded hover:bg-line">' + pinIcon(o.pinned) + '</button>' +
+          '</div>';
+        }).join('');
+      }
+      function openModal() { modal.classList.remove('hidden'); }
+      function closeModal() { modal.classList.add('hidden'); }
+
+      moreBtn.addEventListener('click', function (e) { e.stopPropagation(); openModal(); });
+      modal.addEventListener('click', function (e) {
+        if (e.target.closest('[data-more-close]')) { closeModal(); return; }
+        var btn = e.target.closest('[data-pin]');
+        if (!btn) return;
+        var o = OPTIONAL.find(function (x) { return x.key === btn.getAttribute('data-pin'); });
+        o.pinned = !o.pinned;
+        renderList(); renderPinned();
+      });
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeModal(); });
+
+      renderList(); renderPinned();
+    })();
+
+    // ---- Create work item modal ----
+    (function () {
+      var modal = document.getElementById('work-item-modal');
+      function open() { modal.classList.remove('hidden'); }
+      function close() { modal.classList.add('hidden'); }
+      document.getElementById('new-work-item-btn').addEventListener('click', open);
+      modal.addEventListener('click', function (e) { if (e.target.closest('[data-wi-close]')) close(); });
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
+
+      var CHECK = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" class="text-ink shrink-0"><path d="M5 12l5 5 9-11" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+      // Only one chip dropdown open at a time
+      var CHIP_MENUS = ['wi-state-menu', 'wi-priority-menu', 'wi-assignees-menu', 'wi-labels-menu', 'wi-start-menu', 'wi-due-menu', 'wi-cycle-menu', 'wi-modules-menu'];
+      function closeChipMenus(exceptId) {
+        CHIP_MENUS.forEach(function (id) { if (id !== exceptId) { var el = document.getElementById(id); if (el) el.classList.add('hidden'); } });
+      }
+
+      // Small attribute combobox (state / priority) — gray hover, checkmark on selected
+      function smallCombo(btnId, iconId, labelId, menuId, options, startKey) {
+        var current = startKey;
+        var btn = document.getElementById(btnId);
+        var menu = document.getElementById(menuId);
+        var iconEl = document.getElementById(iconId);
+        var labelEl = document.getElementById(labelId);
+        function opt(k) { return options.find(function (o) { return o.key === k; }); }
+        function paint() { var o = opt(current); iconEl.innerHTML = o.icon; labelEl.textContent = o.label; }
+        function render() {
+          menu.innerHTML = options.map(function (o) {
+            var sel = o.key === current;
+            return '<button type="button" role="option" data-k="' + o.key + '" class="w-full text-left flex items-center gap-2.5 px-2.5 h-9 rounded-md text-[13px] text-ink hover:bg-hover ' + (sel ? 'bg-hover' : '') + '"><span class="grid place-items-center shrink-0">' + o.icon + '</span><span class="flex-1 truncate">' + o.label + '</span>' + (sel ? CHECK : '') + '</button>';
+          }).join('');
+        }
+        btn.addEventListener('click', function (e) { e.stopPropagation(); var open = menu.classList.contains('hidden'); closeChipMenus(menuId); if (open) { render(); menu.classList.remove('hidden'); } else { menu.classList.add('hidden'); } });
+        menu.addEventListener('click', function (e) { var b = e.target.closest('[data-k]'); if (!b) return; current = b.getAttribute('data-k'); paint(); menu.classList.add('hidden'); });
+        document.addEventListener('click', function (e) { if (!menu.contains(e.target) && !btn.contains(e.target)) menu.classList.add('hidden'); });
+        paint();
+      }
+      function dot(color, filled) { return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" stroke="' + color + '" stroke-width="2" ' + (filled ? 'fill="' + color + '"' : 'stroke-dasharray="3 3"') + '/></svg>'; }
+      var STATES = [
+        { key: 'backlog', label: 'Backlog', icon: dot('#9ca3af', false) },
+        { key: 'todo', label: 'Todo', icon: dot('#6b7280', false) },
+        { key: 'inprogress', label: 'In Progress', icon: dot('#f59e0b', true) },
+        { key: 'done', label: 'Done', icon: dot('#22c55e', true) },
+        { key: 'cancelled', label: 'Cancelled', icon: dot('#ef4444', true) }
+      ];
+      function bars(color) { return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="4" y="13" width="3.5" height="7" rx="1" fill="' + color + '"/><rect x="10.25" y="9" width="3.5" height="11" rx="1" fill="' + color + '"/><rect x="16.5" y="5" width="3.5" height="15" rx="1" fill="' + color + '"/></svg>'; }
+      var NONEICON = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.5" stroke="#9ca3af" stroke-width="1.7"/><path d="M6 6l12 12" stroke="#9ca3af" stroke-width="1.7" stroke-linecap="round"/></svg>';
+      var PRIORITIES = [
+        { key: 'urgent', label: 'Urgent', icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="16" height="16" rx="3" fill="#ef4444"/><path d="M12 7v6M12 16v.5" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>' },
+        { key: 'high', label: 'High', icon: bars('#f97316') },
+        { key: 'medium', label: 'Medium', icon: bars('#f59e0b') },
+        { key: 'low', label: 'Low', icon: bars('#3b82f6') },
+        { key: 'none', label: 'None', icon: NONEICON }
+      ];
+      smallCombo('wi-state-btn', 'wi-state-icon', 'wi-state-label', 'wi-state-menu', STATES, 'backlog');
+      smallCombo('wi-priority-btn', 'wi-priority-icon', 'wi-priority-label', 'wi-priority-menu', PRIORITIES, 'none');
+
+      // Create more toggle
+      var cm = document.getElementById('wi-createmore');
+      cm.addEventListener('click', function () {
+        var on = cm.getAttribute('aria-checked') === 'true';
+        cm.setAttribute('aria-checked', String(!on));
+        cm.classList.toggle('bg-brand', !on); cm.classList.toggle('bg-stroke', on);
+        var k = cm.querySelector('.pb-toggle-knob');
+        k.classList.toggle('translate-x-4', !on); k.classList.toggle('translate-x-0', on);
+      });
+
+      // Reusable searchable attribute combobox (Assignees / Labels / Cycle / Modules)
+      var SEARCH_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-faint"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+      function attrCombo(cfg) {
+        var btn = document.getElementById(cfg.btnId);
+        var menu = document.getElementById(cfg.menuId);
+        var labelEl = document.getElementById(cfg.labelId);
+        var selected = [];
+        var built = false, listEl, searchEl;
+        function optByKey(k) { return cfg.options.find(function (o) { return o.key === k; }); }
+        function isSel(k) { return selected.indexOf(k) > -1; }
+        function updateLabel() {
+          if (!selected.length) { labelEl.textContent = cfg.defaultLabel; return; }
+          if (cfg.multi && selected.length > 1) labelEl.textContent = selected.length + ' ' + cfg.plural;
+          else labelEl.textContent = optByKey(selected[0]).label;
+        }
+        function renderList(q) {
+          q = (q || '').toLowerCase();
+          var rows = cfg.options.filter(function (o) { return o.label.toLowerCase().indexOf(q) > -1; });
+          listEl.innerHTML = rows.length ? rows.map(function (o) {
+            return '<button type="button" data-k="' + o.key + '" class="w-full text-left flex items-center gap-2.5 px-2 h-9 rounded-md text-[13px] text-ink hover:bg-hover ' + (isSel(o.key) ? 'bg-hover' : '') + '"><span class="grid place-items-center shrink-0">' + cfg.icon(o) + '</span><span class="flex-1 truncate">' + o.label + '</span>' + (isSel(o.key) ? CHECK : '') + '</button>';
+          }).join('') : '<div class="px-2 py-3 text-[13px] text-sub text-center">No results</div>';
+        }
+        function build() {
+          menu.innerHTML = '<div class="relative mb-1">' + SEARCH_SVG + '<input type="text" class="w-full h-9 pl-8 pr-3 rounded-md bg-hover text-[13px] text-ink placeholder:text-faint outline outline-1 -outline-offset-1 outline-transparent focus:bg-white focus:outline-stroke" placeholder="' + cfg.placeholder + '" /></div><div class="attr-list max-h-56 overflow-y-auto"></div>';
+          searchEl = menu.querySelector('input'); listEl = menu.querySelector('.attr-list');
+          searchEl.addEventListener('input', function () { renderList(searchEl.value); });
+          listEl.addEventListener('click', function (e) {
+            var b = e.target.closest('[data-k]'); if (!b) return;
+            var k = b.getAttribute('data-k');
+            if (cfg.multi) { var i = selected.indexOf(k); if (i > -1) selected.splice(i, 1); else selected.push(k); renderList(searchEl.value); }
+            else { selected = [k]; menu.classList.add('hidden'); }
+            updateLabel();
+          });
+          built = true;
+        }
+        btn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          if (!built) build();
+          var open = menu.classList.contains('hidden');
+          closeChipMenus(cfg.menuId);
+          if (open) { renderList(''); searchEl.value = ''; menu.classList.remove('hidden'); setTimeout(function () { searchEl.focus(); }, 0); }
+          else { menu.classList.add('hidden'); }
+        });
+        document.addEventListener('click', function (e) { if (!menu.contains(e.target) && !btn.contains(e.target)) menu.classList.add('hidden'); });
+      }
+
+      function labelDot(o) { return '<span class="h-2.5 w-2.5 rounded-full" style="background:' + o.color + '"></span>'; }
+      function memberAv(o) { return '<span class="h-5 w-5 rounded-full text-white grid place-items-center text-[9px] font-bold" style="background:' + o.color + '">' + o.initial + '</span>'; }
+      function cycleIc() { return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" stroke="#6b7280" stroke-width="1.7"/><path d="M12 4a8 8 0 010 16z" fill="#6b7280"/></svg>'; }
+      function moduleIc() { return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="text-sub"><rect x="4" y="4" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.6"/><rect x="13" y="4" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.6"/><rect x="4" y="13" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.6"/><rect x="13" y="13" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.6"/></svg>'; }
+
+      attrCombo({ btnId: 'wi-assignees-btn', labelId: 'wi-assignees-label', menuId: 'wi-assignees-menu', placeholder: 'Search members...', defaultLabel: 'Assignees', plural: 'assignees', multi: true, icon: memberAv, options: [{ key: 'zora', label: 'zorainteractive (you)', color: '#1b5f8a', initial: 'Z' }] });
+      attrCombo({ btnId: 'wi-labels-btn', labelId: 'wi-labels-label', menuId: 'wi-labels-menu', placeholder: 'Search labels...', defaultLabel: 'Labels', plural: 'labels', multi: true, icon: labelDot, options: [{ key: 'admin', label: 'admin', color: '#3b82f6' }, { key: 'concepts', label: 'concepts', color: '#8b5cf6' }] });
+      attrCombo({ btnId: 'wi-cycle-btn', labelId: 'wi-cycle-label', menuId: 'wi-cycle-menu', placeholder: 'Search cycles...', defaultLabel: 'Cycle', plural: 'cycles', multi: false, icon: cycleIc, options: [{ key: 'none', label: 'No cycle' }, { key: 'c2', label: 'Cycle 2: Collaboration & Customization' }, { key: 'c1', label: 'Cycle 1: Getting Started with Plane' }] });
+      attrCombo({ btnId: 'wi-modules-btn', labelId: 'wi-modules-label', menuId: 'wi-modules-menu', placeholder: 'Search modules...', defaultLabel: 'Modules', plural: 'modules', multi: true, icon: moduleIc, options: [{ key: 'ws', label: 'Workspace Setup (Area)' }, { key: 'ob', label: 'Onboarding Flow (Feature)' }, { key: 'cw', label: 'Core Workflow (System)' }] });
+
+      // Start / Due date pickers — quick options + Custom Date (design-system calendar)
+      function datePicker(cfg) {
+        var btn = document.getElementById(cfg.btnId);
+        var menu = document.getElementById(cfg.menuId);
+        var labelEl = document.getElementById(cfg.labelId);
+        var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+        var DOW = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'], Y0 = 2015, Y1 = 2035;
+        var selected = null, view = new Date(); view.setDate(1);
+        var CALS = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0"><rect x="4" y="5" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+        function pad(n) { return (n < 10 ? '0' : '') + n; }
+        function fmt(d) { return pad(d.getMonth() + 1) + '/' + pad(d.getDate()) + '/' + d.getFullYear(); }
+        function same(a, b) { return a && b && a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate(); }
+        function set(d) { selected = d; labelEl.textContent = fmt(d); menu.classList.add('hidden'); }
+        function addDays(n) { var d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + n); return d; }
+        var QUICK = [['Today', 0], ['Tomorrow', 1], ['Next 3 days', 3], ['Next 5 days', 5]];
+        function renderQuick() {
+          menu.innerHTML =
+            QUICK.map(function (q) { return '<button type="button" data-days="' + q[1] + '" class="w-full text-left flex items-center gap-2.5 px-2 h-9 rounded-md text-[13px] text-ink hover:bg-hover">' + CALS + q[0] + '</button>'; }).join('') +
+            '<div class="my-1 border-t border-line"></div>' +
+            '<button type="button" data-custom class="w-full text-left flex items-center gap-2.5 px-2 h-9 rounded-md text-[13px] text-ink hover:bg-hover">' + CALS + 'Custom Date</button>';
+        }
+        function tick(sel) { return sel ? '<span class="absolute right-2 text-brand group-hover:text-white"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5 9-11" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>' : ''; }
+        function optRow(attr, val, label, sel) { return '<li ' + attr + '="' + val + '" class="group relative flex items-center cursor-pointer select-none py-1.5 pl-3 pr-8 text-[13px] ' + (sel ? 'text-brand font-medium' : 'text-ink') + ' hover:bg-brand hover:text-white"><span class="truncate">' + label + '</span>' + tick(sel) + '</li>'; }
+        function renderCal() {
+          var y = view.getFullYear(), m = view.getMonth();
+          var mOpts = MONTHS.map(function (name, i) { return optRow('data-month', i, name, i === m); }).join('');
+          var yOpts = ''; for (var yr = Y0; yr <= Y1; yr++) yOpts += optRow('data-year', yr, yr, yr === y);
+          var start = new Date(y, m, 1); start.setDate(1 - start.getDay());
+          var today = new Date(), cells = '';
+          for (var i = 0; i < 42; i++) {
+            var d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
+            var inM = d.getMonth() === m, isSel = same(d, selected), isT = same(d, today);
+            var cls = 'h-8 w-8 grid place-items-center rounded-md text-[13px] cursor-pointer ';
+            if (isSel) cls += 'bg-brand text-white font-medium';
+            else if (!inM) cls += 'text-faint hover:bg-hover';
+            else cls += 'text-ink hover:bg-hover' + (isT ? ' ring-1 ring-brand' : '');
+            cells += '<button type="button" data-d="' + d.getFullYear() + '-' + d.getMonth() + '-' + d.getDate() + '" class="' + cls + '">' + d.getDate() + '</button>';
+          }
+          var mini = 'w-full flex items-center justify-between h-8 px-2.5 rounded-md text-[13px] text-ink outline outline-1 -outline-offset-1 outline-stroke hover:bg-hover cursor-pointer';
+          var chev = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0 ml-1"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+          var listCls = 'hidden absolute z-50 mt-1 w-full max-h-52 overflow-auto rounded-md bg-white border border-line shadow-lg py-1';
+          menu.innerHTML =
+            '<button type="button" data-back class="mb-2 inline-flex items-center gap-1 text-[12px] text-sub hover:text-ink"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Back</button>' +
+            '<div class="flex items-center gap-1.5 mb-2">' +
+              '<button type="button" data-nav="-1" class="h-8 w-8 grid place-items-center rounded-md hover:bg-hover text-sub shrink-0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
+              '<div class="relative flex-1 min-w-0"><button type="button" data-mopen class="' + mini + '"><span class="truncate">' + MONTHS[m] + '</span>' + chev + '</button><ul data-mlist class="' + listCls + '">' + mOpts + '</ul></div>' +
+              '<div class="relative w-[92px] shrink-0"><button type="button" data-yopen class="' + mini + '"><span class="shrink-0 whitespace-nowrap">' + y + '</span>' + chev + '</button><ul data-ylist class="' + listCls + '">' + yOpts + '</ul></div>' +
+              '<button type="button" data-nav="1" class="h-8 w-8 grid place-items-center rounded-md hover:bg-hover text-sub shrink-0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
+            '</div>' +
+            '<div class="grid grid-cols-7 gap-0.5 mb-1">' + DOW.map(function (x) { return '<div class="h-7 grid place-items-center text-[11px] font-medium text-faint">' + x + '</div>'; }).join('') + '</div>' +
+            '<div class="grid grid-cols-7 gap-0.5">' + cells + '</div>';
+        }
+        function toggleList(which) { var ul = menu.querySelector('[' + which + ']'); var other = menu.querySelector(which === 'data-mlist' ? '[data-ylist]' : '[data-mlist]'); if (other) other.classList.add('hidden'); ul.classList.toggle('hidden'); }
+        btn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          var open = menu.classList.contains('hidden');
+          closeChipMenus(cfg.menuId);
+          if (open) { renderQuick(); menu.classList.remove('hidden'); } else menu.classList.add('hidden');
+        });
+        menu.addEventListener('click', function (e) {
+          e.stopPropagation();
+          var q = e.target.closest('[data-days]'); if (q) { set(addDays(+q.getAttribute('data-days'))); return; }
+          if (e.target.closest('[data-custom]')) { if (selected) view = new Date(selected.getFullYear(), selected.getMonth(), 1); renderCal(); return; }
+          if (e.target.closest('[data-back]')) { renderQuick(); return; }
+          var nav = e.target.closest('[data-nav]'); if (nav) { view.setMonth(view.getMonth() + (nav.getAttribute('data-nav') === '1' ? 1 : -1)); renderCal(); return; }
+          if (e.target.closest('[data-mopen]')) { toggleList('data-mlist'); return; }
+          if (e.target.closest('[data-yopen]')) { toggleList('data-ylist'); return; }
+          var mo = e.target.closest('[data-month]'); if (mo) { view.setMonth(+mo.getAttribute('data-month')); renderCal(); return; }
+          var yr = e.target.closest('[data-year]'); if (yr) { view.setFullYear(+yr.getAttribute('data-year')); renderCal(); return; }
+          var day = e.target.closest('[data-d]'); if (day) { var p = day.getAttribute('data-d').split('-'); set(new Date(+p[0], +p[1], +p[2])); }
+        });
+        document.addEventListener('click', function (e) { if (!menu.contains(e.target) && !btn.contains(e.target)) menu.classList.add('hidden'); });
+      }
+      datePicker({ btnId: 'wi-start-btn', labelId: 'wi-start-label', menuId: 'wi-start-menu' });
+      datePicker({ btnId: 'wi-due-btn', labelId: 'wi-due-label', menuId: 'wi-due-menu' });
+
+      // Add parent — work item search modal
+      (function () {
+        var openBtn = document.getElementById('wi-parent-btn');
+        var pModal = document.getElementById('parent-modal');
+        var pSearch = document.getElementById('parent-search');
+        var pList = document.getElementById('parent-list');
+        var pLabel = document.getElementById('wi-parent-label');
+        var PARENTS = [
+          { id: 'TESTI-7', title: '6. Customize your settings ⚙️', color: '#9ca3af' },
+          { id: 'TESTI-6', title: '5. Use Cycles to time box tasks 🗒️', color: '#9ca3af' },
+          { id: 'TESTI-5', title: '4. Visualize your work 🔮', color: '#f59e0b' },
+          { id: 'TESTI-4', title: '3. Create and assign Work Items ✏️', color: '#f59e0b' },
+          { id: 'TESTI-3', title: '2. Invite your team 🤝', color: '#9ca3af' },
+          { id: 'TESTI-2', title: '1. Create Projects 🎯', color: '#111827' },
+          { id: 'TESTI-1', title: 'Welcome to Plane 👋', color: '#22c55e' }
+        ];
+        function dotc(c) { return '<span class="h-2.5 w-2.5 rounded-full shrink-0" style="background:' + c + '"></span>'; }
+        function render(q) {
+          q = (q || '').toLowerCase();
+          var rows = PARENTS.filter(function (p) { return (p.id + ' ' + p.title).toLowerCase().indexOf(q) > -1; });
+          pList.innerHTML = rows.length ? rows.map(function (p) {
+            return '<button type="button" data-p="' + p.id + '" class="w-full text-left flex items-center gap-3 px-3 h-11 rounded-md hover:bg-hover">' + dotc(p.color) + '<span class="text-[13px] text-sub shrink-0">' + p.id + '</span><span class="text-[14px] text-ink truncate">' + p.title + '</span></button>';
+          }).join('') : '<div class="px-3 py-6 text-[13px] text-sub text-center">No work items found</div>';
+        }
+        function open() { closeChipMenus(); render(''); pSearch.value = ''; pModal.classList.remove('hidden'); setTimeout(function () { pSearch.focus(); }, 0); }
+        function close() { pModal.classList.add('hidden'); }
+        openBtn.addEventListener('click', open);
+        pSearch.addEventListener('input', function () { render(pSearch.value); });
+        pModal.addEventListener('click', function (e) {
+          if (e.target.closest('[data-parent-close]')) { close(); return; }
+          var b = e.target.closest('[data-p]'); if (!b) return;
+          pLabel.textContent = b.getAttribute('data-p'); close();
+        });
+        document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
+        var wt = document.getElementById('parent-ws-toggle');
+        wt.addEventListener('click', function () {
+          var on = wt.getAttribute('aria-checked') === 'true';
+          wt.setAttribute('aria-checked', String(!on));
+          wt.classList.toggle('bg-brand', !on); wt.classList.toggle('bg-stroke', on);
+          var k = wt.querySelector('.pb-toggle-knob');
+          k.classList.toggle('translate-x-4', !on); k.classList.toggle('translate-x-0', on);
+        });
+      })();
+    })();
+
+    // ---- Add Project modal ----
+    (function () {
+      var modal = document.getElementById('add-project-modal');
+      var nameEl = document.getElementById('proj-name');
+      var idEl = document.getElementById('proj-id');
+      var idEdited = false;
+
+      function open() { modal.classList.remove('hidden'); }
+      function close() { modal.classList.add('hidden'); }
+      document.getElementById('add-project-btn').addEventListener('click', open);
+      modal.addEventListener('click', function (e) { if (e.target.closest('[data-proj-close]')) close(); });
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
+
+      // Auto-derive the project ID from the name (until the user edits it manually)
+      nameEl.addEventListener('input', function () {
+        if (idEdited) return;
+        idEl.value = nameEl.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10);
+      });
+      idEl.addEventListener('input', function () { idEdited = idEl.value.length > 0; });
+
+      // Access (Public / Private) dropdown
+      (function () {
+        var GLOBE = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/><path d="M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18" stroke="currentColor" stroke-width="1.6"/></svg>';
+        var LOCK = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><rect x="5" y="10" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M8 10V7a4 4 0 018 0v3" stroke="currentColor" stroke-width="1.7"/></svg>';
+        var CHECK = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" class="text-ink shrink-0"><path d="M5 12l5 5 9-11" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        var ACCESS = [
+          { key: 'private', label: 'Private', desc: 'Accessible only by invite', icon: LOCK },
+          { key: 'public', label: 'Public', desc: 'Anyone in the workspace except Guests can join', icon: GLOBE }
+        ];
+        var current = 'public';
+        var btn = document.getElementById('proj-access-btn');
+        var menu = document.getElementById('proj-access-menu');
+        var iconEl = document.getElementById('proj-access-icon');
+        var labelEl = document.getElementById('proj-access-label');
+        function paintBtn() { var o = ACCESS.find(function (a) { return a.key === current; }); iconEl.innerHTML = o.icon; labelEl.textContent = o.label; }
+        function render() {
+          menu.innerHTML = ACCESS.map(function (o) {
+            var sel = o.key === current;
+            return '<button type="button" role="option" data-access="' + o.key + '" class="w-full text-left flex items-start gap-2.5 px-2.5 py-2 rounded-md hover:bg-hover ' + (sel ? 'bg-hover' : '') + '">' +
+              '<span class="mt-0.5 text-sub">' + o.icon + '</span>' +
+              '<span class="flex-1 min-w-0"><span class="block text-[13px] font-medium text-ink">' + o.label + '</span><span class="block text-[12px] text-sub">' + o.desc + '</span></span>' +
+              (sel ? CHECK : '<span class="w-4"></span>') +
+            '</button>';
+          }).join('');
+        }
+        btn.addEventListener('click', function (e) { e.stopPropagation(); render(); menu.classList.toggle('hidden'); });
+        menu.addEventListener('click', function (e) {
+          var b = e.target.closest('[data-access]'); if (!b) return;
+          current = b.getAttribute('data-access'); paintBtn(); menu.classList.add('hidden');
+        });
+        document.addEventListener('click', function (e) { if (!menu.contains(e.target) && !btn.contains(e.target)) menu.classList.add('hidden'); });
+        paintBtn();
+      })();
+
+      // Lead (member picker) dropdown
+      (function () {
+        var MEMBERS = [{ name: 'zorainteractive (you)', initial: 'Z', color: '#1b5f8a' }];
+        var btn = document.getElementById('proj-lead-btn');
+        var menu = document.getElementById('proj-lead-menu');
+        var labelEl = document.getElementById('proj-lead-label');
+        var iconEl = document.getElementById('proj-lead-icon');
+        var search = document.getElementById('proj-lead-search');
+        var listEl = document.getElementById('proj-lead-list');
+        var PERSON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.2" stroke="currentColor" stroke-width="1.7"/><path d="M5 20a7 7 0 0114 0" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
+        function avatar(m) { return '<span class="h-6 w-6 rounded-full text-white grid place-items-center text-[10px] font-bold shrink-0" style="background:' + m.color + '">' + m.initial + '</span>'; }
+        function render(q) {
+          q = (q || '').toLowerCase();
+          var rows = MEMBERS.filter(function (m) { return m.name.toLowerCase().indexOf(q) > -1; });
+          listEl.innerHTML = rows.length
+            ? rows.map(function (m) { return '<button type="button" data-lead="' + m.name + '" class="w-full text-left flex items-center gap-2.5 px-2 h-9 rounded-md hover:bg-hover text-[13px] text-ink">' + avatar(m) + '<span class="truncate">' + m.name + '</span></button>'; }).join('')
+            : '<div class="px-2 py-3 text-[13px] text-sub text-center">No members found</div>';
+        }
+        btn.addEventListener('click', function (e) { e.stopPropagation(); var open = menu.classList.contains('hidden'); render(''); menu.classList.toggle('hidden'); if (open) setTimeout(function () { search.focus(); }, 0); });
+        search.addEventListener('input', function () { render(search.value); });
+        menu.addEventListener('click', function (e) {
+          e.stopPropagation();
+          var b = e.target.closest('[data-lead]'); if (!b) return;
+          var m = MEMBERS.find(function (x) { return x.name === b.getAttribute('data-lead'); });
+          labelEl.textContent = m.name; iconEl.innerHTML = avatar(m); menu.classList.add('hidden');
+        });
+        document.addEventListener('click', function (e) { if (!menu.contains(e.target) && !btn.contains(e.target)) menu.classList.add('hidden'); });
+      })();
+
+      // Cover upload with progress bar (same pattern as the workspace logo upload)
+      // In the Laravel+Vue build, drive #proj-cover-bar from the real XHR/fetch progress event.
+      var input = document.getElementById('proj-cover-input');
+      var cover = document.getElementById('proj-cover');
+      var wrap = document.getElementById('proj-cover-progress');
+      var bar = document.getElementById('proj-cover-bar');
+      var pct = document.getElementById('proj-cover-pct');
+      var lbl = document.getElementById('proj-cover-name');
+      var timer, dataUrl = null;
+      document.getElementById('proj-change-cover').addEventListener('click', function () { input.click(); });
+      input.addEventListener('change', function () {
+        var f = input.files && input.files[0];
+        if (!f) return;
+        var reader = new FileReader();
+        reader.onload = function (e) { dataUrl = e.target.result; };
+        reader.readAsDataURL(f);
+        lbl.textContent = f.name;
+        wrap.classList.remove('hidden');
+        var p = 0; bar.style.width = '0%'; pct.textContent = '0%';
+        clearInterval(timer);
+        timer = setInterval(function () {
+          p += Math.floor(Math.random() * 14) + 6;
+          if (p >= 100) {
+            p = 100; clearInterval(timer);
+            bar.style.width = '100%'; pct.textContent = '100%';
+            setTimeout(function () {
+              if (dataUrl) { cover.style.backgroundImage = 'url(' + dataUrl + ')'; }
+              wrap.classList.add('hidden');
+            }, 500);
+          } else { bar.style.width = p + '%'; pct.textContent = p + '%'; }
+        }, 150);
+      });
+    })();
+
+    // ---- Workspace list modal ----
+    var WS_COLORS = ['#334155', '#1b5f8a', '#7c3aed', '#0891b2', '#be123c', '#15803d', '#b45309', '#4338ca'];
+    var WORKSPACES = [
+      { name: 'Janus Communicaiton', members: 1, role: 'Owner' },
+      { name: 'Zora Interactive', members: 12, role: 'Admin' },
+      { name: 'Northwind Labs', members: 34, role: 'Member' },
+      { name: 'Acme Product Team', members: 8, role: 'Admin' },
+      { name: 'Design Guild', members: 21, role: 'Member' },
+      { name: 'Marketing HQ', members: 17, role: 'Viewer' },
+      { name: 'Client — Bluepeak', members: 5, role: 'Guest' },
+      { name: 'Personal', members: 1, role: 'Owner' }
+    ];
+    var wsModal = document.getElementById('ws-modal');
+    var wsModalList = document.getElementById('ws-modal-list');
+    wsModalList.innerHTML = WORKSPACES.map(function (w, i) {
+      var initial = w.name.charAt(0).toUpperCase();
+      var color = WS_COLORS[i % WS_COLORS.length];
+      return '<div class="flex items-center gap-3 border border-line rounded-lg px-3 py-2.5 hover:bg-hover">' +
+        '<span class="h-9 w-9 rounded-md text-white grid place-items-center text-[13px] font-semibold shrink-0" style="background:' + color + '">' + initial + '</span>' +
+        '<div class="min-w-0 flex-1">' +
+          '<a href="welcome.html" class="text-[14px] font-medium text-ink hover:text-link hover:underline truncate block">' + w.name + '</a>' +
+          '<div class="text-[12px] text-sub">' + w.role + ' &bull; ' + w.members + (w.members === 1 ? ' Member' : ' Members') + '</div>' +
+        '</div>' +
+        '<div class="flex items-center gap-1.5 shrink-0">' +
+          '<a href="setting-general.html" class="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border border-line text-[13px] text-ink hover:bg-white whitespace-nowrap">' +
+            '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.7"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>' +
+            'Settings</a>' +
+          '<a href="setting-member.html" class="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border border-line text-[13px] text-ink hover:bg-white whitespace-nowrap">' +
+            '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3" stroke="currentColor" stroke-width="1.7"/><path d="M3 19a6 6 0 0112 0" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M18 8v6M15 11h6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>' +
+            'Invite members</a>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+    function openWsModal() { wsModal.classList.remove('hidden'); }
+    function closeWsModal() { wsModal.classList.add('hidden'); }
+    document.getElementById('ws-modal-btn').addEventListener('click', openWsModal);
+    document.getElementById('switch-ws-btn').addEventListener('click', openWsModal);
+
+    // ---- User account menu (avatar dropdown) ----
+    var userBtn = document.getElementById('user-btn');
+    var userMenu = document.getElementById('user-menu');
+    userBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var open = userMenu.classList.toggle('hidden');
+      userBtn.classList.toggle('ring-brand', !open);
+    });
+    document.addEventListener('click', function (e) {
+      if (!userMenu.classList.contains('hidden') && !userMenu.contains(e.target) && !userBtn.contains(e.target)) {
+        userMenu.classList.add('hidden');
+        userBtn.classList.remove('ring-brand');
+      }
+    });
+
+    // ---- Account settings modal ----
+    (function () {
+      var modal = document.getElementById('account-modal');
+      var navWrap = document.getElementById('acct-nav');
+      var panels = Array.prototype.slice.call(modal.querySelectorAll('.acct-panel'));
+
+      var ACCT_NAV = [
+        { h: 'Your profile', items: [
+          { label: 'Profile', icon: '<circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="10" r="3" stroke="currentColor" stroke-width="1.6"/><path d="M6.5 18.5a6 6 0 0111 0" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>' },
+          { label: 'Preferences', icon: '<path d="M4 7h9M17 7h3M4 17h3M11 17h9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="15" cy="7" r="2.2" stroke="currentColor" stroke-width="1.6"/><circle cx="9" cy="17" r="2.2" stroke="currentColor" stroke-width="1.6"/>' },
+          { label: 'Notifications', icon: '<path d="M6 9a6 6 0 1112 0c0 5 2 6 2 6H4s2-1 2-6z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M10 20a2 2 0 004 0" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>' },
+          { label: 'Security', icon: '<rect x="5" y="10" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M8 10V7a4 4 0 018 0v3" stroke="currentColor" stroke-width="1.6"/>' }
+        ]},
+        { h: 'Developer', items: [
+          { label: 'Personal Access Tokens', icon: '<circle cx="8" cy="14" r="3.5" stroke="currentColor" stroke-width="1.6"/><path d="M10.5 11.5L20 2M17 5l2 2M14 8l2 2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>' }
+        ]}
+      ];
+
+      function acctIcon(inner) { return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" class="shrink-0">' + inner + '</svg>'; }
+
+      function renderNav(active) {
+        navWrap.innerHTML = ACCT_NAV.map(function (sec) {
+          return '<div class="mt-2 sm:mt-3 first:mt-0 shrink-0">' +
+            '<div class="hidden sm:block px-2 h-6 flex items-center text-[11px] font-semibold text-faint uppercase tracking-wide">' + sec.h + '</div>' +
+            '<div class="flex sm:flex-col gap-1">' + sec.items.map(function (it) {
+              var on = it.label === active;
+              return '<button data-acct-go="' + it.label + '" class="flex items-center gap-2.5 px-2.5 h-9 rounded-md text-[13px] whitespace-nowrap ' + (on ? 'bg-hover text-ink font-medium ring-1 ring-brand/40 sm:ring-0' : 'text-ink hover:bg-hover') + '">' + acctIcon(it.icon) + '<span>' + it.label + '</span></button>';
+            }).join('') + '</div>' +
+          '</div>';
+        }).join('');
+      }
+
+      function show(name) {
+        panels.forEach(function (p) { p.classList.toggle('hidden', p.getAttribute('data-acct-panel') !== name); });
+        renderNav(name);
+      }
+      function open(name) { show(name || 'Profile'); modal.classList.remove('hidden'); }
+      function close() { modal.classList.add('hidden'); }
+
+      navWrap.addEventListener('click', function (e) {
+        var b = e.target.closest('[data-acct-go]');
+        if (b) show(b.getAttribute('data-acct-go'));
+      });
+      modal.addEventListener('click', function (e) { if (e.target.closest('[data-acct-close]')) close(); });
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
+
+      function fromMenu(name) {
+        return function () { userMenu.classList.add('hidden'); userBtn.classList.remove('ring-brand'); open(name); };
+      }
+      document.getElementById('acct-open-settings').addEventListener('click', fromMenu('Profile'));
+      document.getElementById('acct-open-prefs').addEventListener('click', fromMenu('Preferences'));
+
+      // Toggle switches inside the modal
+      modal.addEventListener('click', function (e) {
+        var t = e.target.closest('.pb-toggle');
+        if (!t) return;
+        var on = t.getAttribute('aria-checked') === 'true';
+        t.setAttribute('aria-checked', String(!on));
+        t.classList.toggle('bg-brand', !on);
+        t.classList.toggle('bg-stroke', on);
+        var k = t.querySelector('.pb-toggle-knob');
+        k.classList.toggle('translate-x-4', !on);
+        k.classList.toggle('translate-x-0', on);
+      });
+
+      // Password show/hide
+      modal.addEventListener('click', function (e) {
+        var eye = e.target.closest('.acct-eye');
+        if (!eye) return;
+        var input = eye.parentElement.querySelector('input');
+        input.type = input.type === 'password' ? 'text' : 'password';
+      });
+    })();
+    wsModal.addEventListener('click', function (e) { if (e.target.closest('[data-ws-close]')) closeWsModal(); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeWsModal(); });
+  </script>
+</body>
+</html>

@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Testing · Pages — Project Block</title>
+  <!--
+    Project Block — Project Pages listing
+    Component boundaries for the Laravel + Vue build:
+      component: AppTopbar / AppRail / AppSidebar / ProjectHeader
+      component: PagesToolbar (Add page)
+      component: PagesTabs (Public / Private / Archived)
+      component: PageRow
+  -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="assets/js/tailwind.config.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/css/styles.css" />
+
+  <!-- Tabulator (same data grid used on the Work items / Members lists) + our skin -->
+  <link rel="stylesheet" href="https://unpkg.com/tabulator-tables@6/dist/css/tabulator.min.css" />
+  <link rel="stylesheet" href="assets/css/tabulator-skin.css" />
+  <script src="https://unpkg.com/tabulator-tables@6/dist/js/tabulator.min.js"></script>
+  <style>
+    /* Pages list — clean, header-less list, same feel as the Work items grid. Scoped to #pg-table. */
+    #pg-table.tabulator { border: none; border-radius: 0; background: #fff; }
+    #pg-table .tabulator-tableholder { background: #fff; }
+    #pg-table .tabulator-row,
+    #pg-table .tabulator-row.tabulator-row-even { background: #fff; }
+    #pg-table .tabulator-row { border-bottom: 1px solid #f1f2f4; cursor: pointer; }
+    #pg-table .tabulator-row:hover { background: #f8f9fa !important; }
+    #pg-table .tabulator-row .tabulator-cell { padding: 0 8px; }
+    #pg-table .tabulator-row .tabulator-cell:first-child { padding-left: 24px; }
+    #pg-table .tabulator-row .tabulator-cell:last-child { padding-right: 24px; }
+    /* right-side row actions reveal on hover (like Work items) */
+    #pg-table .pg-hover { opacity: 0; transition: opacity .12s ease; }
+    #pg-table .tabulator-row:hover .pg-hover { opacity: 1; }
+  </style>
+</head>
+<body class="bg-white text-ink h-screen flex flex-col overflow-hidden text-[13px]">
+
+  <!-- ============ component: AppTopbar ============ -->
+  <header class="h-14 shrink-0 border-b border-line flex items-center gap-2 px-3 sm:px-4">
+    <button id="open-sidebar" class="lg:hidden h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+    <div class="flex items-center gap-2 shrink-0">
+      <span class="flex items-center gap-2 px-2 h-9"><span class="h-6 w-6 rounded-md bg-slate-700 text-white grid place-items-center text-[11px] font-semibold">J</span><span class="font-medium text-[13px] max-w-[110px] sm:max-w-[150px] truncate">Janus Communicaiton</span></span>
+      <button class="inline-flex items-center h-7 px-2.5 rounded-md border border-brand text-[12px] text-brand hover:bg-hover whitespace-nowrap">Switch workspace</button>
+    </div>
+    <div class="flex-1 flex justify-center px-2"><div class="relative w-full max-w-md"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="absolute left-3 top-1/2 -translate-y-1/2 text-faint"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><input type="text" placeholder="Search" class="w-full h-9 rounded-md bg-hover pl-9 pr-3 text-[13px] text-ink placeholder:text-faint outline outline-1 -outline-offset-1 outline-transparent focus:bg-white focus:outline-stroke" /></div></div>
+    <div class="flex items-center gap-1.5 shrink-0">
+      <button class="hidden sm:inline-flex items-center h-8 px-3 rounded-md border border-line text-[13px] text-ink hover:bg-hover">Get started</button>
+      <button class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover" title="Inbox"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M3 13h4l2 3h6l2-3h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 6h14l2 7v4a1 1 0 01-1 1H4a1 1 0 01-1-1v-4l2-7z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></button>
+      <button class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover" title="Help"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M9.5 9.5a2.5 2.5 0 114 2c-1 .7-1.5 1.2-1.5 2.5M12 17.5v.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+      <span class="h-7 w-7 rounded-full bg-emerald-500 grid place-items-center text-white text-[11px] font-bold ml-1">Z</span>
+    </div>
+  </header>
+
+  <div class="flex-1 flex min-h-0 relative">
+    <!-- ============ component: AppRail ============ -->
+    <nav class="hidden lg:flex w-16 shrink-0 border-r border-line bg-[#f6f7f8] flex-col items-center py-3 gap-1">
+      <a href="projects.html" class="flex flex-col items-center gap-1 w-full px-0.5 py-2 rounded-lg bg-sel text-brand"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.8"/><rect x="13" y="4" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.8"/><rect x="4" y="13" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.8"/><rect x="13" y="13" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.8"/></svg><span class="text-[10px] text-center leading-tight">Projects</span></a>
+      <a class="flex flex-col items-center gap-1 w-full px-0.5 py-2 rounded-lg text-ink hover:bg-hover"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg><span class="text-[10px] text-center leading-tight">Wiki</span></a>
+      <a class="flex flex-col items-center gap-1 w-full px-0.5 py-2 rounded-lg text-ink hover:bg-hover"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 13v-1a8 8 0 0116 0v1" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><rect x="3" y="12.5" width="4" height="6" rx="1.6" stroke="currentColor" stroke-width="1.7"/><rect x="17" y="12.5" width="4" height="6" rx="1.6" stroke="currentColor" stroke-width="1.7"/><path d="M19 18.5v.5a2.5 2.5 0 01-2.5 2.5H13" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg><span class="text-[10px] text-center leading-tight">Help Desk</span></a>
+      <a href="setting-member.html" class="mt-auto flex flex-col items-center gap-1 w-full px-0.5 py-2 rounded-lg text-ink hover:bg-hover"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M10.3 3.2a1 1 0 011.4 0l.9.9a1 1 0 00.9.3l1.2-.2a1 1 0 011.1.7l.4 1.2a1 1 0 00.6.6l1.2.4a1 1 0 01.7 1.1l-.2 1.2a1 1 0 00.3.9l.9.9a1 1 0 010 1.4l-.9.9a1 1 0 00-.3.9l.2 1.2a1 1 0 01-.7 1.1l-1.2.4a1 1 0 00-.6.6l-.4 1.2a1 1 0 01-1.1.7l-1.2-.2a1 1 0 00-.9.3l-.9.9a1 1 0 01-1.4 0l-.9-.9a1 1 0 00-.9-.3l-1.2.2a1 1 0 01-1.1-.7l-.4-1.2a1 1 0 00-.6-.6l-1.2-.4a1 1 0 01-.7-1.1l.2-1.2a1 1 0 00-.3-.9l-.9-.9a1 1 0 010-1.4l.9-.9a1 1 0 00.3-.9l-.2-1.2a1 1 0 01.7-1.1l1.2-.4a1 1 0 00.6-.6l.4-1.2a1 1 0 011.1-.7l1.2.2a1 1 0 00.9-.3l.9-.9z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.6"/></svg><span class="text-[10px] text-center leading-tight">Settings</span></a>
+    </nav>
+
+    <!-- backdrop for mobile drawer -->
+    <div id="sidebar-backdrop" class="hidden lg:hidden fixed inset-0 bg-black/30 z-30"></div>
+
+    <!-- ============ component: AppSidebar ============ -->
+    <aside id="sidebar" class="w-60 shrink-0 border-r border-line bg-white flex flex-col fixed lg:relative inset-y-0 left-0 z-40 -translate-x-full lg:translate-x-0 transition-transform duration-200">
+      <div class="flex items-center gap-2 px-4 h-12 shrink-0"><span class="font-semibold text-ink">Projects</span><div class="ml-auto flex items-center gap-1 text-faint"><button class="h-7 w-7 grid place-items-center rounded hover:bg-hover"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4 7h9M17 7h3M4 17h7M15 17h5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="15" cy="7" r="2.1" stroke="currentColor" stroke-width="1.7"/><circle cx="13" cy="17" r="2.1" stroke="currentColor" stroke-width="1.7"/></svg></button><button id="close-sidebar" class="lg:hidden h-7 w-7 grid place-items-center rounded hover:bg-hover"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></div></div>
+      <div class="px-2 overflow-y-auto flex-1">
+        <a href="work-items.html" class="w-full flex items-center justify-center gap-2 px-2 h-9 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold mb-2 transition-colors"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>New work item</a>
+        <a class="flex items-center gap-2 px-2 h-8 rounded-md text-ink hover:bg-hover"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4 11l8-6 8 6v8a1 1 0 01-1 1h-4v-6H9v6H5a1 1 0 01-1-1v-8z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>Home</a>
+        <a class="flex items-center gap-2 px-2 h-8 rounded-md text-ink hover:bg-hover"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4 12.5-12.5z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>Drafts</a>
+        <a class="flex items-center gap-2 px-2 h-8 rounded-md text-ink hover:bg-hover"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.2" stroke="currentColor" stroke-width="1.7"/><path d="M5 20a7 7 0 0114 0" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>Your work</a>
+        <a class="flex items-center gap-2 px-2 h-8 rounded-md text-ink hover:bg-hover"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M5 4h14v11l-5 5H5V4z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M14 20v-5h5" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>Stickies</a>
+        <div class="flex items-center gap-1 px-2 h-8 mt-3 text-[11px] font-semibold text-faint uppercase tracking-wide">Workspace</div>
+        <a href="projects.html" class="flex items-center gap-2 px-2 h-8 rounded-md bg-sel text-ink font-medium"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>Projects</a>
+        <button class="w-full flex items-center gap-2 px-2 h-8 rounded-md text-ink hover:bg-hover"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="5" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="19" cy="12" r="1.6" fill="currentColor"/></svg>More</button>
+        <div class="flex items-center gap-1 px-2 h-8 mt-3 text-[11px] font-semibold text-faint uppercase tracking-wide">Projects</div>
+        <a href="work-items.html" class="flex items-center gap-2 px-2 h-8 rounded-md bg-sel text-ink font-medium"><span>🖐️</span>Testing</a>
+      </div>
+    </aside>
+
+    <!-- ============ MAIN ============ -->
+    <main class="flex-1 min-w-0 overflow-y-auto flex flex-col">
+      <!-- component: ProjectHeader -->
+      <div class="border-b border-line px-6 shrink-0">
+        <div class="flex items-center gap-2 h-12 overflow-x-auto">
+          <span class="inline-flex items-center gap-1.5 text-[14px] font-medium text-ink shrink-0"><span>🖐️</span>Testing</span>
+          <button class="h-7 w-7 grid place-items-center rounded-md text-sub hover:bg-hover shrink-0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="5" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="19" cy="12" r="1.6" fill="currentColor"/></svg></button>
+          <nav class="ml-3 flex items-center gap-1 h-12 shrink-0">
+            <a href="#" class="px-2.5 h-12 flex items-center text-[13px] text-sub hover:text-ink border-b-2 border-transparent">Overview</a>
+            <a href="work-items.html" class="px-2.5 h-12 flex items-center text-[13px] text-sub hover:text-ink border-b-2 border-transparent">Work items</a>
+            <a href="cycles.html" class="px-2.5 h-12 flex items-center text-[13px] text-sub hover:text-ink border-b-2 border-transparent">Cycles</a>
+            <a href="modules.html" class="px-2.5 h-12 flex items-center text-[13px] text-sub hover:text-ink border-b-2 border-transparent">Modules</a>
+            <a href="#" class="px-2.5 h-12 flex items-center text-[13px] text-sub hover:text-ink border-b-2 border-transparent">Views</a>
+            <a href="pages.html" class="px-2.5 h-12 flex items-center text-[13px] text-ink font-medium border-b-2 border-brand">Pages</a>
+          </nav>
+        </div>
+      </div>
+
+      <!-- component: PagesToolbar -->
+      <div class="flex items-center gap-2 px-6 h-12 border-b border-line shrink-0">
+        <span class="inline-flex items-center gap-2 text-[13px] font-medium text-ink"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-sub"><path d="M8 3h6l4 4v13a1 1 0 01-1 1H8a1 1 0 01-1-1V4a1 1 0 011-1z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M14 3v4h4" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>Pages</span>
+        <a href="page.html" class="ml-auto inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Add page</a>
+      </div>
+
+      <!-- component: PagesTabs -->
+      <div class="flex items-center gap-6 px-6 h-11 border-b border-line shrink-0">
+        <button class="pg-tab" data-ptab="public">Public</button>
+        <button class="pg-tab" data-ptab="private">Private</button>
+        <button class="pg-tab" data-ptab="archived">Archived</button>
+        <div class="ml-auto flex items-center gap-1.5 text-sub">
+          <button class="h-8 w-8 grid place-items-center rounded-md hover:bg-hover" title="Search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="M21 21l-4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+          <button class="inline-flex items-center gap-1.5 h-8 px-2.5 sm:px-3 rounded-md border border-stroke text-[13px] text-ink hover:bg-hover shrink-0"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M7 12h10M10 17h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span class="hidden sm:inline">Date modified</span></button>
+          <button class="inline-flex items-center gap-1.5 h-8 px-2.5 sm:px-3 rounded-md border border-stroke text-[13px] text-ink hover:bg-hover shrink-0"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M4 5h16l-6 8v5l-4 2v-7L4 5z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg><span class="hidden sm:inline">Filters</span></button>
+        </div>
+      </div>
+
+      <!-- component: PagesList (Tabulator — same grid as Work items, full width) -->
+      <div class="flex-1 min-h-0"><div id="pg-table"></div></div>
+    </main>
+  </div>
+
+  <script>
+    // Mobile sidebar drawer
+    (function () {
+      var sb = document.getElementById('sidebar'), bd = document.getElementById('sidebar-backdrop');
+      function openSb() { sb.classList.remove('-translate-x-full'); bd.classList.remove('hidden'); }
+      function closeSb() { sb.classList.add('-translate-x-full'); bd.classList.add('hidden'); }
+      var o = document.getElementById('open-sidebar'); if (o) o.addEventListener('click', openSb);
+      var c = document.getElementById('close-sidebar'); if (c) c.addEventListener('click', closeSb);
+      if (bd) bd.addEventListener('click', closeSb);
+    })();
+  </script>
+  <script>
+    (function () {
+      var PAGES = {
+        public: [
+          { id: 'untitled', title: 'Untitled', who: 'Z', color: '#1b5f8a', star: false },
+          { id: 'project-design-spec', title: 'Project Design Spec', who: 'P', color: '#7c3aed', star: false }
+        ],
+        private: [],
+        archived: []
+      };
+      var tabEls = document.querySelectorAll('.pg-tab');
+      var tab = 'public';
+      var IC_DOC = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" class="text-sub shrink-0"><path d="M8 3h6l4 4v13a1 1 0 01-1 1H8a1 1 0 01-1-1V4a1 1 0 011-1z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M14 3v4h4" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>';
+      var IC_TAG = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M3 12l7-7h7a2 2 0 012 2v7l-7 7-9-9z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="14.5" cy="9.5" r="1.3" fill="currentColor"/></svg>';
+      var IC_PALETTE = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 3a9 9 0 100 18 2.5 2.5 0 002.5-2.5c0-.7-.3-1.3-.3-1.9 0-.6.5-1.1 1.1-1.1H17a4 4 0 004-4c0-4.4-4-8.5-9-8.5z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="7.5" cy="11" r="1" fill="currentColor"/><circle cx="10" cy="7.5" r="1" fill="currentColor"/><circle cx="14" cy="7.5" r="1" fill="currentColor"/></svg>';
+      var IC_MENU = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="5" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="19" cy="12" r="1.6" fill="currentColor"/></svg>';
+      function star(on) { return on ? '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" class="text-warning"><path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9 6.8 19.2l1-5.8L3.5 9.2l5.9-.9L12 3z"/></svg>' : '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9 6.8 19.2l1-5.8L3.5 9.2l5.9-.9L12 3z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>'; }
+
+      function titleFmt(cell) {
+        var p = cell.getData();
+        return '<div class="flex items-center gap-3 min-w-0">' + IC_DOC + '<span class="text-[14px] text-ink truncate">' + p.title + '</span></div>';
+      }
+      function metaFmt(cell) {
+        var p = cell.getData();
+        return '<div class="flex items-center justify-end gap-1">' +
+          '<span class="pg-hover flex items-center gap-1 text-faint">' +
+            '<button class="h-7 w-7 grid place-items-center rounded hover:bg-line" title="Labels">' + IC_TAG + '</button>' +
+            '<button class="h-7 w-7 grid place-items-center rounded hover:bg-line" title="Color">' + IC_PALETTE + '</button>' +
+          '</span>' +
+          '<span class="h-6 w-6 rounded-full text-white grid place-items-center text-[10px] font-bold" style="background:' + p.color + '">' + p.who + '</span>' +
+          '<button data-star="' + p.id + '" class="h-7 w-7 grid place-items-center rounded hover:bg-line ' + (p.star ? '' : 'text-faint') + '" title="Favorite">' + star(p.star) + '</button>' +
+          '<button data-pmenu="' + p.id + '" class="h-7 w-7 grid place-items-center rounded hover:bg-line text-faint" title="More">' + IC_MENU + '</button>' +
+        '</div>';
+      }
+
+      var table = new Tabulator('#pg-table', {
+        data: PAGES.public,
+        index: 'id',
+        layout: 'fitColumns',
+        headerVisible: false,
+        rowHeight: 44,
+        placeholder: "<div class='py-20 flex flex-col items-center text-center'><svg width='44' height='44' viewBox='0 0 24 24' fill='none' class='text-faint'><path d='M8 3h6l4 4v13a1 1 0 01-1 1H8a1 1 0 01-1-1V4a1 1 0 011-1z' stroke='currentColor' stroke-width='1.5' stroke-linejoin='round'/><path d='M14 3v4h4' stroke='currentColor' stroke-width='1.5'/></svg><div class='text-[14px] font-semibold text-head mt-3'>No pages here</div><div class='text-[13px] text-sub mt-1'>Create a page to get started.</div></div>",
+        columnDefaults: { vertAlign: 'middle', headerSort: false, resizable: false },
+        columns: [
+          { title: 'Title', field: 'title', widthGrow: 1, formatter: titleFmt },
+          { title: 'meta', width: 170, hozAlign: 'right', formatter: metaFmt }
+        ]
+      });
+
+      var tableEl = document.getElementById('pg-table');
+      // Row click → open the page (unless a row action button was clicked)
+      table.on('rowClick', function (e, row) {
+        if (e.target.closest('button')) return;
+        location.href = 'page.html?title=' + encodeURIComponent(row.getData().title);
+      });
+      // Star / more actions
+      tableEl.addEventListener('click', function (e) {
+        var s = e.target.closest('[data-star]');
+        if (s) {
+          e.stopPropagation();
+          var row = table.getRow(s.getAttribute('data-star'));
+          if (row) { var d = row.getData(); d.star = !d.star; row.update({ star: d.star }); row.reformat(); }
+          return;
+        }
+        if (e.target.closest('[data-pmenu]')) { e.stopPropagation(); }
+      });
+
+      function paintTabs() { tabEls.forEach(function (t) { var on = t.getAttribute('data-ptab') === tab; t.className = 'pg-tab h-11 flex items-center -mb-px border-b-2 text-[13px] ' + (on ? 'border-brand text-ink font-medium' : 'border-transparent text-sub hover:text-ink'); }); }
+      tabEls.forEach(function (t) { t.addEventListener('click', function () { tab = t.getAttribute('data-ptab'); paintTabs(); table.replaceData(PAGES[tab]); }); });
+      paintTabs();
+    })();
+  </script>
+</body>
+</html>
