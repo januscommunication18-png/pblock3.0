@@ -13,13 +13,14 @@
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
   </button>
 
-  {{-- Workspace switcher --}}
+  {{-- Workspace switcher. Both openers raise the shared modal included below, so switching
+       happens in place on whatever screen the user is on instead of bouncing to /welcome. --}}
   <div class="flex items-center gap-2 shrink-0">
-    <a href="{{ route('welcome') }}" class="flex items-center gap-2 px-2 h-9 rounded-md hover:bg-hover">
+    <button type="button" data-ws-open title="Switch workspace" class="flex items-center gap-2 px-2 h-9 rounded-md hover:bg-hover">
       <span class="h-6 w-6 rounded-md bg-slate-700 text-white grid place-items-center text-[11px] font-semibold">{{ $__ws->initial() }}</span>
       <span class="font-medium text-[13px] max-w-[110px] sm:max-w-[150px] truncate">{{ $__ws->name }}</span>
-    </a>
-    <a href="{{ route('welcome') }}" class="inline-flex items-center h-7 px-2.5 rounded-md border border-brand text-[12px] text-brand hover:bg-hover whitespace-nowrap">Switch workspace</a>
+    </button>
+    <button type="button" data-ws-open class="inline-flex items-center h-7 px-2.5 rounded-md border border-brand text-[12px] text-brand hover:bg-hover whitespace-nowrap">Switch workspace</button>
   </div>
 
   {{-- Search --}}
@@ -72,6 +73,8 @@
     </div>
   </div>
 </header>
+
+@include('partials.workspace-switcher')
 
 <script>
   (function () {

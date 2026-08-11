@@ -54,12 +54,19 @@ class ProjectCreator
         });
     }
 
-    /** Seed the creator (admin) and the lead (member) as project members. */
+    /**
+     * Seed the creator and the lead as project members.
+     *
+     * §19: the creator automatically becomes Project Admin and must never have to add
+     * themselves — which is also what guarantees §20's "at least one Project Admin" holds
+     * from the moment a project exists. §13 of the member spec makes the lead a Contributor.
+     */
     private function seedMembers(Project $project, int $creatorId, ?int $leadId): void
     {
         ProjectMember::create([
             'project_id' => $project->id,
             'user_id' => $creatorId,
+            'added_by' => $creatorId,
             'role' => ProjectMember::ROLE_ADMIN,
         ]);
 
@@ -67,7 +74,8 @@ class ProjectCreator
             ProjectMember::create([
                 'project_id' => $project->id,
                 'user_id' => $leadId,
-                'role' => ProjectMember::ROLE_MEMBER,
+                'added_by' => $creatorId,
+                'role' => ProjectMember::ROLE_CONTRIBUTOR,
             ]);
         }
     }

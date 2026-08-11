@@ -39,7 +39,10 @@ class UpdateProjectRequest extends FormRequest
                     ->ignore($projectId),
             ],
             'description' => ['nullable', 'string', 'max:2000'],
-            'visibility' => ['required', Rule::in(config('projects.visibilities'))],
+            // Keys, not labels: `visibilities` is a key => label map, so validating against
+            // the map itself compared the submitted value with "Public"/"Private" and
+            // rejected every real save. Matches StoreProjectRequest.
+            'visibility' => ['required', Rule::in(array_keys(config('projects.visibilities')))],
             'lead_user_id' => [
                 'nullable', 'integer',
                 Rule::exists('workspace_memberships', 'user_id')

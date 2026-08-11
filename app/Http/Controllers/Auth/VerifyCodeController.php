@@ -8,6 +8,7 @@ use App\Models\EmailVerificationCode;
 use App\Models\OnboardingProfile;
 use App\Models\User;
 use App\Models\UserIdentity;
+use App\Models\WorkspaceInvitation;
 use App\Services\AuthCodeService;
 use App\Services\OnboardingRouter;
 use Illuminate\Http\RedirectResponse;
@@ -37,7 +38,7 @@ class VerifyCodeController extends Controller
     public function store(VerifyCodeRequest $request): RedirectResponse
     {
         $email = $request->validated('email');
-        $code  = $request->validated('code');
+        $code = $request->validated('code');
         $purpose = session('login_purpose', EmailVerificationCode::PURPOSE_SIGNUP);
 
         if (! $this->codes->verify($email, $code, $purpose)) {
@@ -49,7 +50,7 @@ class VerifyCodeController extends Controller
             $user = User::firstOrCreate(
                 ['email' => $email],
                 [
-                    'status'            => 'active',
+                    'status' => 'active',
                     'email_verified_at' => now(),
                     'terms_accepted_at' => $request->session()->pull('pending_terms_accepted') ? now() : null,
                 ],
@@ -61,7 +62,7 @@ class VerifyCodeController extends Controller
 
             // Ensure an email identity exists (AUTH-002/007: one identity per verified email).
             UserIdentity::firstOrCreate([
-                'provider'         => UserIdentity::PROVIDER_EMAIL,
+                'provider' => UserIdentity::PROVIDER_EMAIL,
                 'provider_subject' => $email,
             ], ['user_id' => $user->id]);
 
@@ -70,6 +71,12 @@ class VerifyCodeController extends Controller
                 ['user_id' => $user->id],
                 ['current_step' => OnboardingProfile::STEP_PROFILE],
             );
+
+            // Now that the identity behind the invited address is known, record it on any
+            // invitation waiting for it (invite spec §32). This happens before onboarding
+            // completes and before membership exists, and is what lets the join step find
+            // the invitation without depending on the session surviving.
+            WorkspaceInvitation::pendingFor($email)->update(['user_id' => $user->id]);
 
             return $user;
         });

@@ -54,7 +54,7 @@ class ProjectStatusTest extends ProjectTestCase
     {
         [$owner, $ws] = $this->owner();
         [, $completedId] = $this->seedStates($ws);
-        $project = $this->makeProject($ws, $owner, ['name' => 'Site', 'identifier' => 'SITE']);
+        $project = $this->makeProject($owner, $ws, ['name' => 'Site', 'identifier' => 'SITE']);
 
         $this->actingAs($owner)
             ->patchJson(route('projects.state', ['project' => $project->id]), ['state_id' => $completedId])
@@ -69,7 +69,7 @@ class ProjectStatusTest extends ProjectTestCase
     {
         [$owner, $ws] = $this->owner();
         [$defaultId] = $this->seedStates($ws);
-        $project = $this->makeProject($ws, $owner, ['name' => 'Site', 'identifier' => 'SITE']);
+        $project = $this->makeProject($owner, $ws, ['name' => 'Site', 'identifier' => 'SITE']);
 
         // Clearing the explicit status falls back to the workspace default (not "no status").
         $this->actingAs($owner)
@@ -82,7 +82,7 @@ class ProjectStatusTest extends ProjectTestCase
     {
         [$owner, $ws] = $this->owner();
         [, $completedId] = $this->seedStates($ws);
-        $project = $this->makeProject($ws, $owner, ['name' => 'Site', 'identifier' => 'SITE']);
+        $project = $this->makeProject($owner, $ws, ['name' => 'Site', 'identifier' => 'SITE']);
         $member = $this->member($ws, 'member', 'm@example.com');
 
         $this->actingAs($member)

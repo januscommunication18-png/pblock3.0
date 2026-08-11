@@ -16,7 +16,7 @@ class ProjectSettingsTest extends ProjectTestCase
     public function test_update_general_persists_and_identifier_unique_ignores_self(): void
     {
         [$owner, $workspace] = $this->owner();
-        $project = $this->makeProject($workspace, $owner, ['identifier' => 'WEB']);
+        $project = $this->makeProject($owner, $workspace, ['identifier' => 'WEB']);
 
         $this->actingAs($owner)->patchJson(route('projects.settings.general.update', $project), [
             'name' => 'Web App', 'identifier' => 'WEB', 'visibility' => 'private',
@@ -31,22 +31,22 @@ class ProjectSettingsTest extends ProjectTestCase
     public function test_members_add_role_and_remove_with_last_admin_protected(): void
     {
         [$owner, $workspace] = $this->owner();
-        $project = $this->makeProject($workspace, $owner);
+        $project = $this->makeProject($owner, $workspace);
         $u = $this->member($workspace, 'member', 'u@example.com');
 
-        // Add u as a member.
+        // Add u as a contributor (project roles: admin | contributor | commenter | guest).
         $this->actingAs($owner)->postJson(route('projects.settings.members.store', $project), [
-            'user_id' => $u->id, 'role' => 'member',
+            'user_id' => $u->id, 'role' => 'contributor',
         ])->assertOk();
         $member = $workspace->run(fn () => ProjectMember::where('project_id', $project->id)->where('user_id', $u->id)->first());
         $ownerMember = $workspace->run(fn () => ProjectMember::where('project_id', $project->id)->where('user_id', $owner->id)->first());
 
         // Promote u to admin (two admins now), then demote back — both allowed.
         $this->actingAs($owner)->patchJson(route('projects.settings.members.role', ['project' => $project->id, 'member' => $member->id]), ['role' => 'admin'])->assertOk();
-        $this->actingAs($owner)->patchJson(route('projects.settings.members.role', ['project' => $project->id, 'member' => $member->id]), ['role' => 'member'])->assertOk();
+        $this->actingAs($owner)->patchJson(route('projects.settings.members.role', ['project' => $project->id, 'member' => $member->id]), ['role' => 'contributor'])->assertOk();
 
         // Demoting the creator — the last remaining admin — is blocked.
-        $this->actingAs($owner)->patchJson(route('projects.settings.members.role', ['project' => $project->id, 'member' => $ownerMember->id]), ['role' => 'member'])
+        $this->actingAs($owner)->patchJson(route('projects.settings.members.role', ['project' => $project->id, 'member' => $ownerMember->id]), ['role' => 'contributor'])
             ->assertStatus(422);
 
         // Remove the plain member (not the last admin) — allowed.
@@ -57,7 +57,7 @@ class ProjectSettingsTest extends ProjectTestCase
     public function test_feature_toggle_persists(): void
     {
         [$owner, $workspace] = $this->owner();
-        $project = $this->makeProject($workspace, $owner);
+        $project = $this->makeProject($owner, $workspace);
 
         $this->actingAs($owner)->postJson(route('projects.settings.features.toggle', $project), [
             'feature' => 'intake', 'enabled' => true,
@@ -69,7 +69,7 @@ class ProjectSettingsTest extends ProjectTestCase
     public function test_states_and_labels_crud(): void
     {
         [$owner, $workspace] = $this->owner();
-        $project = $this->makeProject($workspace, $owner);
+        $project = $this->makeProject($owner, $workspace);
 
         $this->actingAs($owner)->postJson(route('projects.settings.states.store', $project), [
             'name' => 'Review', 'color' => '#2563EB', 'group' => 'started',
@@ -84,10 +84,30 @@ class ProjectSettingsTest extends ProjectTestCase
         $this->assertSame(0, $workspace->run(fn () => ProjectItemLabel::where('project_id', $project->id)->count()));
     }
 
+    /**
+     * Settings is a full-screen detour, so every way out of it — the back arrow, the project
+     * name, Close, and the Escape handler — returns to that project's work item list, which
+     * is where the project workspace opens.
+     */
+    public function test_every_exit_from_project_settings_returns_to_the_work_item_list(): void
+    {
+        [$owner, $workspace] = $this->owner();
+        $project = $this->makeProject($owner, $workspace);
+        $workItems = route('projects.work-items', $project->id);
+
+        $html = $this->actingAs($owner)->get(route('projects.settings', [
+            'project' => $project->id, 'section' => 'general',
+        ]))->assertOk()->getContent();
+
+        // Back arrow + project name + Close, then the Escape handler's target.
+        $this->assertSame(3, substr_count($html, 'href="'.$workItems.'"'));
+        $this->assertStringContainsString('var closeUrl = "'.str_replace('/', '\/', $workItems).'"', $html);
+    }
+
     public function test_non_manager_cannot_change_settings(): void
     {
         [$owner, $workspace] = $this->owner();
-        $project = $this->makeProject($workspace, $owner, ['visibility' => 'public']);
+        $project = $this->makeProject($owner, $workspace, ['visibility' => 'public']);
         $member = $this->member($workspace, 'member', 'plain@example.com');
 
         $this->actingAs($member)->postJson(route('projects.settings.features.toggle', $project), ['feature' => 'intake', 'enabled' => true])

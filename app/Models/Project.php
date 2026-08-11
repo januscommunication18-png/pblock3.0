@@ -63,6 +63,24 @@ class Project extends Model
         return $this->hasMany(ProjectMember::class);
     }
 
+    /** Work-item states configured for this project (Project Settings → States). */
+    public function states(): HasMany
+    {
+        return $this->hasMany(ProjectItemState::class);
+    }
+
+    /** Work-item labels configured for this project (Project Settings → Labels). */
+    public function labels(): HasMany
+    {
+        return $this->hasMany(ProjectItemLabel::class);
+    }
+
+    /** Work items tracked in this project (Phase 5). */
+    public function workItems(): HasMany
+    {
+        return $this->hasMany(WorkItem::class);
+    }
+
     public function isPublic(): bool
     {
         return $this->visibility === self::VISIBILITY_PUBLIC;

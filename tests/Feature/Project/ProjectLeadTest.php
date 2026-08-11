@@ -14,7 +14,7 @@ class ProjectLeadTest extends ProjectTestCase
     {
         [$owner, $ws] = $this->owner();
         $alice = $this->member($ws, 'member', 'alice@example.com');
-        $project = $this->makeProject($ws, $owner, ['name' => 'Site', 'identifier' => 'SITE']);
+        $project = $this->makeProject($owner, $ws, ['name' => 'Site', 'identifier' => 'SITE']);
 
         // set
         $this->actingAs($owner)
@@ -34,7 +34,7 @@ class ProjectLeadTest extends ProjectTestCase
     public function test_lead_must_be_a_workspace_member(): void
     {
         [$owner, $ws] = $this->owner();
-        $project = $this->makeProject($ws, $owner, ['name' => 'Site', 'identifier' => 'SITE']);
+        $project = $this->makeProject($owner, $ws, ['name' => 'Site', 'identifier' => 'SITE']);
 
         $this->actingAs($owner)
             ->patchJson(route('projects.lead', ['project' => $project->id]), ['lead_user_id' => 999999])
@@ -44,7 +44,7 @@ class ProjectLeadTest extends ProjectTestCase
     public function test_non_manager_cannot_set_lead(): void
     {
         [$owner, $ws] = $this->owner();
-        $project = $this->makeProject($ws, $owner, ['name' => 'Site', 'identifier' => 'SITE']);
+        $project = $this->makeProject($owner, $ws, ['name' => 'Site', 'identifier' => 'SITE']);
         $member = $this->member($ws, 'member', 'm@example.com');
 
         $this->actingAs($member)

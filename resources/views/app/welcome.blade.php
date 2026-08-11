@@ -17,7 +17,7 @@
         <span class="h-6 w-6 rounded-md bg-slate-700 text-white grid place-items-center text-[11px] font-semibold">{{ $workspace->initial() }}</span>
         <span class="font-medium text-[13px] max-w-[110px] sm:max-w-[150px] truncate">{{ $workspace->name }}</span>
       </span>
-      <button id="switch-ws-btn" class="inline-flex items-center h-7 px-2.5 rounded-md border border-brand text-[12px] text-brand hover:bg-hover whitespace-nowrap">Switch workspace</button>
+      <button type="button" data-ws-open class="inline-flex items-center h-7 px-2.5 rounded-md border border-brand text-[12px] text-brand hover:bg-hover whitespace-nowrap">Switch workspace</button>
     </div>
 
     <!-- Search -->
@@ -31,7 +31,7 @@
     <!-- Actions -->
     <div class="flex items-center gap-1.5 shrink-0">
       <button class="hidden sm:inline-flex items-center h-8 px-3 rounded-md border border-line text-[13px] text-ink hover:bg-hover">Get started</button>
-      <button id="ws-modal-btn" class="hidden sm:inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-line text-[13px] text-ink hover:bg-hover">
+      <button type="button" data-ws-open class="hidden sm:inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-line text-[13px] text-ink hover:bg-hover">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/><rect x="13" y="4" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/><rect x="4" y="13" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/><rect x="13" y="13" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/></svg>
         Workspace
       </button>
@@ -116,28 +116,7 @@
     </main>
   </div>
 
-  <!-- WorkspaceListModal -->
-  <div id="ws-modal" class="hidden fixed inset-0 z-[60] flex items-start justify-center p-4 sm:pt-24">
-    <div class="absolute inset-0 bg-black/40" data-ws-close></div>
-    <div class="relative w-full max-w-[560px] bg-white rounded-xl shadow-xl flex flex-col max-h-[80vh]">
-      <div class="flex items-center justify-between px-6 py-4 border-b border-line shrink-0">
-        <div>
-          <h2 class="text-[16px] font-semibold text-head">Your workspaces</h2>
-          <p class="text-[13px] text-sub mt-0.5">Switch, manage settings, or invite teammates.</p>
-        </div>
-        <button data-ws-close class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover" title="Close">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-        </button>
-      </div>
-      <div id="ws-modal-list" class="overflow-y-auto px-4 py-3 space-y-2" data-workspaces='@json($workspaces)'></div>
-      <div class="px-6 py-4 border-t border-line shrink-0">
-        <a href="{{ route('workspaces.create') }}" class="w-full inline-flex items-center justify-center gap-2 h-9 rounded-md border border-stroke text-[13px] font-semibold text-ink hover:bg-hover">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-          Create workspace
-        </a>
-      </div>
-    </div>
-  </div>
+  @include('partials.workspace-switcher')
 
   @if (session('status'))
     <div class="fixed top-4 right-4 z-[80] w-full max-w-sm flex justify-end pointer-events-none">
@@ -181,48 +160,6 @@
       span.classList.toggle('line-through', e.target.checked);
       span.classList.toggle('text-faint', e.target.checked);
     });
-
-    // Workspace list modal (server data)
-    var WS_COLORS = ['#334155', '#1b5f8a', '#7c3aed', '#0891b2', '#be123c', '#15803d', '#b45309', '#4338ca'];
-    var wsModal = document.getElementById('ws-modal');
-    var wsModalList = document.getElementById('ws-modal-list');
-    var WORKSPACES = JSON.parse(wsModalList.getAttribute('data-workspaces') || '[]');
-    var CSRF = document.querySelector('meta[name=csrf-token]').getAttribute('content');
-    function escapeHtml(s) { return String(s).replace(/[&<>"']/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
-    wsModalList.innerHTML = WORKSPACES.map(function (w, i) {
-      var color = WS_COLORS[i % WS_COLORS.length];
-      var members = w.members + (w.members === 1 ? ' Member' : ' Members');
-      var avatar = '<span class="h-9 w-9 rounded-md text-white grid place-items-center text-[13px] font-semibold shrink-0" style="background:' + color + '">' + escapeHtml(w.initial) + '</span>';
-
-      if (w.current) {
-        // Current workspace — not clickable.
-        return '<div class="flex items-center gap-3 border border-brand/40 bg-sel/40 rounded-lg px-3 py-2.5">' + avatar +
-          '<div class="min-w-0 flex-1">' +
-            '<div class="text-[14px] font-medium text-ink truncate">' + escapeHtml(w.name) +
-              '<span class="text-[11px] bg-sel text-brand rounded px-1.5 py-0.5 ml-2">Current</span></div>' +
-            '<div class="text-[12px] text-sub">' + escapeHtml(w.role) + ' &bull; ' + members + '</div>' +
-          '</div></div>';
-      }
-
-      // Other workspaces — the whole row submits a POST to switch.
-      return '<form method="POST" action="' + w.switch_url + '" class="block">' +
-        '<input type="hidden" name="_token" value="' + CSRF + '" />' +
-        '<button type="submit" class="w-full text-left flex items-center gap-3 border border-line rounded-lg px-3 py-2.5 hover:bg-hover hover:border-brand/40 transition-colors">' +
-          avatar +
-          '<div class="min-w-0 flex-1">' +
-            '<div class="text-[14px] font-medium text-ink truncate">' + escapeHtml(w.name) + '</div>' +
-            '<div class="text-[12px] text-sub">' + escapeHtml(w.role) + ' &bull; ' + members + '</div>' +
-          '</div>' +
-          '<span class="text-[12px] text-link font-medium shrink-0">Switch</span>' +
-        '</button>' +
-      '</form>';
-    }).join('');
-    function openWsModal() { wsModal.classList.remove('hidden'); }
-    function closeWsModal() { wsModal.classList.add('hidden'); }
-    document.getElementById('ws-modal-btn').addEventListener('click', openWsModal);
-    document.getElementById('switch-ws-btn').addEventListener('click', openWsModal);
-    wsModal.addEventListener('click', function (e) { if (e.target.closest('[data-ws-close]')) closeWsModal(); });
-    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeWsModal(); });
 
     // User menu
     var userBtn = document.getElementById('user-btn');

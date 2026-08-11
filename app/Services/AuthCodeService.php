@@ -8,7 +8,6 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Str;
 
 /**
  * Issues and verifies short-lived, single-use 6-digit email codes (spec D-A3).
@@ -16,7 +15,8 @@ use Illuminate\Support\Str;
  */
 class AuthCodeService
 {
-    private const TTL_MINUTES  = 10;
+    private const TTL_MINUTES = 10;
+
     private const MAX_ATTEMPTS = 5;
 
     public static function normalizeEmail(string $email): string
@@ -42,11 +42,11 @@ class AuthCodeService
         $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 
         EmailVerificationCode::create([
-            'email'      => $email,
-            'code_hash'  => Hash::make($code),
-            'purpose'    => $purpose,
+            'email' => $email,
+            'code_hash' => Hash::make($code),
+            'purpose' => $purpose,
             'expires_at' => Carbon::now()->addMinutes(self::TTL_MINUTES),
-            'attempts'   => 0,
+            'attempts' => 0,
         ]);
 
         Mail::to($email)->send(new LoginCodeMail($code, self::TTL_MINUTES));

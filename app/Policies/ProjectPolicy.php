@@ -40,7 +40,17 @@ class ProjectPolicy
         );
     }
 
-    /** Can the user open this specific project (PRJ-030/031)? */
+    /**
+     * Can the user open this specific project?
+     *
+     * Two layers (Project Member Management §16): workspace membership decides whether they
+     * reach the workspace at all, project membership decides whether they reach THIS project.
+     *
+     * §38 is the governing rule — *Workspace Member ≠ Automatic Project Member*. A workspace
+     * member gets no access to a project until they are explicitly added to it (§18), which
+     * **supersedes Phase 4's PRJ-030**, where a public project was visible to every standard
+     * member. `visibility` no longer grants access on its own.
+     */
     public function view(User $user, Project $project): bool
     {
         $role = $this->workspaceRole($user, $this->workspaceIdOf($project));
@@ -50,23 +60,60 @@ class ProjectPolicy
             return false;
         }
 
-        // Workspace owners/admins keep administrative access to every project (PRJ-031).
+        // §18: Workspace Owner/Admin keep administrative visibility across every project —
+        // they must, since §17 lets them manage any project's members.
         if (in_array($role, [WorkspaceMembership::ROLE_OWNER, 'admin'], true)) {
             return true;
         }
 
-        // Explicit project members can always open it (public or private).
-        if ($this->isProjectMember($user, $project)) {
-            return true;
-        }
-
-        // Public projects are discoverable to standard members, but NOT to guests solely
-        // because they are public (PRJ-030).
-        return $project->isPublic() && $role !== 'guest';
+        // Everyone else needs an explicit project membership (§18), which the project's
+        // creator receives automatically (§19).
+        return $this->isProjectMember($user, $project);
     }
 
     /** Managing a project (settings/members/lifecycle) — later phases lean on this. */
     public function update(User $user, Project $project): bool
+    {
+        return $this->canManage($user, $project);
+    }
+
+    /**
+     * Alias of update, for the `can('manage', $project)` calls in the project-settings
+     * controllers. Laravel denies an ability whose policy method is missing, so without
+     * this every Project Settings section returned 403 — including for workspace owners.
+     */
+    public function manage(User $user, Project $project): bool
+    {
+        return $this->canManage($user, $project);
+    }
+
+    /**
+     * Permanent delete (PRJ-047) — manage rights, same as update. The typed-identifier
+     * confirmation is enforced in the controller, not here.
+     */
+    public function delete(User $user, Project $project): bool
+    {
+        return $this->canManage($user, $project);
+    }
+
+    /**
+     * Who may manage a project's members (§17): Workspace Owner, Workspace Admin, or this
+     * project's own Admin. A Workspace Manager only qualifies when they are also Project
+     * Admin — which this covers, since the check is on the project role, not the workspace
+     * one. Contributors, Commenters and Guests never qualify.
+     *
+     * Passed as `$user->can('manageMembers', $project)`.
+     */
+    public function manageMembers(User $user, Project $project): bool
+    {
+        return $this->canManage($user, $project);
+    }
+
+    /**
+     * Manage rights: workspace owners/admins can manage any project in the workspace;
+     * otherwise the user must be an admin of this specific project.
+     */
+    private function canManage(User $user, Project $project): bool
     {
         $role = $this->workspaceRole($user, $this->workspaceIdOf($project));
 

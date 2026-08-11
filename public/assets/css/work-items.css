@@ -1,0 +1,147 @@
+/* Work items list skin (Phase 5) — ported from html/work-items.html.
+ *
+ * Overrides Tabulator's own class names, scoped to #wi-table so the Members grid keeps the
+ * shared tabulator-skin.css look. These are vendor-class overrides rather than new utility
+ * classes, so the `_moretogether` prefix (CLAUDE.md §14) does not apply — same convention
+ * assets/css/tabulator-skin.css already follows. */
+
+#wi-table.tabulator { border: none; border-radius: 0; background: #fff; }
+#wi-table .tabulator-tableholder { background: #fff; }
+
+/* Rows: white, uniform height, subtle separator, hover, clickable */
+#wi-table .tabulator-row,
+#wi-table .tabulator-row.tabulator-row-even { background: #fff; }
+#wi-table .tabulator-row { border-bottom: 1px solid #f1f2f4; cursor: pointer; }
+#wi-table .tabulator-row:hover { background: #f8f9fa !important; }
+#wi-table .tabulator-row .tabulator-cell { padding: 0 8px; }
+#wi-table .tabulator-row .tabulator-cell:first-child { padding-left: 24px; }
+#wi-table .tabulator-row .tabulator-cell:last-child { padding-right: 20px; }
+
+/* Group header: light gray band, aligned with rows, uniform height */
+#wi-table .tabulator-group,
+#wi-table .tabulator-group.tabulator-group-visible {
+  background: #f6f7f8;
+  border-top: none;
+  border-bottom: 1px solid #e5e7eb;
+  height: 40px;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 20px 0 24px;
+  box-sizing: border-box;
+  color: #0f0f10;
+  font-weight: 600;
+}
+#wi-table .tabulator-group:hover { background: #eef0f2; cursor: pointer; }
+
+/* Hide Tabulator's native toggle so our own chevron sits at the group's left padding,
+   aligned with the "Work items" toolbar label. */
+#wi-table .tabulator-group .tabulator-group-toggle { display: none !important; }
+#wi-table .tabulator-group .tabulator-arrow { display: none !important; }
+
+/* Tabulator's base theme sets group <span> { color:#d00; margin-left:10px } — reset both. */
+#wi-table .tabulator-group span { color: inherit; margin-left: 0; }
+
+/* Collapse/expand chevron — points right when collapsed, down when expanded. */
+#wi-table .tabulator-group .wi-chevron { transition: transform .15s ease; transform: rotate(0deg); }
+#wi-table .tabulator-group.tabulator-group-visible .wi-chevron { transform: rotate(90deg); }
+
+/* ---------------------------------------------------------------------------
+   Rich text (read view)
+
+   Tailwind's preflight strips list markers, heading sizes and blockquote
+   indentation, so stored description markup renders as an undifferentiated wall
+   of text without these. `.wi-rich` is the READ view; the editing surface is
+   styled further down alongside Quill. Same `wi-` prefix as the rest of this screen's
+   classes (see the file header on why the `_moretogether` prefix isn't used
+   here — these ride alongside vendor classes rather than being new utilities).
+   --------------------------------------------------------------------------- */
+.wi-rich > *:first-child { margin-top: 0; }
+.wi-rich > *:last-child { margin-bottom: 0; }
+.wi-rich p { margin: 0 0 10px; }
+.wi-rich h1, .wi-rich h2, .wi-rich h3,
+.wi-rich h4, .wi-rich h5, .wi-rich h6 { font-weight: 600; color: #0f0f10; margin: 18px 0 8px; line-height: 1.3; }
+.wi-rich h1 { font-size: 20px; }
+.wi-rich h2 { font-size: 17px; }
+.wi-rich h3 { font-size: 15px; }
+.wi-rich h4, .wi-rich h5, .wi-rich h6 { font-size: 14px; }
+.wi-rich ul, .wi-rich ol { margin: 0 0 10px; padding-left: 22px; }
+.wi-rich ul { list-style: disc; }
+.wi-rich ol { list-style: decimal; }
+.wi-rich li { margin: 3px 0; }
+.wi-rich a { color: #1b5f8a; text-decoration: underline; }
+.wi-rich blockquote { margin: 10px 0; padding: 2px 0 2px 12px; border-left: 3px solid #e5e7eb; color: #6b7280; }
+.wi-rich hr { margin: 14px 0; border: 0; border-top: 1px solid #e5e7eb; }
+.wi-rich pre { background: #f6f7f8; border: 1px solid #e5e7eb; border-radius: 6px; padding: 10px 12px; overflow-x: auto; }
+.wi-rich code { background: #f3f4f6; border-radius: 4px; padding: 1px 4px; font-size: 12.5px; }
+.wi-rich pre code { background: none; padding: 0; }
+.wi-rich img { max-width: 100%; height: auto; border-radius: 6px; }
+.wi-rich table { border-collapse: collapse; margin: 10px 0; width: 100%; }
+.wi-rich th, .wi-rich td { border: 1px solid #e5e7eb; padding: 6px 8px; text-align: left; }
+.wi-rich th { background: #f8f9fa; font-weight: 600; }
+
+/* ---------------------------------------------------------------------------
+   Rich-text editor (Quill, snow theme)
+
+   Quill's own stylesheet only styles content INSIDE `.ql-editor`, and Tailwind's
+   preflight has already stripped list markers and heading sizes globally — so
+   both the editing surface and the read view need them put back. The read view
+   also has to understand Quill's alignment and indent CLASSES, which is how it
+   represents those formats.
+   --------------------------------------------------------------------------- */
+.wi-editor { display: block; width: 100%; }
+.wi-editor .ql-toolbar.ql-snow {
+  border-color: #e5e7eb;
+  border-radius: 8px 8px 0 0;
+  background: #f8f9fa;
+  padding: 5px 6px;
+}
+.wi-editor .ql-container.ql-snow { border-color: #e5e7eb; border-radius: 0 0 8px 8px; }
+.wi-editor .ql-editor {
+  min-height: var(--wi-editor-min, 140px);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #23272f;
+}
+.wi-editor .ql-editor.ql-blank::before { color: #9ca3af; font-style: normal; }
+/* Compact the toolbar: Quill's defaults are sized for a full-page editor. */
+.wi-editor .ql-snow.ql-toolbar button,
+.wi-editor .ql-snow .ql-toolbar button { width: 26px; height: 26px; padding: 3px; }
+.wi-editor .ql-snow .ql-picker { height: 26px; }
+.wi-editor .ql-snow.ql-toolbar button:hover { background: #eef0f2; border-radius: 5px; }
+.wi-editor .ql-snow.ql-toolbar button.ql-active { background: #e6eef4; border-radius: 5px; }
+.wi-editor .ql-snow .ql-stroke { stroke: #6b7280; }
+.wi-editor .ql-snow .ql-fill { fill: #6b7280; }
+.wi-editor .ql-snow.ql-toolbar button.ql-active .ql-stroke { stroke: #1b5f8a; }
+.wi-editor .ql-snow.ql-toolbar button.ql-active .ql-fill { fill: #1b5f8a; }
+/* Preflight strips these inside the editing surface too. */
+.wi-editor .ql-editor ul { list-style: disc; }
+.wi-editor .ql-editor ol { list-style: decimal; }
+.wi-editor .ql-editor blockquote { border-left: 3px solid #e5e7eb; padding-left: 12px; color: #6b7280; }
+.wi-editor .ql-editor img { max-width: 100%; height: auto; border-radius: 6px; }
+
+/* Quill represents alignment and indentation as classes, so the READ view needs
+   them as well — otherwise a centred paragraph renders left once saved. */
+.wi-rich .ql-align-center, .wi-editor .ql-editor .ql-align-center { text-align: center; }
+.wi-rich .ql-align-right, .wi-editor .ql-editor .ql-align-right { text-align: right; }
+.wi-rich .ql-align-justify, .wi-editor .ql-editor .ql-align-justify { text-align: justify; }
+.wi-rich .ql-indent-1 { padding-left: 3em; }
+.wi-rich .ql-indent-2 { padding-left: 6em; }
+.wi-rich .ql-indent-3 { padding-left: 9em; }
+.wi-rich .ql-indent-4 { padding-left: 12em; }
+/* Quill marks list type on the item, not the wrapper, so a bullet list can arrive
+   inside an <ol>. Follow the item's own marker. */
+.wi-rich li[data-list="bullet"], .wi-editor .ql-editor li[data-list="bullet"] { list-style-type: disc; }
+.wi-rich li[data-list="ordered"], .wi-editor .ql-editor li[data-list="ordered"] { list-style-type: decimal; }
+.wi-rich .ql-syntax {
+  background: #23272f; color: #f3f4f6; border-radius: 6px;
+  padding: 10px 12px; overflow-x: auto; white-space: pre-wrap;
+}
+.wi-rich iframe { max-width: 100%; aspect-ratio: 16 / 9; height: auto; border: 0; border-radius: 8px; }
+
+/* Tab strip: scrollable on narrow screens, but without the scrollbar chrome —
+   a 1px-tall horizontal bar under seven tabs reads as damage, not affordance. */
+.wi-tabs { scrollbar-width: none; -ms-overflow-style: none; }
+.wi-tabs::-webkit-scrollbar { display: none; }

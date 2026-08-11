@@ -18,6 +18,21 @@ var PB_SVG = {
   person: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.2" stroke="currentColor" stroke-width="1.7"/><path d="M5 20a7 7 0 0114 0" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>'
 };
 
+// The modal's form doubles as a popover target so the status / priority / date pickers
+// built for the cards can drive it too. It therefore carries the same shape a card payload
+// has (id, can_manage, state, priority, dates); PB_FORM_ID is the sentinel that tells the
+// shared handlers "edit this object in memory, don't PATCH the server yet".
+var PB_FORM_ID = '__form__';
+
+function pbBlankForm(gradient) {
+  return {
+    id: PB_FORM_ID, can_manage: true,
+    name: '', identifier: '', description: '', visibility: 'public',
+    lead_user_id: '', emoji: '', cover_gradient: gradient || '',
+    state: null, priority: null, start_date: '', end_date: ''
+  };
+}
+
 PB.boot('projects-index', {
   props: { bootstrap: Object },
   data: function () {
@@ -36,12 +51,16 @@ PB.boot('projects-index', {
       statusMenu: { open: false, projectId: null, style: {} },
       priorityMenu: { open: false, projectId: null, style: {} },
       leadMenu: { open: false, projectId: null, style: {} }, leadMenuQuery: '',
+      // Per-card action menu (Edit / Archive|Restore / Delete) + typed-confirmation delete.
+      actionsMenu: { open: false, projectId: null, style: {} },
+      deleteModal: { open: false, project: null, typed: '', busy: false },
       // Design-system calendar popover (quick options + Custom Date grid), matches projects.html.
       dateMenu: { open: false, projectId: null, field: 'start_date', mode: 'quick', vy: 2026, vm: 0, style: {}, monthOpen: false, yearOpen: false },
-      open: false, creating: false, idEdited: false, errors: {},
+      // The one modal serves both Add Project and Edit project; `editing` picks the mode.
+      open: false, editing: false, editId: null, creating: false, idEdited: false, errors: {},
       accessOpen: false, leadOpen: false, leadQuery: '',
       coverImage: '', coverUploading: false, coverPct: 0, coverName: '',
-      form: { name: '', identifier: '', description: '', visibility: 'public', lead_user_id: '', emoji: '', cover_gradient: covers[0] }
+      form: pbBlankForm(covers[0])
     };
   },
   mounted: function () {
@@ -80,17 +99,18 @@ PB.boot('projects-index', {
       if (!id) return null;
       return this.members.find(function (m) { return String(m.id) === String(id); }) || null;
     },
-    statusProject: function () {
-      var id = this.statusMenu.projectId;
+    statusProject: function () { return this.menuTarget(this.statusMenu.projectId); },
+    priorityMenuProject: function () { return this.menuTarget(this.priorityMenu.projectId); },
+    leadMenuProject: function () { return this.menuTarget(this.leadMenu.projectId); },
+    actionsProject: function () {
+      var id = this.actionsMenu.projectId;
       return this.projects.find(function (p) { return p.id === id; }) || null;
     },
-    priorityMenuProject: function () {
-      var id = this.priorityMenu.projectId;
-      return this.projects.find(function (p) { return p.id === id; }) || null;
-    },
-    leadMenuProject: function () {
-      var id = this.leadMenu.projectId;
-      return this.projects.find(function (p) { return p.id === id; }) || null;
+    // The server requires the project identifier typed back before deleting (PRJ-047).
+    deleteConfirmed: function () {
+      var p = this.deleteModal.project;
+      if (!p) return false;
+      return this.deleteModal.typed.trim().toUpperCase() === String(p.identifier || '').toUpperCase();
     },
     leadMenuMembers: function () {
       var q = (this.leadMenuQuery || '').toLowerCase();
@@ -98,10 +118,7 @@ PB.boot('projects-index', {
         return !q || (m.name || '').toLowerCase().indexOf(q) > -1 || (m.email || '').toLowerCase().indexOf(q) > -1;
       });
     },
-    dateMenuProject: function () {
-      var id = this.dateMenu.projectId;
-      return this.projects.find(function (p) { return p.id === id; }) || null;
-    },
+    dateMenuProject: function () { return this.menuTarget(this.dateMenu.projectId); },
     // The currently-selected date (Date obj) for the field being edited, or null.
     dateSelected: function () {
       var p = this.dateMenuProject; if (!p) return null;
@@ -144,6 +161,15 @@ PB.boot('projects-index', {
       }
       return cells;
     },
+    // Validation messages for fields edited through chips rather than inputs — they have
+    // nowhere of their own to render, so the modal lists them under the chip row.
+    chipErrors: function () {
+      var e = this.errors, out = [];
+      ['visibility', 'lead_user_id', 'state_id', 'priority_id', 'start_date', 'end_date'].forEach(function (k) {
+        if (e[k] && e[k][0]) out.push(e[k][0]);
+      });
+      return out;
+    },
     modalCoverStyle: function () {
       return this.coverImage
         ? { backgroundImage: 'url(' + this.coverImage + ')', backgroundSize: 'cover', backgroundPosition: 'center' }
@@ -153,8 +179,21 @@ PB.boot('projects-index', {
   methods: {
     // @mention handle shown wherever a project id appears (PRJ mention handle).
     handle: function (id) { return '@' + String(id || '').toLowerCase(); },
+    // True when a popover is editing the modal's form rather than a live card.
+    isForm: function (p) { return !!p && p.id === PB_FORM_ID; },
+    // Resolve what a shared popover is pointed at: the modal form, or a card by id.
+    menuTarget: function (id) {
+      if (id === PB_FORM_ID) return this.form;
+      return this.projects.find(function (p) { return p.id === id; }) || null;
+    },
+    // A popover may open when its target is the modal form (saved later, on submit) or a
+    // manageable card whose per-chip endpoint exists (saved immediately).
+    canOpenMenu: function (p, endpoint) {
+      if (this.isForm(p)) return true;
+      return !!(p && p.can_manage && endpoint);
+    },
     openStatusMenu: function (p, e) {
-      if (!p || !p.can_manage || !this.endpoints.state) return;
+      if (!this.canOpenMenu(p, this.endpoints.state)) return;
       var r = e.currentTarget.getBoundingClientRect();
       var width = 208;
       var left = Math.max(8, Math.min(r.left, window.innerWidth - width - 8));
@@ -165,6 +204,8 @@ PB.boot('projects-index', {
     },
     closeStatusMenu: function () { this.statusMenu = { open: false, projectId: null, style: {} }; },
     setStatus: async function (p, s) {
+      // Modal form: hold the choice locally, the whole modal saves in one PATCH.
+      if (this.isForm(p)) { p.state = s; this.closeStatusMenu(); return; }
       if (!p || !this.endpoints.state) { this.closeStatusMenu(); return; }
       try {
         var url = this.$pb.withId(this.endpoints.state, p.id);
@@ -175,7 +216,7 @@ PB.boot('projects-index', {
       this.closeStatusMenu();
     },
     openPriorityMenu: function (p, e) {
-      if (!p || !p.can_manage || !this.endpoints.priority) return;
+      if (!this.canOpenMenu(p, this.endpoints.priority)) return;
       var r = e.currentTarget.getBoundingClientRect();
       var width = 200;
       var left = Math.max(8, Math.min(r.left, window.innerWidth - width - 8));
@@ -186,6 +227,7 @@ PB.boot('projects-index', {
     },
     closePriorityMenu: function () { this.priorityMenu = { open: false, projectId: null, style: {} }; },
     setPriority: async function (p, pr) {
+      if (this.isForm(p)) { p.priority = pr; this.closePriorityMenu(); return; }
       if (!p || !this.endpoints.priority) { this.closePriorityMenu(); return; }
       try {
         var url = this.$pb.withId(this.endpoints.priority, p.id);
@@ -195,7 +237,99 @@ PB.boot('projects-index', {
       } catch (e) { this.$pb.toast(this.$pb.firstError(e), 'error'); }
       this.closePriorityMenu();
     },
+    // ---- Card action menu: Edit / Archive|Restore / Delete (PRJ-045/046/047) ----
+    openActionsMenu: function (p, e) {
+      if (!p || !p.can_manage) return;
+      var r = e.currentTarget.getBoundingClientRect();
+      var width = 184;
+      // Right-align to the kebab and open downward — the button sits on the card cover,
+      // so there is always room below.
+      var left = Math.max(8, Math.min(r.right - width, window.innerWidth - width - 8));
+      this.actionsMenu = {
+        open: true, projectId: p.id,
+        style: { position: 'fixed', left: left + 'px', top: (r.bottom + 6) + 'px', width: width + 'px', zIndex: 120 }
+      };
+    },
+    closeActionsMenu: function () { this.actionsMenu = { open: false, projectId: null, style: {} }; },
+    // Edit opens the same modal the Add Project button uses, pre-filled from the card —
+    // including the four chips (status, priority, start/end date) and the lead. Without an
+    // update endpoint we fall back to the project's own settings screen.
+    editProject: function (p) {
+      this.closeActionsMenu();
+      // Editing is workspace Owner/Admin only — the server enforces it too.
+      if (!p || !p.can_edit) return;
+      if (!this.endpoints.update) {
+        if (p.settings_url) { window.location = p.settings_url; }
+        return;
+      }
+      this.resetModal();
+      this.idEdited = true; // the identifier already exists; never re-derive it from the name
+      this.coverImage = p.cover_url || '';
+      this.editing = true; this.editId = p.id;
+      this.form = {
+        id: PB_FORM_ID, can_manage: true,
+        name: p.name || '',
+        // Shown lowercase (the @handle look); normalized back to uppercase on save.
+        identifier: String(p.identifier || '').toLowerCase(),
+        description: p.description || '',
+        visibility: p.visibility || 'public',
+        lead_user_id: p.lead ? String(p.lead.id) : '',
+        emoji: p.emoji || '',
+        cover_gradient: p.cover_gradient || this.coverPresets[0],
+        state: p.state || null,
+        priority: p.priority || null,
+        start_date: p.start_date || '',
+        end_date: p.end_date || ''
+      };
+      this.open = true;
+    },
+    // Swap a card in the grid for the fresh payload the server returned after a save.
+    applyCard: function (card) {
+      if (!card) return;
+      for (var i = 0; i < this.projects.length; i++) {
+        if (this.projects[i].id === card.id) { this.projects.splice(i, 1, card); return; }
+      }
+    },
+    // Archive and restore both drop the card from the current list, since the list is
+    // filtered by status (active vs. archived).
+    setArchived: async function (p, archive) {
+      this.closeActionsMenu();
+      var url = archive ? this.endpoints.archive : this.endpoints.restore;
+      if (!p || !url) return;
+      try {
+        await this.$pb.api(this.$pb.withId(url, p.id), { method: 'POST' });
+        this.removeCard(p);
+        this.$pb.toast(archive ? 'Project archived.' : 'Project restored.');
+      } catch (e) { this.$pb.toast(this.$pb.firstError(e), 'error'); }
+    },
+    askDelete: function (p) {
+      this.closeActionsMenu();
+      if (!p || !this.endpoints.destroy) return;
+      this.deleteModal = { open: true, project: p, typed: '', busy: false };
+    },
+    closeDelete: function () { this.deleteModal = { open: false, project: null, typed: '', busy: false }; },
+    confirmDelete: async function () {
+      var p = this.deleteModal.project;
+      if (!p || !this.deleteConfirmed || this.deleteModal.busy) return;
+      this.deleteModal.busy = true;
+      try {
+        await this.$pb.api(this.$pb.withId(this.endpoints.destroy, p.id), {
+          method: 'DELETE', body: { confirm: this.deleteModal.typed.trim() }
+        });
+        this.removeCard(p);
+        this.closeDelete();
+        this.$pb.toast('Project deleted.');
+      } catch (e) {
+        this.deleteModal.busy = false;
+        this.$pb.toast(this.$pb.firstError(e), 'error');
+      }
+    },
+    removeCard: function (p) {
+      var i = this.projects.indexOf(p);
+      if (i > -1) this.projects.splice(i, 1);
+    },
     setDates: async function (p, field, value) {
+      if (this.isForm(p)) { p[field] = value || ''; return; }
       if (!p || !this.endpoints.dates) return;
       var body = {}; body[field] = value || '';
       try {
@@ -225,7 +359,7 @@ PB.boot('projects-index', {
       return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
     },
     openDateMenu: function (p, field, e) {
-      if (!p || !p.can_manage || !this.endpoints.dates) return;
+      if (!this.canOpenMenu(p, this.endpoints.dates)) return;
       var r = e.currentTarget.getBoundingClientRect();
       var width = 300, menuH = 380;
       var left = Math.max(8, Math.min(r.left, window.innerWidth - width - 8));
@@ -322,12 +456,21 @@ PB.boot('projects-index', {
     coverStyle: function (p) {
       return p.cover_url ? { backgroundImage: 'url(' + p.cover_url + ')', backgroundSize: 'cover', backgroundPosition: 'center' } : { background: p.cover_gradient || this.coverPresets[0] };
     },
-    openCreate: function () {
+    // Shared reset for both modal modes — clears errors, dropdowns and any cover upload.
+    resetModal: function () {
       this.errors = {}; this.idEdited = false; this.accessOpen = false; this.leadOpen = false; this.leadQuery = '';
+      this.editing = false; this.editId = null;
       this.coverImage = ''; this.coverUploading = false; this.coverPct = 0; this.coverName = ''; this._coverData = null;
       if (this._coverTimer) { clearInterval(this._coverTimer); this._coverTimer = null; }
-      this.form = { name: '', identifier: '', description: '', visibility: 'public', lead_user_id: '', emoji: '', cover_gradient: this.coverPresets[0] };
+    },
+    openCreate: function () {
+      this.resetModal();
+      this.form = pbBlankForm(this.coverPresets[0]);
       this.open = true;
+    },
+    closeModal: function () {
+      this.open = false;
+      this.closeStatusMenu(); this.closePriorityMenu(); this.closeDateMenu();
     },
     pickCover: function () { if (this.$refs.coverInput) this.$refs.coverInput.click(); },
     onCoverChange: function (e) {
@@ -369,17 +512,51 @@ PB.boot('projects-index', {
       window.location = this.endpoints.list + (this.archived ? '' : '?archived=1');
     },
     soon: function () { this.$pb.toast('Filters & sorting are coming soon.'); },
+    // Fields common to create and edit. The identifier is shown lowercase (the @handle
+    // look); the server stores the canonical uppercase one, so normalize before posting.
+    basePayload: function () {
+      var f = this.form;
+      return {
+        name: f.name,
+        identifier: f.identifier ? String(f.identifier).toUpperCase() : '',
+        description: f.description,
+        visibility: f.visibility,
+        emoji: f.emoji,
+        cover_gradient: f.cover_gradient,
+        lead_user_id: f.lead_user_id
+      };
+    },
+    submit: function () { return this.editing ? this.update() : this.create(); },
     create: async function () {
       if (this.creating) return; this.creating = true; this.errors = {};
-      var payload = Object.assign({}, this.form);
-      // Field is shown lowercase (the @handle look); the server stores the canonical
-      // uppercase identifier, so normalize before posting.
-      if (payload.identifier) payload.identifier = String(payload.identifier).toUpperCase();
+      var payload = this.basePayload();
       if (!payload.lead_user_id) delete payload.lead_user_id;
       try {
         var resp = await this.$pb.api(this.endpoints.store, { method: 'POST', body: payload });
         this.$pb.toast('Project created.');
         window.location = resp.redirect;
+      } catch (e) { this.errors = this.$pb.fieldErrors(e); this.$pb.toast(this.$pb.firstError(e), 'error'); }
+      this.creating = false;
+    },
+    // One PATCH saves everything the modal shows, including the four chips.
+    update: async function () {
+      if (this.creating || !this.endpoints.update) return;
+      this.creating = true; this.errors = {};
+      var f = this.form;
+      var payload = Object.assign(this.basePayload(), {
+        state_id: f.state ? f.state.id : '',
+        priority_id: f.priority ? f.priority.id : '',
+        start_date: f.start_date || '',
+        end_date: f.end_date || ''
+      });
+      // The project ID is immutable — never post it back from the edit modal.
+      delete payload.identifier;
+      try {
+        var url = this.$pb.withId(this.endpoints.update, this.editId);
+        var resp = await this.$pb.api(url, { method: 'PATCH', body: payload });
+        this.applyCard(resp.project);
+        this.closeModal();
+        this.$pb.toast('Project updated.');
       } catch (e) { this.errors = this.$pb.fieldErrors(e); this.$pb.toast(this.$pb.firstError(e), 'error'); }
       this.creating = false;
     }
@@ -406,7 +583,13 @@ PB.boot('projects-index', {
     '<a v-for="p in projects" :key="p.id" :href="p.url" class="group block border border-line rounded-xl overflow-hidden hover:shadow-md transition-shadow">' +
     '<div class="relative h-24" :style="coverStyle(p)">' +
     '<span v-if="p.emoji" class="absolute top-2.5 left-2.5 h-7 w-7 rounded-md bg-white/90 grid place-items-center text-[15px] shadow-sm">{{ p.emoji }}</span>' +
-    '<span class="absolute top-2.5 right-2.5 text-[11px] bg-white/90 rounded px-1.5 py-0.5 text-sub capitalize">{{ p.visibility }}</span>' +
+    '<div class="absolute top-2.5 right-2.5 flex items-center gap-1.5">' +
+    '<span class="text-[11px] bg-white/90 rounded px-1.5 py-0.5 text-sub capitalize">{{ p.visibility }}</span>' +
+    // Actions kebab — Edit / Archive|Restore / Delete. The card is a link, so stop the click.
+    '<button v-if="p.can_manage" type="button" @click.stop.prevent="openActionsMenu(p, $event)" :aria-expanded="actionsMenu.open && actionsMenu.projectId===p.id ? \'true\' : \'false\'" aria-haspopup="menu" title="Project actions" class="h-6 w-6 grid place-items-center rounded bg-white/90 text-sub hover:bg-white hover:text-ink shadow-sm">' +
+    '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5.5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="18.5" r="1.6"/></svg>' +
+    '</button>' +
+    '</div>' +
     '</div>' +
     '<div class="p-4">' +
     '<div class="text-[15px] font-semibold text-head truncate">{{ p.name }}</div>' +
@@ -414,12 +597,12 @@ PB.boot('projects-index', {
 
     // Lead chip — sits directly under the @mention line
     '<div class="mt-2.5">' +
-    '<button v-if="p.can_manage" type="button" @click.stop.prevent="openLeadMenu(p, $event)" class="inline-flex items-center gap-1.5 h-8 pl-1.5 pr-2 rounded-md border border-stroke text-[13px] text-ink hover:bg-hover max-w-full min-w-0">' +
+    '<button v-if="p.can_manage" type="button" @click.stop.prevent="openLeadMenu(p, $event)" class="inline-flex items-center gap-1.5 h-8 pl-1.5 pr-2 rounded-md border border-stroke text-[12px] text-ink hover:bg-hover max-w-full min-w-0">' +
     '<template v-if="p.lead"><span class="h-5 w-5 rounded-full bg-brand text-white grid place-items-center text-[9px] font-bold shrink-0">{{ p.lead.initial }}</span><span class="truncate">{{ p.lead.name }}</span></template>' +
     '<template v-else><svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0"><circle cx="12" cy="8" r="3.2" stroke="currentColor" stroke-width="1.7"/><path d="M5 20a7 7 0 0114 0" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg><span class="text-sub">No lead</span></template>' +
     '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
     '</button>' +
-    '<span v-else class="inline-flex items-center gap-1.5 h-8 pl-1.5 pr-2 rounded-md border border-stroke text-[13px] text-ink max-w-full min-w-0">' +
+    '<span v-else class="inline-flex items-center gap-1.5 h-8 pl-1.5 pr-2 rounded-md border border-stroke text-[12px] text-ink max-w-full min-w-0">' +
     '<template v-if="p.lead"><span class="h-5 w-5 rounded-full bg-brand text-white grid place-items-center text-[9px] font-bold shrink-0">{{ p.lead.initial }}</span><span class="truncate">{{ p.lead.name }}</span></template>' +
     '<template v-else><svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0"><circle cx="12" cy="8" r="3.2" stroke="currentColor" stroke-width="1.7"/><path d="M5 20a7 7 0 0114 0" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg><span class="text-sub">No lead</span></template>' +
     '</span>' +
@@ -430,39 +613,39 @@ PB.boot('projects-index', {
     '<div class="px-4 py-3 border-t border-line flex flex-wrap items-center gap-2 min-w-0">' +
 
     // Status (editable / read-only / none)
-    '<button v-if="p.can_manage" type="button" @click.stop.prevent="openStatusMenu(p, $event)" class="inline-flex items-center gap-2 h-8 px-3 rounded-md border border-stroke text-[13px] text-ink hover:bg-hover shrink-0">' +
+    '<button v-if="p.can_manage" type="button" @click.stop.prevent="openStatusMenu(p, $event)" class="inline-flex items-center gap-2 h-8 px-3 rounded-md border border-stroke text-[12px] text-ink hover:bg-hover shrink-0">' +
     '<span class="h-2.5 w-2.5 rounded-full shrink-0" :style="{background: p.state ? p.state.color : \'#94a3b8\'}"></span>' +
     '<span>{{ p.state ? p.state.name : \'Set status\' }}</span>' +
     '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" class="text-faint ml-0.5"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
     '</button>' +
-    '<span v-else-if="p.state" class="inline-flex items-center gap-2 h-8 px-3 rounded-md border border-stroke text-[13px] text-ink shrink-0">' +
+    '<span v-else-if="p.state" class="inline-flex items-center gap-2 h-8 px-3 rounded-md border border-stroke text-[12px] text-ink shrink-0">' +
     '<span class="h-2.5 w-2.5 rounded-full shrink-0" :style="{background: p.state.color}"></span>' +
     '<span>{{ p.state.name }}</span>' +
     '</span>' +
     '<span v-else class="text-[12px] text-sub shrink-0">No status</span>' +
 
     // Priority (editable combo) — only when priorities are available
-    '<button v-if="p.can_manage && endpoints.priority" type="button" @click.stop.prevent="openPriorityMenu(p, $event)" class="inline-flex items-center gap-2 h-8 px-3 rounded-md border border-stroke text-[13px] text-ink hover:bg-hover shrink-0">' +
+    '<button v-if="p.can_manage && endpoints.priority" type="button" @click.stop.prevent="openPriorityMenu(p, $event)" class="inline-flex items-center gap-2 h-8 px-3 rounded-md border border-stroke text-[12px] text-ink hover:bg-hover shrink-0">' +
     '<span class="h-2.5 w-2.5 rounded-full shrink-0" :style="{background: p.priority ? p.priority.color : \'#cbd5e1\'}"></span>' +
     '<span>{{ p.priority ? p.priority.name : \'Priority\' }}</span>' +
     '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" class="text-faint ml-0.5"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
     '</button>' +
-    '<span v-else-if="p.priority" class="inline-flex items-center gap-2 h-8 px-3 rounded-md border border-stroke text-[13px] text-ink shrink-0">' +
+    '<span v-else-if="p.priority" class="inline-flex items-center gap-2 h-8 px-3 rounded-md border border-stroke text-[12px] text-ink shrink-0">' +
     '<span class="h-2.5 w-2.5 rounded-full shrink-0" :style="{background: p.priority.color}"></span><span>{{ p.priority.name }}</span></span>' +
 
     // Start date (opens the design-system calendar popover)
-    '<button v-if="p.can_manage && endpoints.dates" type="button" @click.stop.prevent="openDateMenu(p, \'start_date\', $event)" class="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border border-stroke text-[13px] text-ink hover:bg-hover shrink-0" title="Start date">' +
+    '<button v-if="p.can_manage && endpoints.dates" type="button" @click.stop.prevent="openDateMenu(p, \'start_date\', $event)" class="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border border-stroke text-[12px] text-ink hover:bg-hover shrink-0" title="Start date">' +
     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0"><rect x="4" y="5" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>' +
     '<span>{{ p.start_date ? fmtDate(p.start_date) : \'Start date\' }}</span>' +
     '</button>' +
-    '<span v-else-if="p.start_date" class="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border border-stroke text-[13px] text-ink shrink-0"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="text-faint"><rect x="4" y="5" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>{{ fmtDate(p.start_date) }}</span>' +
+    '<span v-else-if="p.start_date" class="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border border-stroke text-[12px] text-ink shrink-0"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="text-faint"><rect x="4" y="5" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>{{ fmtDate(p.start_date) }}</span>' +
 
     // End date (opens the design-system calendar popover)
-    '<button v-if="p.can_manage && endpoints.dates" type="button" @click.stop.prevent="openDateMenu(p, \'end_date\', $event)" class="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border border-stroke text-[13px] text-ink hover:bg-hover shrink-0" title="End date">' +
+    '<button v-if="p.can_manage && endpoints.dates" type="button" @click.stop.prevent="openDateMenu(p, \'end_date\', $event)" class="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border border-stroke text-[12px] text-ink hover:bg-hover shrink-0" title="End date">' +
     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0"><rect x="4" y="5" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>' +
     '<span>{{ p.end_date ? fmtDate(p.end_date) : \'Due date\' }}</span>' +
     '</button>' +
-    '<span v-else-if="p.end_date" class="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border border-stroke text-[13px] text-ink shrink-0"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="text-faint"><rect x="4" y="5" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>{{ fmtDate(p.end_date) }}</span>' +
+    '<span v-else-if="p.end_date" class="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border border-stroke text-[12px] text-ink shrink-0"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="text-faint"><rect x="4" y="5" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>{{ fmtDate(p.end_date) }}</span>' +
 
     '</div></a>' +
 
@@ -487,6 +670,30 @@ PB.boot('projects-index', {
     '<p class="text-[14px] text-sub mt-1.5 max-w-sm">Projects keep your work items, cycles, and docs together in one place. Watch the quick intro, then spin up your first project.</p>' +
     '<button v-if="canCreate" type="button" @click="openCreate" class="mt-5 inline-flex items-center gap-1.5 h-9 px-4 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Add Project</button>' +
     '</div>' +
+
+    // ===== Card actions menu (shared, fixed-positioned to escape card clipping) =====
+    '<div v-if="actionsMenu.open" class="fixed inset-0 z-[110]" @click="closeActionsMenu"></div>' +
+    '<div v-if="actionsMenu.open" :style="actionsMenu.style" role="menu" class="rounded-md bg-white py-1 shadow-lg ring-1 ring-black/5">' +
+    '<button v-if="actionsProject && actionsProject.can_edit && (endpoints.update || actionsProject.settings_url)" type="button" role="menuitem" @click="editProject(actionsProject)" class="w-full text-left flex items-center gap-2.5 px-2.5 h-9 hover:bg-hover text-[13px] text-ink">' +
+    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0"><path d="M4 20h4l10-10a2.5 2.5 0 10-3.5-3.5L4.5 16.5 4 20z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>Edit</button>' +
+    '<button v-if="!archived && endpoints.archive" type="button" role="menuitem" @click="setArchived(actionsProject, true)" class="w-full text-left flex items-center gap-2.5 px-2.5 h-9 hover:bg-hover text-[13px] text-ink">' +
+    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0"><rect x="3" y="4" width="18" height="4" rx="1" stroke="currentColor" stroke-width="1.7"/><path d="M5 8v11a1 1 0 001 1h12a1 1 0 001-1V8M10 12h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>Archive</button>' +
+    '<button v-if="archived && endpoints.restore" type="button" role="menuitem" @click="setArchived(actionsProject, false)" class="w-full text-left flex items-center gap-2.5 px-2.5 h-9 hover:bg-hover text-[13px] text-ink">' +
+    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0"><path d="M4 9a8 8 0 1114 5.3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M4 4v5h5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>Restore</button>' +
+    '<div v-if="endpoints.destroy" class="my-1 border-t border-line"></div>' +
+    '<button v-if="endpoints.destroy" type="button" role="menuitem" @click="askDelete(actionsProject)" class="w-full text-left flex items-center gap-2.5 px-2.5 h-9 hover:bg-hover text-[13px] text-danger">' +
+    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="shrink-0"><path d="M4 7h16M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2M6 7l1 13a1 1 0 001 1h8a1 1 0 001-1l1-13" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>Delete</button>' +
+    '</div>' +
+
+    // ===== Delete confirmation — typed project identifier required (PRJ-047) =====
+    '<pb-modal :open="deleteModal.open" title="Delete project?" @close="closeDelete">' +
+    '<p class="text-[13px] text-sub leading-relaxed">This permanently deletes <span class="font-semibold text-ink">{{ deleteModal.project ? deleteModal.project.name : \'\' }}</span> and everything in it — work items, members, states and labels. This cannot be undone.</p>' +
+    '<label class="block text-[13px] text-ink mt-4 mb-1.5">Type <span class="font-semibold">{{ deleteModal.project ? deleteModal.project.identifier : \'\' }}</span> to confirm</label>' +
+    '<input v-model="deleteModal.typed" type="text" name="confirm-identifier" autocomplete="off" @keyup.enter="confirmDelete" class="w-full h-9 px-3 rounded-md text-[13px] text-ink outline outline-1 -outline-offset-1 outline-stroke focus:outline-brand" />' +
+    '<template #footer>' +
+    '<button type="button" class="h-9 px-4 rounded-md border border-stroke text-[13px] font-semibold text-ink hover:bg-hover" @click="closeDelete">Cancel</button>' +
+    '<button type="button" :disabled="!deleteConfirmed || deleteModal.busy" @click="confirmDelete" :class="[\'h-9 px-4 rounded-md bg-danger text-white text-[13px] font-semibold\', (!deleteConfirmed || deleteModal.busy) ? \'opacity-50 cursor-not-allowed\' : \'hover:opacity-90\']">{{ deleteModal.busy ? \'Deleting…\' : \'Delete project\' }}</button>' +
+    '</template></pb-modal>' +
 
     // ===== Project status menu (shared, fixed-positioned to escape card clipping) =====
     '<div v-if="statusMenu.open" class="fixed inset-0 z-[110]" @click="closeStatusMenu"></div>' +
@@ -583,14 +790,14 @@ PB.boot('projects-index', {
 
     // ===== Add Project modal (matches projects.html AddProjectModal) =====
     '<div v-if="open" class="fixed inset-0 z-[70] flex items-start justify-center p-4 sm:pt-24">' +
-    '<div class="absolute inset-0 bg-black/40" @click="open=false"></div>' +
+    '<div class="absolute inset-0 bg-black/40" @click="closeModal"></div>' +
     '<div class="relative w-full max-w-[860px] bg-white rounded-xl shadow-xl flex flex-col max-h-[88vh]">' +
 
     // Cover header (gradient or uploaded image) with Change cover + progress
     '<div class="relative h-32 rounded-t-xl shrink-0 bg-center bg-cover" :style="modalCoverStyle">' +
     '<button @click="pickCover" class="absolute top-3 left-3 h-8 px-3 rounded-md bg-white/85 text-[12px] font-medium text-ink hover:bg-white shadow-sm">Change cover</button>' +
     '<input ref="coverInput" type="file" accept="image/*" class="hidden" @change="onCoverChange" />' +
-    '<button @click="open=false" class="absolute top-3 right-3 h-8 w-8 grid place-items-center rounded-md bg-white/85 text-sub hover:bg-white shadow-sm" title="Close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>' +
+    '<button @click="closeModal" class="absolute top-3 right-3 h-8 w-8 grid place-items-center rounded-md bg-white/85 text-sub hover:bg-white shadow-sm" title="Close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>' +
     '<div v-if="!coverUploading" class="absolute bottom-3 right-3 flex items-center gap-1.5">' +
     '<button v-for="g in coverPresets" :key="g" type="button" @click="coverImage=\'\'; form.cover_gradient=g" :style="{background:g}" :class="[\'h-6 w-8 rounded-md ring-2 ring-offset-1 ring-offset-black/10 transition\', (!coverImage && form.cover_gradient===g) ? \'ring-white\' : \'ring-transparent hover:ring-white/60\']"></button>' +
     '</div>' +
@@ -606,7 +813,9 @@ PB.boot('projects-index', {
     '<div class="flex flex-col sm:flex-row gap-3">' +
     '<div class="flex-1"><input class="pb-input" :class="{\'is-error\': errors.name}" v-model="form.name" @input="onName" placeholder="Project name" />' +
     '<p v-if="errors.name" class="text-[12px] text-danger mt-1">{{ errors.name[0] }}</p></div>' +
-    '<div class="sm:w-44"><input class="pb-input lowercase" :class="{\'is-error\': errors.identifier}" :value="form.identifier" @input="onId" placeholder="project id" maxlength="10" />' +
+    // Project ID: editable while creating, permanently read-only once the project exists —
+    // it is the @mention handle everything else references.
+    '<div class="sm:w-44"><input class="pb-input lowercase" :class="{\'is-error\': errors.identifier, \'bg-hover text-sub cursor-not-allowed\': editing}" :value="form.identifier" @input="onId" :readonly="editing" :title="editing ? \'The project ID cannot be changed\' : null" placeholder="project id" maxlength="10" />' +
     '<p v-if="errors.identifier" class="text-[12px] text-danger mt-1">{{ errors.identifier[0] }}</p>' +
     '<p v-else class="text-[11px] text-sub mt-1">Team handle: <span class="text-brand font-medium">{{ form.identifier ? handle(form.identifier) : \'@…\' }}</span></p></div>' +
     '</div>' +
@@ -617,7 +826,7 @@ PB.boot('projects-index', {
 
     // Access chip
     '<div class="relative">' +
-    '<button type="button" @click.stop="accessOpen=!accessOpen; leadOpen=false" class="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-stroke text-[13px] text-ink hover:bg-hover">' +
+    '<button type="button" @click.stop="accessOpen=!accessOpen; leadOpen=false" class="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-stroke text-[12px] text-ink hover:bg-hover">' +
     '<span class="grid place-items-center text-sub" v-html="accessCurrent.icon"></span>' +
     '<span>{{ accessCurrent.label }}</span>' +
     '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" class="text-faint"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
@@ -634,7 +843,7 @@ PB.boot('projects-index', {
 
     // Lead chip
     '<div class="relative">' +
-    '<button type="button" @click.stop="openLead" class="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-stroke text-[13px] text-ink hover:bg-hover">' +
+    '<button type="button" @click.stop="openLead" class="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-stroke text-[12px] text-ink hover:bg-hover">' +
     '<span v-if="leadSelected" class="h-5 w-5 rounded-full bg-brand text-white grid place-items-center text-[9px] font-bold">{{ leadSelected.initial }}</span>' +
     '<span v-else class="grid place-items-center text-sub" v-html="personIcon"></span>' +
     '<span>{{ leadSelected ? leadSelected.name : \'Lead\' }}</span>' +
@@ -655,13 +864,49 @@ PB.boot('projects-index', {
     '</div>' +
     '</div>' +
 
+    // Status / Priority / Start / Due — edit only, since create has no such fields yet.
+    // All four reuse the shared card popovers, pointed at the form instead of a card.
+    '<template v-if="editing">' +
+
+    // Status chip
+    '<button type="button" @click.stop.prevent="openStatusMenu(form, $event)" class="inline-flex items-center gap-2 h-8 px-3 rounded-md border border-stroke text-[12px] text-ink hover:bg-hover">' +
+    '<span class="h-2.5 w-2.5 rounded-full shrink-0" :style="{background: form.state ? form.state.color : \'#94a3b8\'}"></span>' +
+    '<span>{{ form.state ? form.state.name : \'Status\' }}</span>' +
+    '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" class="text-faint"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+    '</button>' +
+
+    // Priority chip
+    '<button type="button" @click.stop.prevent="openPriorityMenu(form, $event)" class="inline-flex items-center gap-2 h-8 px-3 rounded-md border border-stroke text-[12px] text-ink hover:bg-hover">' +
+    '<span class="h-2.5 w-2.5 rounded-full shrink-0" :style="{background: form.priority ? form.priority.color : \'#cbd5e1\'}"></span>' +
+    '<span>{{ form.priority ? form.priority.name : \'Priority\' }}</span>' +
+    '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" class="text-faint"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+    '</button>' +
+
+    // Start date chip
+    '<button type="button" @click.stop.prevent="openDateMenu(form, \'start_date\', $event)" class="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border border-stroke text-[12px] text-ink hover:bg-hover" title="Start date">' +
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0"><rect x="4" y="5" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>' +
+    '<span>{{ form.start_date ? fmtDate(form.start_date) : \'Start date\' }}</span>' +
+    '</button>' +
+
+    // End date chip
+    '<button type="button" @click.stop.prevent="openDateMenu(form, \'end_date\', $event)" class="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border border-stroke text-[12px] text-ink hover:bg-hover" title="Due date">' +
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0"><rect x="4" y="5" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>' +
+    '<span>{{ form.end_date ? fmtDate(form.end_date) : \'Due date\' }}</span>' +
+    '</button>' +
+
+    '</template>' +
+
     '</div>' +
+
+    // Server-side messages for the chip fields (the inputs above show their own).
+    '<p v-for="msg in chipErrors" :key="msg" class="text-[12px] text-danger mt-2">{{ msg }}</p>' +
+
     '</div>' +
 
     // Footer
     '<div class="flex items-center justify-end gap-2 px-5 sm:px-6 py-4 border-t border-line shrink-0">' +
-    '<button class="h-9 px-4 rounded-md border border-stroke text-[13px] font-semibold text-ink hover:bg-hover" @click="open=false">Cancel</button>' +
-    '<button class="h-9 px-4 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold disabled:opacity-50" :disabled="creating || !form.name.trim() || !form.identifier" @click="create">Create project</button>' +
+    '<button class="h-9 px-4 rounded-md border border-stroke text-[13px] font-semibold text-ink hover:bg-hover" @click="closeModal">Cancel</button>' +
+    '<button class="h-9 px-4 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold disabled:opacity-50" :disabled="creating || !form.name.trim() || !form.identifier" @click="submit">{{ creating ? (editing ? \'Saving…\' : \'Creating…\') : (editing ? \'Save changes\' : \'Create project\') }}</button>' +
     '</div>' +
 
     '</div></div>' +

@@ -78,12 +78,17 @@ return [
     'roles' => [
         'owner' => 'Owner',
         'admin' => 'Admin',
+        // Manager comes from the Project Member Management spec §25. Added alongside the
+        // existing roles rather than replacing Member, so no live membership is migrated.
+        // It carries no extra workspace privileges of its own: per §17 a Manager only
+        // manages project members when they are also that project's Admin.
+        'manager' => 'Manager',
         'member' => 'Member',
         'viewer' => 'Viewer',
         'guest' => 'Guest',
     ],
 
-    'invite_roles' => ['admin', 'member', 'viewer', 'guest'],
+    'invite_roles' => ['admin', 'manager', 'member', 'viewer', 'guest'],
 
     /**
      * Reserved slugs blocked from workspace URLs (WS-004). Keeps workspace slugs from
@@ -100,4 +105,13 @@ return [
      * Invitations expire after this many days.
      */
     'invitation_expiry_days' => 14,
+
+    /**
+     * Member seats per workspace — active members plus outstanding invitations (invite spec
+     * §10/§65). `null` means unlimited, which is the current state of the product: there is
+     * no subscription model yet, so this is the single place that decides capacity. When
+     * billing lands, WorkspaceSeatGuard reads the workspace's plan instead and this becomes
+     * the fallback (docs/features/member-invite-flow.md D-I3).
+     */
+    'seat_limit' => env('WORKSPACE_SEAT_LIMIT') === null ? null : (int) env('WORKSPACE_SEAT_LIMIT'),
 ];

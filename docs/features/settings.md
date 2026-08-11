@@ -91,7 +91,8 @@ Covered by `tests/Feature/Settings/*`:
 - General update persists name/size/slug/timezone; slug uniqueness + reserved enforced;
   delete-workspace is Owner-only and removes the workspace + memberships.
 - Members: invite persists pending rows (Owner not invitable), revoke, role edit with
-  last-owner guard, remove member.
+  last-owner guard, remove member. Sending an invitation now also emails a secure accept
+  link — see docs/features/member-invite-flow.md for the acceptance and activation half.
 - Projects: toggle persists; default states seeded once; add/edit/delete state (default +
   last-state protected); label CRUD.
 - Wiki/Releases/Initiatives/Customers toggles persist; label/tag/property CRUD.

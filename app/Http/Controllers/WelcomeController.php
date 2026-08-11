@@ -27,27 +27,11 @@ class WelcomeController extends Controller
 
         $current = $user->currentWorkspace ?? $user->workspaces()->first();
 
-        // Workspaces for the switcher modal, with the user's role and member counts.
-        $workspaces = $user->workspaces()
-            ->withCount('memberships')
-            ->orderBy('name')
-            ->get()
-            ->map(fn ($w) => [
-                'id' => $w->id,
-                'name' => $w->name,
-                'slug' => $w->slug,
-                'initial' => $w->initial(),
-                'role' => ucfirst((string) $w->pivot->role),
-                'members' => $w->memberships_count,
-                'current' => $current && $w->id === $current->id,
-                'switch_url' => route('workspaces.switch', $w->id),
-            ])
-            ->all();
-
+        // The switcher's own data comes from the view composer on
+        // partials.workspace-switcher, which every screen shares — nothing to pass here.
         return view('app.welcome', [
             'user' => $user,
             'workspace' => $current,
-            'workspaces' => $workspaces,
             'projects' => $this->sidebarProjects($current, $user),
             'canCreateProject' => $user->can('create', [Project::class, $current]),
         ]);
@@ -89,4 +73,3 @@ class WelcomeController extends Controller
         });
     }
 }
-

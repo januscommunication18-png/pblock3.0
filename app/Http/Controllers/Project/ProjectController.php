@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Project;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Project\StoreProjectRequest;
+use App\Http\Requests\Project\UpdateProjectDetailsRequest;
 use App\Models\Project;
 use App\Models\ProjectMember;
 use App\Models\ProjectPriority;
@@ -12,10 +13,13 @@ use App\Models\Workspace;
 use App\Models\WorkspaceMembership;
 use App\Services\ProjectCreator;
 use App\Services\ProjectLifecycle;
+use App\Services\ProjectNavigation;
 use App\Services\WorkspaceSettingsManager;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
@@ -30,19 +34,46 @@ class ProjectController extends Controller
     public function __construct(
         private readonly ProjectCreator $creator,
         private readonly ProjectLifecycle $lifecycle,
+        private readonly ProjectNavigation $navigation,
     ) {}
 
-    /** @var \Illuminate\Support\Collection<int, ProjectState>|null Memoized workspace states. */
+    /** @var Collection<int, ProjectState>|null Memoized workspace states. */
     private $stateMap = null;
+
+    /** Identity (user + workspace) the memos below were built for. */
+    private ?string $memoKey = null;
 
     private function workspace(): Workspace
     {
         return Auth::user()->currentWorkspace;
     }
 
+    /**
+     * Drop the per-request memos when the acting user or workspace changes.
+     *
+     * The router caches ONE controller instance on the Route object, so this instance is
+     * reused for every request in a long-running process (Octane, and any feature test that
+     * makes more than one request). Without this guard, request 2 would answer with
+     * request 1's workspace role, states and priorities.
+     */
+    private function syncMemos(): void
+    {
+        $key = Auth::id().'|'.(Auth::user()?->current_workspace_id ?? '');
+        if ($this->memoKey === $key) {
+            return;
+        }
+        $this->memoKey = $key;
+        $this->stateMap = null;
+        $this->priorityMap = null;
+        $this->wsRole = null;
+        $this->wsRoleLoaded = false;
+    }
+
     /** Workspace project states keyed by id (memoized for the request). */
     private function statesMap()
     {
+        $this->syncMemos();
+
         return $this->stateMap ??= ProjectState::query()->orderBy('position')->get()->keyBy('id');
     }
 
@@ -62,12 +93,14 @@ class ProjectController extends Controller
             ->all();
     }
 
-    /** @var \Illuminate\Support\Collection<int, ProjectPriority>|null */
+    /** @var Collection<int, ProjectPriority>|null */
     private $priorityMap = null;
 
     /** Workspace project priorities keyed by id (memoized). Empty if not migrated yet. */
     private function prioritiesMap()
     {
+        $this->syncMemos();
+
         if ($this->priorityMap !== null) {
             return $this->priorityMap;
         }
@@ -111,10 +144,16 @@ class ProjectController extends Controller
                     'store' => route('projects.store'),
                     'identifier' => route('projects.identifier'),
                     'list' => route('projects.index'),
+                    // Edit modal — saves every field in one PATCH (PRJ-045).
+                    'update' => Route::has('projects.update') ? route('projects.update', ['project' => '__ID__']) : null,
                     'state' => Route::has('projects.state') ? route('projects.state', ['project' => '__ID__']) : null,
                     'lead' => Route::has('projects.lead') ? route('projects.lead', ['project' => '__ID__']) : null,
                     'priority' => Route::has('projects.priority') ? route('projects.priority', ['project' => '__ID__']) : null,
                     'dates' => Route::has('projects.dates') ? route('projects.dates', ['project' => '__ID__']) : null,
+                    // Card action menu — Edit / Archive (or Restore) / Delete (PRJ-045/046/047).
+                    'archive' => Route::has('projects.archive') ? route('projects.archive', ['project' => '__ID__']) : null,
+                    'restore' => Route::has('projects.restore') ? route('projects.restore', ['project' => '__ID__']) : null,
+                    'destroy' => Route::has('projects.destroy') ? route('projects.destroy', ['project' => '__ID__']) : null,
                 ],
             ],
         ]);
@@ -147,6 +186,56 @@ class ProjectController extends Controller
             'ok' => true,
             'project' => $this->card($project->fresh()),
             'redirect' => route('projects.show', $project),
+        ]);
+    }
+
+    /**
+     * PATCH /projects/{project} — save the card's Edit modal (PRJ-045).
+     *
+     * One request for everything the modal shows: the create-modal fields plus the four
+     * chips the card edits individually (status, priority, start/end date), so an edit is a
+     * single atomic save instead of five separate PATCHes.
+     */
+    public function update(UpdateProjectDetailsRequest $request, Project $project): JsonResponse
+    {
+        // Editing a project's details is workspace Owner/Admin only — narrower than the
+        // manage rights that gate archive/restore/delete, which project admins also hold.
+        abort_unless($this->isWorkspaceAdmin(), 403);
+
+        $data = $request->validated();
+
+        // `identifier` is intentionally not writable here — the project ID is the permanent
+        // @mention handle, so the modal shows it read-only and any posted value is ignored.
+        $project->name = $data['name'];
+        $project->description = $data['description'] ?? null;
+        $project->visibility = $data['visibility'];
+        $project->lead_user_id = $data['lead_user_id'] ?? null;
+
+        // Status/priority must belong to THIS workspace's configured sets (same rule the
+        // per-chip endpoints enforce). Dates and priority are guarded by hasColumn so an
+        // edit still saves on an install where the later migrations have not run.
+        if (($stateId = $data['state_id'] ?? null) !== null) {
+            abort_unless($this->statesMap()->has((int) $stateId), 422, 'That status is not available in this workspace.');
+        }
+        $project->state_id = $stateId !== null ? (int) $stateId : null;
+
+        if (Schema::hasColumn('projects', 'priority_id')) {
+            if (($priorityId = $data['priority_id'] ?? null) !== null) {
+                abort_unless($this->prioritiesMap()->has((int) $priorityId), 422, 'That priority is not available in this workspace.');
+            }
+            $project->priority_id = $priorityId !== null ? (int) $priorityId : null;
+        }
+
+        if (Schema::hasColumn('projects', 'start_date')) {
+            $project->start_date = $data['start_date'] ?? null;
+            $project->end_date = $data['end_date'] ?? null;
+        }
+
+        $project->save();
+
+        return response()->json([
+            'ok' => true,
+            'project' => $this->card($project->fresh()),
         ]);
     }
 
@@ -272,19 +361,19 @@ class ProjectController extends Controller
         return response()->json(['identifier' => $id, 'available' => $available]);
     }
 
-    /** GET /projects/{project} — the project landing view (PRJ-028 post-create destination). */
-    public function show(Project $project): View
+    /**
+     * GET /projects/{project} — opening a project enters its Project Workspace.
+     *
+     * Phase 5 requirement §11.1: selecting a project opens that project's workspace with
+     * Work Items selected, since Overview is Coming Soon. Kept as a redirect rather than a
+     * moved route so every existing `projects.show` link (cards, sidebar, post-create
+     * redirect) keeps working.
+     */
+    public function show(Project $project): RedirectResponse
     {
         abort_unless(Auth::user()->can('view', $project), 404); // 404, never leak metadata
 
-        return view('projects.show', [
-            'workspace' => $this->workspace(),
-            'user' => Auth::user(),
-            'project' => $this->card($project),
-            'canManage' => $this->canManageProject($project),
-            'projects' => $this->navProjects(),
-            'canCreateProject' => Auth::user()->can('create', [Project::class, $this->workspace()]),
-        ]);
+        return redirect()->route('projects.work-items', $project);
     }
 
     /** POST /projects/{project}/archive */
@@ -331,14 +420,9 @@ class ProjectController extends Controller
 
         $query = Project::query()->where('status', $status)->with('lead')->latest();
 
+        // §38: membership, not visibility, decides who sees a project (see ProjectPolicy@view).
         if (! in_array($wsRole, ['owner', 'admin'], true)) {
-            $memberProjectIds = ProjectMember::query()->where('user_id', $user->id)->pluck('project_id');
-            $query->where(function ($q) use ($memberProjectIds, $wsRole) {
-                $q->whereIn('id', $memberProjectIds);
-                if (in_array($wsRole, ['member', 'viewer'], true)) {
-                    $q->orWhere('visibility', 'public');
-                }
-            });
+            $query->whereIn('id', ProjectMember::query()->where('user_id', $user->id)->select('project_id'));
         }
 
         $memberIds = ProjectMember::query()->where('user_id', $user->id)->pluck('project_id')->flip();
@@ -355,23 +439,7 @@ class ProjectController extends Controller
      */
     private function navProjects(): array
     {
-        $user = Auth::user();
-        $wsRole = $this->workspaceRole();
-
-        $query = Project::query()->where('status', Project::STATUS_ACTIVE)->latest();
-        if (! in_array($wsRole, ['owner', 'admin'], true)) {
-            $ids = ProjectMember::query()->where('user_id', $user->id)->pluck('project_id');
-            $query->where(function ($q) use ($ids, $wsRole) {
-                $q->whereIn('id', $ids);
-                if (in_array($wsRole, ['member', 'viewer'], true)) {
-                    $q->orWhere('visibility', 'public');
-                }
-            });
-        }
-
-        return $query->limit(50)->get()
-            ->map(fn (Project $p) => ['name' => $p->name, 'emoji' => $p->emoji, 'url' => route('projects.show', $p->id)])
-            ->all();
+        return $this->navigation->sidebarProjects(Auth::user());
     }
 
     /** @return array<string, mixed> */
@@ -401,6 +469,8 @@ class ProjectController extends Controller
             'start_date' => $this->dateStr($project->start_date),
             'end_date' => $this->dateStr($project->end_date),
             'can_manage' => $this->canManageProject($project),
+            // Edit is workspace Owner/Admin only; can_manage still covers archive/delete.
+            'can_edit' => $this->isWorkspaceAdmin(),
             'joined' => $joined ?? ProjectMember::query()->where('project_id', $project->id)->where('user_id', Auth::id())->exists(),
             'url' => Route::has('projects.show') ? route('projects.show', $project) : '#',
             'settings_url' => Route::has('projects.settings')
@@ -444,6 +514,8 @@ class ProjectController extends Controller
 
     private function workspaceRole(): ?string
     {
+        $this->syncMemos();
+
         if (! $this->wsRoleLoaded) {
             $this->wsRole = WorkspaceMembership::query()
                 ->where('workspace_id', $this->workspace()->id)
@@ -461,9 +533,15 @@ class ProjectController extends Controller
      * project; otherwise the user must be a project admin. Computed directly (not via a
      * policy ability) so it doesn't depend on a specific policy method name.
      */
+    /** Is the current user a workspace Owner or Admin? Gates the card's Edit action. */
+    private function isWorkspaceAdmin(): bool
+    {
+        return in_array($this->workspaceRole(), ['owner', 'admin'], true);
+    }
+
     private function canManageProject(Project $project): bool
     {
-        if (in_array($this->workspaceRole(), ['owner', 'admin'], true)) {
+        if ($this->isWorkspaceAdmin()) {
             return true;
         }
 

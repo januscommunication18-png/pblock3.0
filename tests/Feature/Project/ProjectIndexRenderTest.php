@@ -11,7 +11,7 @@ class ProjectIndexRenderTest extends ProjectTestCase
     public function test_index_renders_bootstrap_and_cache_busted_assets(): void
     {
         [$owner, $ws] = $this->owner();
-        $this->makeProject($ws, $owner, ['name' => 'Testing', 'identifier' => 'TESTI', 'emoji' => '👍']);
+        $this->makeProject($owner, $ws, ['name' => 'Testing', 'identifier' => 'TESTI', 'emoji' => '👍']);
 
         $html = $this->actingAs($owner)->get(route('projects.index'))->assertOk()->getContent();
 

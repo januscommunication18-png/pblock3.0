@@ -14,6 +14,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="{{ pb_asset('assets/css/styles.css') }}" />
+  @stack('head')
 </head>
 <body class="bg-white text-ink min-h-screen flex flex-col">
   @yield('body')

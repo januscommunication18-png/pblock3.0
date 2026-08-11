@@ -25,7 +25,7 @@ class ProjectPriorityDatesTest extends ProjectTestCase
     {
         [$owner, $ws] = $this->owner();
         [$urgentId] = $this->seedPriorities($ws);
-        $project = $this->makeProject($ws, $owner, ['name' => 'Site', 'identifier' => 'SITE']);
+        $project = $this->makeProject($owner, $ws, ['name' => 'Site', 'identifier' => 'SITE']);
 
         $this->actingAs($owner)
             ->patchJson(route('projects.priority', ['project' => $project->id]), ['priority_id' => $urgentId])
@@ -40,7 +40,7 @@ class ProjectPriorityDatesTest extends ProjectTestCase
     {
         [$owner, $ws] = $this->owner();
         $this->seedPriorities($ws);
-        $project = $this->makeProject($ws, $owner, ['name' => 'Site', 'identifier' => 'SITE']);
+        $project = $this->makeProject($owner, $ws, ['name' => 'Site', 'identifier' => 'SITE']);
 
         $this->actingAs($owner)
             ->patchJson(route('projects.priority', ['project' => $project->id]), ['priority_id' => 999999])
@@ -50,7 +50,7 @@ class ProjectPriorityDatesTest extends ProjectTestCase
     public function test_owner_can_set_start_and_end_dates(): void
     {
         [$owner, $ws] = $this->owner();
-        $project = $this->makeProject($ws, $owner, ['name' => 'Site', 'identifier' => 'SITE']);
+        $project = $this->makeProject($owner, $ws, ['name' => 'Site', 'identifier' => 'SITE']);
 
         $this->actingAs($owner)
             ->patchJson(route('projects.dates', ['project' => $project->id]), ['start_date' => '2026-08-20', 'end_date' => '2026-09-10'])
@@ -64,7 +64,7 @@ class ProjectPriorityDatesTest extends ProjectTestCase
     public function test_end_date_cannot_precede_start_date(): void
     {
         [$owner, $ws] = $this->owner();
-        $project = $this->makeProject($ws, $owner, ['name' => 'Site', 'identifier' => 'SITE']);
+        $project = $this->makeProject($owner, $ws, ['name' => 'Site', 'identifier' => 'SITE']);
 
         $this->actingAs($owner)
             ->patchJson(route('projects.dates', ['project' => $project->id]), ['start_date' => '2026-09-10', 'end_date' => '2026-08-01'])
@@ -75,7 +75,7 @@ class ProjectPriorityDatesTest extends ProjectTestCase
     {
         [$owner, $ws] = $this->owner();
         [$urgentId] = $this->seedPriorities($ws);
-        $project = $this->makeProject($ws, $owner, ['name' => 'Site', 'identifier' => 'SITE']);
+        $project = $this->makeProject($owner, $ws, ['name' => 'Site', 'identifier' => 'SITE']);
         $member = $this->member($ws, 'member', 'm@example.com');
 
         $this->actingAs($member)

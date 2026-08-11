@@ -2,6 +2,8 @@
 
 namespace Tests\Feature\Project;
 
+use App\Models\ProjectMember;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 /** Project list visibility (spec §4.1 / PRJ-010/030/031). */
@@ -17,17 +19,24 @@ class ProjectListTest extends ProjectTestCase
         $this->actingAs($owner)->get(route('projects.index'))->assertOk()->assertSee('Alpha');
     }
 
-    public function test_member_sees_public_but_not_unassigned_private_projects(): void
+    public function test_member_sees_only_projects_they_were_added_to(): void
     {
         [$owner, $workspace] = $this->owner();
+        $joined = $this->makeProject($owner, $workspace, ['name' => 'JoinedOne', 'identifier' => 'JOIN', 'visibility' => 'public']);
         $this->makeProject($owner, $workspace, ['name' => 'PublicOne', 'identifier' => 'PUB', 'visibility' => 'public']);
         $this->makeProject($owner, $workspace, ['name' => 'SecretOne', 'identifier' => 'SEC', 'visibility' => 'private']);
 
         $member = $this->member($workspace, 'member', 'member@example.com');
+        $workspace->run(fn () => ProjectMember::create([
+            'project_id' => $joined->id, 'user_id' => $member->id, 'role' => ProjectMember::ROLE_CONTRIBUTOR,
+        ]));
 
+        // Project Member Management §38: workspace membership alone grants nothing. Being
+        // public no longer makes a project visible — only an explicit project membership does.
         $this->actingAs($member)->get(route('projects.index'))
             ->assertOk()
-            ->assertSee('PublicOne')
+            ->assertSee('JoinedOne')
+            ->assertDontSee('PublicOne')
             ->assertDontSee('SecretOne');
     }
 
@@ -58,7 +67,7 @@ class ProjectListTest extends ProjectTestCase
 
     public function test_user_without_workspace_is_redirected_to_onboarding(): void
     {
-        $stray = \App\Models\User::factory()->create(['current_workspace_id' => null]);
+        $stray = User::factory()->create(['current_workspace_id' => null]);
 
         $this->actingAs($stray)->get(route('projects.index'))->assertRedirect(route('onboarding.workspace'));
     }

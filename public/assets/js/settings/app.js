@@ -232,7 +232,9 @@
       props: { open: Boolean, title: String },
       emits: ['close'],
       template:
-        '<teleport to="body"><div v-if="open" class="fixed inset-0 z-[70] flex items-start justify-center p-4 sm:pt-24">' +
+        // role/aria-modal are load-bearing beyond a11y: the settings shell reads them to know
+        // a dialog is open, so Escape closes the dialog instead of leaving the page.
+        '<teleport to="body"><div v-if="open" role="dialog" aria-modal="true" class="fixed inset-0 z-[70] flex items-start justify-center p-4 sm:pt-24">' +
         '<div class="absolute inset-0 bg-black/40" @click="$emit(\'close\')"></div>' +
         '<div class="relative w-full max-w-[520px] bg-white rounded-xl shadow-xl flex flex-col max-h-[85vh]">' +
         '<div class="flex items-center justify-between px-6 py-4 border-b border-line shrink-0">' +

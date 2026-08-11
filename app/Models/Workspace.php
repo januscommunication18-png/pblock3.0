@@ -39,6 +39,8 @@ class Workspace extends BaseTenant
             'view_type',
             'status',
             'created_by',
+            // Counter behind the workspace-unique work item ID; allocated by WorkItemCreator.
+            'work_item_sequence',
         ];
     }
 
@@ -46,6 +48,7 @@ class Workspace extends BaseTenant
     {
         return [
             'data' => 'array',
+            'work_item_sequence' => 'integer',
         ];
     }
 

@@ -1,0 +1,224 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\ProjectItemLabel;
+use App\Models\ProjectItemState;
+use App\Models\User;
+use App\Models\WorkItem;
+use App\Models\WorkItemActivity;
+use App\Models\WorkItemTransition;
+use Illuminate\Support\Facades\DB;
+
+/**
+ * Applies work-item edits and records what changed (spec §4.2 / §6).
+ *
+ * Every mutation funnels through here so the audit feed cannot drift from reality: the diff
+ * and its activity entries are written in one transaction, so a property can never change
+ * without a matching history row. This is what finally fills §6's Activity, Transition
+ * (`field = 'state'`) and History (rows carrying before/after) feeds.
+ */
+class WorkItemUpdater
+{
+    /** Scalar columns, in the order the feed reads best. */
+    private const FIELDS = ['title', 'description', 'state_id', 'priority', 'start_date', 'due_date', 'parent_id'];
+
+    public function __construct(
+        private readonly WorkItemActivityRecorder $activity,
+        private readonly WorkItemAssignmentNotifier $assignments,
+        private readonly RichTextSanitizer $richText,
+    ) {}
+
+    /**
+     * @param  array<string, mixed>  $data  Validated attributes; only keys present are touched.
+     */
+    public function update(WorkItem $item, User $actor, array $data): WorkItem
+    {
+        return DB::transaction(function () use ($item, $actor, $data) {
+            foreach (self::FIELDS as $field) {
+                if (! array_key_exists($field, $data)) {
+                    continue;
+                }
+                $old = $this->scalar($item, $field);
+                $new = $this->normalize($field, $data[$field]);
+                if ($old === $new) {
+                    continue;
+                }
+
+                $item->{$field} = $data[$field];
+                $this->log($item, $actor, $field, $old, $new);
+
+                // §10.6/§13.2: a state change — and only a state change — also writes a
+                // transition, in the same transaction as the change itself.
+                if ($field === 'state_id') {
+                    $this->recordTransition($item, $actor, $old, $new);
+                }
+            }
+
+            $item->save();
+
+            if (array_key_exists('assignee_ids', $data)) {
+                $this->syncRelation($item, $actor, 'assignees', $data['assignee_ids']);
+            }
+            if (array_key_exists('label_ids', $data)) {
+                $this->syncRelation($item, $actor, 'labels', $data['label_ids']);
+            }
+
+            return $item->fresh(['state', 'assignees', 'labels', 'parent', 'creator']);
+        });
+    }
+
+    /** Archive / restore (§4.4). Archived items leave the default list but keep their data. */
+    public function setArchived(WorkItem $item, User $actor, bool $archived): WorkItem
+    {
+        if ($item->isArchived() === $archived) {
+            return $item;
+        }
+
+        return DB::transaction(function () use ($item, $actor, $archived) {
+            $item->archived_at = $archived ? now() : null;
+            $item->save();
+
+            $this->activity->record($item, $actor, $archived ? 'archived' : 'restored');
+
+            return $item->fresh(['state', 'assignees', 'labels', 'creator']);
+        });
+    }
+
+    /** The value we compare and store in the feed — always a string or null. */
+    private function scalar(WorkItem $item, string $field): ?string
+    {
+        $value = $item->{$field};
+
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format('Y-m-d');
+        }
+
+        return $value === null || $value === '' ? null : (string) $value;
+    }
+
+    private function normalize(string $field, $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return in_array($field, ['start_date', 'due_date'], true)
+            ? substr((string) $value, 0, 10)
+            : (string) $value;
+    }
+
+    /**
+     * Record one property change, resolving ids to names at write time so the feed still
+     * reads correctly after a state is renamed or a parent is deleted.
+     */
+    private function log(WorkItem $item, User $actor, string $field, ?string $old, ?string $new): void
+    {
+        $meta = null;
+
+        if ($field === 'state_id') {
+            $meta = [
+                'old_label' => $old ? ProjectItemState::find($old)?->name : null,
+                'new_label' => $new ? ProjectItemState::find($new)?->name : null,
+            ];
+        } elseif ($field === 'parent_id') {
+            $meta = [
+                'old_label' => $old ? WorkItem::find($old)?->identifier : null,
+                'new_label' => $new ? WorkItem::find($new)?->identifier : null,
+            ];
+        }
+
+        // The description is rich text and can run to 20k of markup. Storing both sides of
+        // every edit verbatim would bloat the feed with HTML nobody reads, so history keeps a
+        // short plain-text excerpt instead — enough to see what the change was about.
+        if ($field === 'description') {
+            $old = $this->richText->excerpt($old);
+            $new = $this->richText->excerpt($new);
+        }
+
+        $this->activity->record($item, $actor, WorkItemActivity::EVENT_UPDATED, [
+            // §6's Transition feed is exactly the rows where field = 'state'.
+            'field' => $field === 'state_id' ? 'state' : $field,
+            'old_value' => $old,
+            'new_value' => $new,
+            'meta' => $meta,
+        ]);
+    }
+
+    /**
+     * Write the state movement behind a state change (§10.3/§10.5).
+     *
+     * State names are copied in, not just their ids: states are renameable and deletable, and
+     * a workflow history that changes meaning when someone edits a column is not history.
+     */
+    private function recordTransition(WorkItem $item, User $actor, ?string $fromId, ?string $toId): void
+    {
+        $from = $fromId ? ProjectItemState::find($fromId) : null;
+        $to = $toId ? ProjectItemState::find($toId) : null;
+
+        WorkItemTransition::create([
+            'project_id' => $item->project_id,
+            'work_item_id' => $item->id,
+            'from_state_id' => $from?->id,
+            'to_state_id' => $to?->id,
+            'from_state_name' => $from?->name,
+            'to_state_name' => $to?->name,
+            'actor_id' => $actor->id,
+            'transitioned_at' => now(),
+        ]);
+    }
+
+    /**
+     * Sync a many-to-many and log it only if the membership actually changed.
+     *
+     * @param  array<int, int>  $ids
+     */
+    private function syncRelation(WorkItem $item, User $actor, string $relation, array $ids): void
+    {
+        $ids = array_values(array_unique(array_map('intval', $ids)));
+        $before = $item->{$relation}()->pluck($relation === 'assignees' ? 'users.id' : 'project_item_labels.id')
+            ->map(fn ($id) => (int) $id)->sort()->values()->all();
+
+        $after = collect($ids)->sort()->values()->all();
+        if ($before === $after) {
+            return;
+        }
+
+        $item->{$relation}()->sync($ids);
+        $item->unsetRelation($relation);
+
+        if ($relation === 'assignees') {
+            $this->notifyNewAssignees($item, $actor, $before, $after);
+        }
+
+        $names = $relation === 'assignees'
+            ? User::whereIn('id', $ids)->get()->map(fn (User $u) => $u->displayName())->all()
+            : ProjectItemLabel::whereIn('id', $ids)->pluck('name')->all();
+
+        $this->activity->record($item, $actor, WorkItemActivity::EVENT_UPDATED, [
+            'field' => $relation,
+            'old_value' => implode(',', $before) ?: null,
+            'new_value' => implode(',', $after) ?: null,
+            'meta' => ['new_labels' => $names],
+        ]);
+    }
+
+    /**
+     * Mail whoever just became the assignee (§4.3). Only the ids that were not there before
+     * are told, so re-saving the same assignee — or clearing one — sends nothing.
+     *
+     * @param  array<int, int>  $before
+     * @param  array<int, int>  $after
+     */
+    private function notifyNewAssignees(WorkItem $item, User $actor, array $before, array $after): void
+    {
+        $added = array_values(array_diff($after, $before));
+        if ($added === []) {
+            return;
+        }
+
+        foreach (User::whereIn('id', $added)->get() as $assignee) {
+            $this->assignments->assigned($item, $assignee, $actor);
+        }
+    }
+}

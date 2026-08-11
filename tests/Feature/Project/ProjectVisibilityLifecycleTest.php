@@ -16,26 +16,26 @@ class ProjectVisibilityLifecycleTest extends ProjectTestCase
     public function test_private_project_is_hidden_from_a_non_member_but_visible_to_owner(): void
     {
         [$owner, $workspace] = $this->owner();
-        $project = $this->makeProject($workspace, $owner, ['identifier' => 'PRIV', 'visibility' => 'private']);
+        $project = $this->makeProject($owner, $workspace, ['identifier' => 'PRIV', 'visibility' => 'private']);
         $stranger = $this->member($workspace, 'member', 'stranger@example.com');
 
         $this->actingAs($stranger)->get(route('projects.show', $project))->assertNotFound();
-        $this->actingAs($owner)->get(route('projects.show', $project))->assertOk();
+        $this->actingAs($owner)->followingRedirects()->get(route('projects.show', $project))->assertOk();
     }
 
     public function test_public_project_is_visible_to_a_standard_member(): void
     {
         [$owner, $workspace] = $this->owner();
-        $project = $this->makeProject($workspace, $owner, ['identifier' => 'PUB', 'visibility' => 'public']);
+        $project = $this->makeProject($owner, $workspace, ['identifier' => 'PUB', 'visibility' => 'public']);
         $member = $this->member($workspace, 'member', 'member@example.com');
 
-        $this->actingAs($member)->get(route('projects.show', $project))->assertOk();
+        $this->actingAs($member)->followingRedirects()->get(route('projects.show', $project))->assertOk();
     }
 
     public function test_archive_then_restore(): void
     {
         [$owner, $workspace] = $this->owner();
-        $project = $this->makeProject($workspace, $owner);
+        $project = $this->makeProject($owner, $workspace);
 
         $this->actingAs($owner)->postJson(route('projects.archive', $project))->assertOk();
         $this->assertSame('archived', $workspace->run(fn () => Project::find($project->id)->status));
@@ -52,7 +52,7 @@ class ProjectVisibilityLifecycleTest extends ProjectTestCase
     public function test_delete_requires_typed_identifier_and_cascades(): void
     {
         [$owner, $workspace] = $this->owner();
-        $project = $this->makeProject($workspace, $owner, ['identifier' => 'DEL']);
+        $project = $this->makeProject($owner, $workspace, ['identifier' => 'DEL']);
         $workspace->run(fn () => ProjectItemLabel::create(['project_id' => $project->id, 'name' => 'L', 'color' => '#22C55E', 'position' => 1]));
 
         // Wrong confirmation → rejected.
@@ -70,7 +70,7 @@ class ProjectVisibilityLifecycleTest extends ProjectTestCase
     {
         [$ownerA, $wsA] = $this->owner('acme');
         [$ownerB] = $this->owner('beta');
-        $projectA = $this->makeProject($wsA, $ownerA, ['identifier' => 'AON']);
+        $projectA = $this->makeProject($ownerA, $wsA, ['identifier' => 'AON']);
 
         // Owner B (different active workspace) cannot open or archive A's project — 404 via tenant scope.
         $this->actingAs($ownerB)->get(route('projects.show', $projectA))->assertNotFound();

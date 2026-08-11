@@ -18,15 +18,21 @@
 
   {{-- Topbar (settings mode: minimal, not the full app topbar) --}}
   <header class="h-14 shrink-0 border-b border-line flex items-center gap-2 px-3 sm:px-4">
-    <a href="{{ route('projects.show', $project->id) }}" class="flex items-center gap-2">
-      <span class="h-6 w-6 rounded-md grid place-items-center text-[13px]" style="background: {{ $project->cover_gradient ?: '#334155' }}">{{ $project->emoji ?: '📁' }}</span>
+    {{-- Back to the project workspace. Settings is a full-screen detour, so it needs a way
+         out on the left as well as the Close affordance on the right. --}}
+    <a href="{{ route('projects.work-items', $project->id) }}" title="Back to {{ $project->name }}"
+       class="h-9 w-9 grid place-items-center rounded-md text-sub hover:bg-hover shrink-0">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </a>
+    <a href="{{ route('projects.work-items', $project->id) }}" class="flex items-center gap-2 min-w-0">
+      <span class="h-6 w-6 rounded-md grid place-items-center text-[13px] shrink-0" style="background: {{ $project->cover_gradient ?: '#334155' }}">{{ $project->emoji ?: '📁' }}</span>
       <span class="font-medium text-[13px] max-w-[160px] truncate">{{ $project->name }}</span>
     </a>
     <span class="text-faint">/</span>
     <span class="text-[13px] text-sub">Settings</span>
     <div class="ml-auto flex items-center gap-2">
       <span class="h-6 w-px bg-line"></span>
-      <a href="{{ route('projects.show', $project->id) }}" title="Close" class="h-9 w-9 grid place-items-center rounded-md text-sub hover:bg-hover">
+      <a href="{{ route('projects.work-items', $project->id) }}" title="Close" class="h-9 w-9 grid place-items-center rounded-md text-sub hover:bg-hover">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
       </a>
     </div>
@@ -34,7 +40,12 @@
 
   <div class="flex-1 flex min-h-0 relative">
     <aside class="w-60 shrink-0 border-r border-line bg-white hidden md:flex flex-col">
-      <div class="px-4 h-12 flex items-center text-[11px] font-semibold text-faint uppercase tracking-wide">Project settings</div>
+      {{-- Name the project being configured, so it is clear WHOSE settings these are when
+           several projects are open in different tabs. --}}
+      <div class="px-4 pt-4 pb-2">
+        <div class="text-[13px] font-semibold text-head truncate" title="{{ $project->name }}">{{ $project->name }}</div>
+        <div class="text-[11px] font-semibold text-faint uppercase tracking-wide mt-0.5">Project settings</div>
+      </div>
       <nav class="flex-1 overflow-y-auto px-2 pb-6">
         @foreach ($nav as $item)
           @php $active = $item['key'] === $section; @endphp
@@ -57,5 +68,25 @@
       </div>
     </main>
   </div>
+
+  {{-- Escape is the third way out of the settings detour, alongside the back arrow and the
+       Close button — all three land on the project's work item list, which is where the
+       project workspace opens. Guarded so it never fires while a dialog, a dropdown or a
+       text field owns the key: closing that comes first, and only a second Escape leaves. --}}
+  <script>
+    (function () {
+      var closeUrl = @json(route('projects.work-items', $project->id));
+
+      document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Escape' || e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
+        if (document.querySelector('[role="dialog"], details[open]')) return;
+
+        var el = e.target;
+        if (el && el.closest && el.closest('input, textarea, select, [contenteditable="true"]')) return;
+
+        window.location.href = closeUrl;
+      });
+    })();
+  </script>
 </body>
 </html>

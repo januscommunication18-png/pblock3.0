@@ -3,6 +3,7 @@
 namespace Tests\Feature\Project;
 
 use App\Models\Project;
+use App\Models\ProjectMember;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 /** Visibility & membership enforcement (spec §4.3 / PRJ-030/031/032). */
@@ -15,7 +16,7 @@ class ProjectAccessTest extends ProjectTestCase
         [$owner, $workspace] = $this->owner();
         $project = $this->makeProject($owner, $workspace, ['identifier' => 'PRV', 'visibility' => 'private']);
 
-        $this->actingAs($owner)->get(route('projects.show', $project->id))->assertOk();
+        $this->actingAs($owner)->followingRedirects()->get(route('projects.show', $project->id))->assertOk();
     }
 
     public function test_unassigned_member_cannot_open_a_private_project_by_url(): void
@@ -34,7 +35,7 @@ class ProjectAccessTest extends ProjectTestCase
         $project = $this->makeProject($owner, $workspace, ['identifier' => 'PRV', 'visibility' => 'private']);
 
         $admin = $this->member($workspace, 'admin', 'admin@example.com');
-        $this->actingAs($admin)->get(route('projects.show', $project->id))->assertOk();
+        $this->actingAs($admin)->followingRedirects()->get(route('projects.show', $project->id))->assertOk();
     }
 
     public function test_assigned_lead_can_open_a_private_project(): void
@@ -45,20 +46,27 @@ class ProjectAccessTest extends ProjectTestCase
             'identifier' => 'PRV', 'visibility' => 'private', 'lead_user_id' => $lead->id,
         ]);
 
-        $this->actingAs($lead)->get(route('projects.show', $project->id))->assertOk();
+        $this->actingAs($lead)->followingRedirects()->get(route('projects.show', $project->id))->assertOk();
     }
 
-    public function test_standard_member_can_open_a_public_project_but_guest_cannot(): void
+    public function test_public_visibility_does_not_grant_access_without_membership(): void
     {
         [$owner, $workspace] = $this->owner();
         $project = $this->makeProject($owner, $workspace, ['identifier' => 'PUB', 'visibility' => 'public']);
 
+        // Project Member Management §38 supersedes PRJ-030: a workspace member gets no
+        // access to a project until they are explicitly added to it, public or not.
         $member = $this->member($workspace, 'member', 'member@example.com');
-        $this->actingAs($member)->get(route('projects.show', $project->id))->assertOk();
+        $this->actingAs($member)->get(route('projects.show', $project->id))->assertNotFound();
 
-        // A guest is NOT granted access just because the project is public (PRJ-030).
         $guest = $this->member($workspace, 'guest', 'guest@example.com');
         $this->actingAs($guest)->get(route('projects.show', $project->id))->assertNotFound();
+
+        // Once added, the same member can open it.
+        $workspace->run(fn () => ProjectMember::create([
+            'project_id' => $project->id, 'user_id' => $member->id, 'role' => ProjectMember::ROLE_CONTRIBUTOR,
+        ]));
+        $this->actingAs($member)->followingRedirects()->get(route('projects.show', $project->id))->assertOk();
     }
 
     public function test_project_is_isolated_from_another_workspace(): void

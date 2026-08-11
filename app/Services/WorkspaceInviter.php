@@ -2,26 +2,32 @@
 
 namespace App\Services;
 
+use App\Mail\WorkspaceInvitationMail;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceInvitation;
 use App\Models\WorkspaceMembership;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 /**
- * Persists pending teammate invitations for a workspace (spec §6).
+ * Persists teammate invitations for a workspace and emails them (spec §6, invite spec §8–§17).
  *
  * Invitations are TENANT-SCOPED, so this runs inside the target workspace's tenancy
  * context: BelongsToTenant then stamps tenant_id automatically and duplicate/pending
  * lookups are confined to the workspace. Each row is handled independently — an invalid
- * or duplicate row never discards the valid ones (spec §9, INV-004). No email is sent in
- * this phase; rows land as pending and surface later under Settings > Members.
+ * or duplicate row never discards the valid ones (spec §9, INV-004).
+ *
+ * Each accepted row gets a fresh raw token; only its SHA-256 hash is stored, and the raw value
+ * leaves this class exactly once, inside the emailed link (invite spec §13).
  *
  * @phpstan-type InviteRow array{email:string, role:string}
  */
 class WorkspaceInviter
 {
+    public function __construct(private readonly WorkspaceSeatGuard $seats) {}
+
     /**
      * @param  array<int, array{email:string, role:string}>  $rows
      * @return array<int, array{email:string, role:string, status:string}> per-recipient result
@@ -63,45 +69,97 @@ class WorkspaceInviter
                 }
                 $seenThisRequest[$email] = true;
 
-                // Existing active member of this workspace (spec §9).
-                $alreadyMember = WorkspaceMembership::query()
+                // Existing member of this workspace (spec §9, invite spec §8.1/§8.3). A
+                // suspended membership is reported separately: re-inviting must not create a
+                // second membership, the administrator has to reactivate the existing one.
+                $membership = WorkspaceMembership::query()
                     ->where('workspace_id', $workspace->id)
                     ->whereHas('user', fn ($q) => $q->where('email', $email))
-                    ->exists();
-                if ($alreadyMember) {
-                    $results[] = ['email' => $email, 'role' => $role, 'status' => 'already_member'];
+                    ->first();
+                if ($membership) {
+                    $results[] = [
+                        'email' => $email,
+                        'role' => $role,
+                        'status' => $membership->status === WorkspaceMembership::STATUS_ACTIVE
+                            ? 'already_member'
+                            : 'suspended_member',
+                    ];
 
                     continue;
                 }
 
                 // Don't create a second active invite for the same workspace/email (INV-004).
-                // Tenant scope confines this to the current workspace automatically.
+                // Tenant scope confines this to the current workspace automatically. A lapsed
+                // invitation is retired first, so an expired one never blocks a fresh invite.
                 $existing = WorkspaceInvitation::query()
                     ->where('email', $email)
                     ->where('status', WorkspaceInvitation::STATUS_PENDING)
                     ->first();
-                if ($existing) {
+                if ($existing && ! $existing->markExpiredIfLapsed()) {
                     $results[] = ['email' => $email, 'role' => $role, 'status' => 'already_invited'];
 
                     continue;
                 }
 
-                DB::transaction(function () use ($email, $role, $inviter, $expiryDays) {
-                    WorkspaceInvitation::create([
-                        // tenant_id is stamped by BelongsToTenant from the active tenancy context.
-                        'email' => $email,
-                        'role' => $role,
-                        'inviter_user_id' => $inviter->id,
-                        'token' => hash('sha256', Str::random(48)),
-                        'status' => WorkspaceInvitation::STATUS_PENDING,
-                        'expires_at' => now()->addDays($expiryDays),
-                    ]);
-                });
+                // Capacity is checked per row, not once per request, because each invitation
+                // sent inside this loop consumes a seat (invite spec §10/§65).
+                if (! $this->seats->hasSeat($workspace)) {
+                    $results[] = ['email' => $email, 'role' => $role, 'status' => 'no_seats'];
+
+                    continue;
+                }
+
+                $token = WorkspaceInvitation::newToken();
+
+                $invitation = DB::transaction(fn () => WorkspaceInvitation::create([
+                    // tenant_id is stamped by BelongsToTenant from the active tenancy context.
+                    'email' => $email,
+                    'role' => $role,
+                    'inviter_user_id' => $inviter->id,
+                    'token' => WorkspaceInvitation::hashToken($token),
+                    'status' => WorkspaceInvitation::STATUS_PENDING,
+                    'expires_at' => now()->addDays($expiryDays),
+                ]));
+
+                $this->sendInvitationEmail($workspace, $inviter, $invitation, $token);
 
                 $results[] = ['email' => $email, 'role' => $role, 'status' => 'invited'];
             }
 
             return $results;
         });
+    }
+
+    /**
+     * Queue the invitation email (CLAUDE.md §11). Delivery failure must not roll back the
+     * invitation — the row is what the Members screen and the resend action work from — so
+     * this sits outside the transaction and reports rather than throws.
+     */
+    private function sendInvitationEmail(
+        Workspace $workspace,
+        User $inviter,
+        WorkspaceInvitation $invitation,
+        string $rawToken,
+    ): void {
+        $roleLabels = config('workspace.roles');
+
+        try {
+            Mail::to($invitation->email)->queue(new WorkspaceInvitationMail(
+                workspaceName: (string) $workspace->name,
+                inviterName: $inviter->displayName(),
+                invitedEmail: $invitation->email,
+                roleLabel: $roleLabels[$invitation->role] ?? ucfirst($invitation->role),
+                acceptUrl: route('invitations.show', ['token' => $rawToken]),
+                expiresOn: optional($invitation->expires_at)->format('F j, Y') ?? '',
+                workspaceLogoUrl: $workspace->logo_url,
+            ));
+        } catch (\Throwable $e) {
+            // Never log the token or the link — both carry the raw secret.
+            Log::error('workspace.invitation.email_failed', [
+                'invitation_id' => $invitation->id,
+                'tenant_id' => $invitation->tenant_id,
+                'reason' => $e->getMessage(),
+            ]);
+        }
     }
 }

@@ -191,7 +191,9 @@ PB.boot('members', {
       var map = {
         invalid_email: 'Enter a valid email address.', invalid_role: 'Select a valid role.',
         duplicate: 'This email is listed more than once.', already_member: 'Already a member of this workspace.',
-        already_invited: 'This person has already been invited.'
+        already_invited: 'This person has already been invited.',
+        suspended_member: 'This person has a suspended membership — reactivate it instead.',
+        no_seats: 'Your workspace has reached the maximum number of members allowed by your current plan.'
       };
       return map[s] || 'Could not send this invitation.';
     },

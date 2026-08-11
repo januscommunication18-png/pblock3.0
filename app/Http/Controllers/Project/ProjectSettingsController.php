@@ -10,6 +10,7 @@ use DateTimeZone;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -87,7 +88,7 @@ class ProjectSettingsController extends ManagesProjectController
         if ($project->lead_user_id) {
             ProjectMember::query()->firstOrCreate(
                 ['project_id' => $project->id, 'user_id' => $project->lead_user_id],
-                ['role' => ProjectMember::ROLE_MEMBER],
+                ['role' => ProjectMember::ROLE_CONTRIBUTOR],
             );
         }
     }
@@ -115,9 +116,14 @@ class ProjectSettingsController extends ManagesProjectController
                 ],
             ],
             'members' => [
-                'members' => $this->projectMembers($project),
-                'candidates' => $this->workspaceMembers($project),
+                // Shared with the mutation endpoints so the screen and its responses always
+                // describe members the same way (§6/§8).
+                'members' => ProjectMembersController::memberList($project),
+                'candidates' => ProjectMembersController::candidates($project),
                 'roles' => config('projects.roles'),
+                'defaultRole' => config('projects.default_role'),
+                'workspaceRoles' => config('workspace.roles'),
+                'canManage' => Auth::user()->can('manageMembers', $project),
                 'endpoints' => [
                     'store' => route('projects.settings.members.store', $project),
                     'role' => route('projects.settings.members.role', ['project' => $project->id, 'member' => '__ID__']),
@@ -150,18 +156,6 @@ class ProjectSettingsController extends ManagesProjectController
             ],
             default => [],
         };
-    }
-
-    /** @return array<int, array<string, mixed>> */
-    private function projectMembers(Project $project): array
-    {
-        return $project->members()->with('user')->get()
-            ->map(fn (ProjectMember $m) => [
-                'id' => $m->id, 'user_id' => $m->user_id,
-                'name' => $m->user?->displayName(), 'email' => $m->user?->email,
-                'initial' => $m->user?->initial(), 'role' => $m->role,
-                'is_lead' => $m->user_id === $project->lead_user_id,
-            ])->all();
     }
 
     /** @return array<int, array<string, mixed>> */
