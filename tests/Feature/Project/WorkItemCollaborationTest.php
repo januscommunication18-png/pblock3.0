@@ -310,6 +310,39 @@ class WorkItemCollaborationTest extends ProjectTestCase
         $this->assertSame($sorted, $times, 'The All feed must be ordered by time, not grouped by type.');
     }
 
+    public function test_assignee_history_records_names_on_both_sides_not_ids(): void
+    {
+        [$owner, $ws] = $this->owner();
+        $project = $this->makeProject($owner, $ws, ['identifier' => 'TESTI']);
+        $this->actingAs($owner)->get(route('projects.work-items', $project));
+        $item = $this->makeItem($owner, $project);
+
+        $angel = $this->projectMember($ws, $project, 'member', 'angel@example.com');
+        $angel->forceFill(['full_name' => 'Angel R. Pritchard'])->save();
+        $rohit = $this->projectMember($ws, $project, 'member', 'rohit@example.com');
+        $rohit->forceFill(['full_name' => 'Rohit Philip'])->save();
+
+        $url = route('projects.work-items.update', ['project' => $project->id, 'workItem' => $item['id']]);
+        $this->actingAs($owner)->patchJson($url, ['assignee_ids' => [$angel->id]])->assertOk();
+        $this->actingAs($owner)->patchJson($url, ['assignee_ids' => [$rohit->id]])->assertOk();
+
+        $history = collect($this->actingAs($owner)->getJson($this->url('projects.work-items.feed', $project, $item))
+            ->assertOk()->json('feed.history'))
+            ->filter(fn ($h) => $h['field'] === 'assignees')
+            ->values();
+
+        // §11.6: History reads before → after. Both sides must be resolved at write time —
+        // the value columns hold ids, and rendering those gave rows reading "None → 4".
+        $swap = $history->first(fn ($h) => $h['old_value'] !== null);
+        $this->assertNotNull($swap);
+        $this->assertSame(['Angel R. Pritchard'], $swap['meta']['old_labels']);
+        $this->assertSame(['Rohit Philip'], $swap['meta']['new_labels']);
+
+        $first = $history->last();
+        $this->assertSame([], $first['meta']['old_labels']);
+        $this->assertSame(['Angel R. Pritchard'], $first['meta']['new_labels']);
+    }
+
     public function test_the_feed_is_isolated_by_workspace_and_writes_need_permission(): void
     {
         [$owner, $ws] = $this->owner();

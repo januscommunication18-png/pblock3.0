@@ -17,7 +17,7 @@ class ProjectIndexRenderTest extends ProjectTestCase
 
         // Bootstrap payload is embedded for the Vue app to hydrate.
         $this->assertStringContainsString('id="settings-root"', $html);
-        $this->assertStringContainsString('TESTI', $html);
+        $this->assertStringContainsString('testi', $html);
         $this->assertStringContainsString('"canCreate":true', $html);
 
         // App JS is loaded and cache-busted via ?v=<mtime> so browsers refetch on change.

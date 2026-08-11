@@ -12,7 +12,7 @@
     <span class="inline-flex items-center gap-1.5 text-[14px] font-medium text-ink shrink-0">
       <span>{{ $project->emoji ?: '📁' }}</span>{{ $project->name }}
     </span>
-    <span class="text-[12px] text-brand font-medium shrink-0">{{ '@'.strtolower($project->identifier) }}</span>
+    <span class="text-[12px] text-brand font-medium shrink-0">{{ '@'.$project->identifier }}</span>
 
     {{-- Project actions (⋯), matching the POC's ProjectHeader. Built with <details> so it
          works on both workspace pages without either owning a Vue root; the script at the

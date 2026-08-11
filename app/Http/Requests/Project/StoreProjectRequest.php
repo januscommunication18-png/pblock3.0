@@ -27,8 +27,8 @@ class StoreProjectRequest extends FormRequest
     {
         $name = trim((string) $this->input('name'));
 
-        // PRJ-023: uppercase, strip non-alphanumerics, cap length. Derive from the name when
-        // the identifier field is empty; otherwise normalize what the user typed.
+        // Lower case, strip non-alphanumerics, cap length. Derive from the name when the
+        // identifier field is empty; otherwise normalize what the user typed.
         $max = (int) config('projects.identifier_max');
         $identifier = $this->normalizeIdentifier((string) $this->input('identifier'), $max);
         if ($identifier === '') {
@@ -51,7 +51,7 @@ class StoreProjectRequest extends FormRequest
             'name' => ['required', 'string', 'max:'.config('projects.name_max')],
             'identifier' => [
                 'required', 'string', 'max:'.config('projects.identifier_max'),
-                'regex:/^[A-Z0-9]+$/', // PRJ-023 uppercase alphanumeric
+                'regex:/^[a-z0-9]+$/', // lower-case alphanumeric
                 // PRJ-022: unique within THIS workspace only (same code may exist elsewhere).
                 Rule::unique('projects', 'identifier')->where('tenant_id', $workspaceId),
             ],
@@ -76,8 +76,8 @@ class StoreProjectRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'identifier.regex' => 'The Project ID may only contain uppercase letters and numbers.',
-            'identifier.unique' => 'That Project ID is already used in this workspace. Please choose another.',
+            'identifier.regex' => 'The identifier may only contain lowercase letters and numbers.',
+            'identifier.unique' => 'That identifier is already used in this workspace. Please choose another.',
             'lead_user_id.exists' => 'Choose a lead from the current workspace members.',
             'cover.image' => 'The cover must be an image file.',
             'cover.mimes' => 'Use a JPG, PNG, WEBP or GIF image for the cover.',
@@ -99,6 +99,6 @@ class StoreProjectRequest extends FormRequest
 
     private function normalizeIdentifier(string $value, int $max): string
     {
-        return Str::substr(preg_replace('/[^A-Z0-9]/', '', Str::upper($value)), 0, $max);
+        return Str::substr(preg_replace('/[^a-z0-9]/', '', Str::lower($value)), 0, $max);
     }
 }

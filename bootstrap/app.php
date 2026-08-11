@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\InitializeWorkspaceTenancy;
+use App\Http\Middleware\RequireAccessCode;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -20,6 +21,12 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'workspace.tenancy' => InitializeWorkspaceTenancy::class,
         ]);
+
+        // Access gate (Dev/UAT): holds every web request behind the access-code screen until
+        // a code has been entered. On the whole group rather than on the auth routes, so a
+        // route added later cannot quietly be reachable. Inert in production and wherever
+        // the module is switched off — see App\Services\AccessGate.
+        $middleware->web(append: RequireAccessCode::class);
 
         // Tenancy MUST initialize before route-model binding so that bindings of
         // tenant-scoped models (project states, labels, invitations, …) are confined to

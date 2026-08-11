@@ -59,8 +59,8 @@ class WorkItemRelationManager
 
                 // Logged on BOTH items: the child's parent changed, and the parent gained a
                 // sub-task. Each panel should be able to explain itself without the other.
-                $this->log($child, $actor, 'parent', null, $parent->identifier);
-                $this->log($parent, $actor, 'subtask_added', null, $child->identifier);
+                $this->logRelated($child, $actor, 'parent', null, $parent);
+                $this->logRelated($parent, $actor, 'subtask_added', null, $child);
             }
         });
 
@@ -76,8 +76,8 @@ class WorkItemRelationManager
 
         DB::transaction(function () use ($parent, $child, $actor) {
             $child->forceFill(['parent_id' => null])->save();
-            $this->log($child, $actor, 'parent', $parent->identifier, null);
-            $this->log($parent, $actor, 'subtask_removed', $child->identifier, null);
+            $this->logRelated($child, $actor, 'parent', $parent, null);
+            $this->logRelated($parent, $actor, 'subtask_removed', $child, null);
         });
     }
 
@@ -164,9 +164,12 @@ class WorkItemRelationManager
                     $newlyBlocked[$to->id]['blockers'][] = $from;
                 }
 
-                // Both items show the relation, so both records it.
-                $this->log($item, $actor, 'relation_added', null, $this->label($type).' '.$target->identifier);
-                $this->log($target, $actor, 'relation_added', null, $this->label($this->inverse($type)).' '.$item->identifier);
+                // Both items show the relation, so both records it. The kind and the other
+                // item travel as separate facts — glued into one string they produced audit
+                // lines like "changed relation added to blocking 1", where "1" is an
+                // identifier that reads as a quantity.
+                $this->logRelation($item, $actor, 'relation_added', $type, $target);
+                $this->logRelation($target, $actor, 'relation_added', $this->inverse($type), $item);
             }
         });
 
@@ -189,11 +192,9 @@ class WorkItemRelationManager
 
             $relation->delete();
 
-            if ($from) {
-                $this->log($from, $actor, 'relation_removed', $this->label($type).' '.($to?->identifier ?? ''), null);
-            }
-            if ($to) {
-                $this->log($to, $actor, 'relation_removed', $this->label($this->inverse($type)).' '.($from?->identifier ?? ''), null);
+            if ($from && $to) {
+                $this->logRelation($from, $actor, 'relation_removed', $type, $to);
+                $this->logRelation($to, $actor, 'relation_removed', $this->inverse($type), $from);
             }
         });
     }
@@ -439,6 +440,41 @@ class WorkItemRelationManager
                 ])->values()->all()
                 : [],
         ];
+    }
+
+    /**
+     * Record a relation change with its parts kept apart: which kind of relation, and which
+     * work item — identifier AND title, because an identifier is now a bare number and "1"
+     * alone tells a reader nothing.
+     */
+    private function logRelation(WorkItem $item, User $actor, string $field, string $type, WorkItem $other): void
+    {
+        $this->activity->record($item, $actor, WorkItemActivity::EVENT_UPDATED, [
+            'field' => $field,
+            'old_value' => $field === 'relation_removed' ? $other->identifier : null,
+            'new_value' => $field === 'relation_added' ? $other->identifier : null,
+            'meta' => [
+                'relation' => $this->label($type),
+                'target' => $other->identifier,
+                'target_title' => $other->title,
+            ],
+        ]);
+    }
+
+    /** Parent and sub-task changes, with the other item's title alongside its identifier. */
+    private function logRelated(WorkItem $item, User $actor, string $field, ?WorkItem $old, ?WorkItem $new): void
+    {
+        $this->activity->record($item, $actor, WorkItemActivity::EVENT_UPDATED, [
+            'field' => $field,
+            'old_value' => $old?->identifier,
+            'new_value' => $new?->identifier,
+            'meta' => [
+                'old_label' => $old ? $old->identifier.' '.$old->title : null,
+                'new_label' => $new ? $new->identifier.' '.$new->title : null,
+                'target' => ($new ?? $old)?->identifier,
+                'target_title' => ($new ?? $old)?->title,
+            ],
+        ]);
     }
 
     private function log(WorkItem $item, User $actor, string $field, ?string $old, ?string $new): void

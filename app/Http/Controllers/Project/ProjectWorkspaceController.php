@@ -12,9 +12,12 @@ use Illuminate\Support\Facades\Auth;
 /**
  * Project Workspace shell (Phase 5, requirements §3).
  *
- * Renders the Coming Soon page for the five non-MVP tabs — Overview, Cycles, Modules, Views
- * and Pages. They stay visible so the planned information architecture is legible, but must
- * never expose unfinished functionality as if it were production-ready (spec §13).
+ * Renders the Coming Soon page for the remaining non-MVP tabs — Overview, Modules, Views and
+ * Pages. They stay visible so the planned information architecture is legible, but must never
+ * expose unfinished functionality as if it were production-ready (spec §13).
+ *
+ * Cycles is no longer one of them: it has its own controller and its own routes, registered
+ * ahead of this catch-all.
  */
 class ProjectWorkspaceController extends Controller
 {
@@ -26,15 +29,17 @@ class ProjectWorkspaceController extends Controller
         // 404, never leak whether an inaccessible project exists (spec §12).
         abort_unless(Auth::user()->can('viewAny', [WorkItem::class, $project]), 404);
 
-        $tabs = config('projects.workspace_tabs');
-        $current = collect($tabs)->firstWhere('key', $tab);
+        // The Coming Soon check reads the raw config: a feature-gated tab is owned by its own
+        // controller and routed before this catch-all, so it must never resolve here.
+        $current = collect(config('projects.workspace_tabs'))->firstWhere('key', $tab);
         abort_if($current === null || ($current['status'] ?? '') === 'active', 404);
+        abort_if($tab === 'cycles', 404);
 
         return view('projects.coming-soon', [
             'workspace' => Auth::user()->currentWorkspace,
             'user' => Auth::user(),
             'project' => $project,
-            'tabs' => $tabs,
+            'tabs' => $this->navigation->tabs($project),
             'activeTab' => $tab,
             'label' => $current['label'],
             // Shared sidebar: project list + the gate on its "New work item" action.

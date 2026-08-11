@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Auth\AccessGateController;
 use App\Http\Controllers\Auth\EmailSignupController;
 use App\Http\Controllers\Auth\LogoutController;
 use App\Http\Controllers\Auth\SignInController;
@@ -19,6 +20,17 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 | require __DIR__.'/auth.php'; from routes/web.php
 */
+
+// ---- Access gate (Dev/UAT only) ----
+// Outside the `guest` group on purpose: this stands in front of the whole site, so it has to
+// answer for signed-in visitors too. It is exempt from its own middleware via
+// config('access_gate.except'), or the redirect would loop.
+Route::get('/access', [AccessGateController::class, 'show'])->name('access.show');
+Route::post('/access', [AccessGateController::class, 'store'])
+    // A short code deserves a brute-force limit, low enough to be useless to a script and
+    // high enough that a person mistyping twice is not locked out.
+    ->middleware('throttle:10,1')
+    ->name('access.store');
 
 // ---- Guest ----
 Route::middleware('guest')->group(function () {

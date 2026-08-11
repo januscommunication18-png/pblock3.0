@@ -110,7 +110,7 @@ PB.boot('projects-index', {
     deleteConfirmed: function () {
       var p = this.deleteModal.project;
       if (!p) return false;
-      return this.deleteModal.typed.trim().toUpperCase() === String(p.identifier || '').toUpperCase();
+      return this.deleteModal.typed.trim().toLowerCase() === String(p.identifier || '').toLowerCase();
     },
     leadMenuMembers: function () {
       var q = (this.leadMenuQuery || '').toLowerCase();
@@ -269,7 +269,7 @@ PB.boot('projects-index', {
       this.form = {
         id: PB_FORM_ID, can_manage: true,
         name: p.name || '',
-        // Shown lowercase (the @handle look); normalized back to uppercase on save.
+        // Identifiers are lower case throughout (the @handle look).
         identifier: String(p.identifier || '').toLowerCase(),
         description: p.description || '',
         visibility: p.visibility || 'public',
@@ -512,13 +512,13 @@ PB.boot('projects-index', {
       window.location = this.endpoints.list + (this.archived ? '' : '?archived=1');
     },
     soon: function () { this.$pb.toast('Filters & sorting are coming soon.'); },
-    // Fields common to create and edit. The identifier is shown lowercase (the @handle
-    // look); the server stores the canonical uppercase one, so normalize before posting.
+    // Fields common to create and edit. Identifiers are lower case everywhere — stored,
+    // displayed and posted — so nothing has to be re-cased on the way in or out.
     basePayload: function () {
       var f = this.form;
       return {
         name: f.name,
-        identifier: f.identifier ? String(f.identifier).toUpperCase() : '',
+        identifier: f.identifier ? String(f.identifier).toLowerCase() : '',
         description: f.description,
         visibility: f.visibility,
         emoji: f.emoji,
@@ -549,7 +549,7 @@ PB.boot('projects-index', {
         start_date: f.start_date || '',
         end_date: f.end_date || ''
       });
-      // The project ID is immutable — never post it back from the edit modal.
+      // The identifier is immutable — never post it back from the edit modal.
       delete payload.identifier;
       try {
         var url = this.$pb.withId(this.endpoints.update, this.editId);
@@ -813,9 +813,9 @@ PB.boot('projects-index', {
     '<div class="flex flex-col sm:flex-row gap-3">' +
     '<div class="flex-1"><input class="pb-input" :class="{\'is-error\': errors.name}" v-model="form.name" @input="onName" placeholder="Project name" />' +
     '<p v-if="errors.name" class="text-[12px] text-danger mt-1">{{ errors.name[0] }}</p></div>' +
-    // Project ID: editable while creating, permanently read-only once the project exists —
+    // Identifier: editable while creating, permanently read-only once the project exists —
     // it is the @mention handle everything else references.
-    '<div class="sm:w-44"><input class="pb-input lowercase" :class="{\'is-error\': errors.identifier, \'bg-hover text-sub cursor-not-allowed\': editing}" :value="form.identifier" @input="onId" :readonly="editing" :title="editing ? \'The project ID cannot be changed\' : null" placeholder="project id" maxlength="10" />' +
+    '<div class="sm:w-44"><input class="pb-input lowercase" :class="{\'is-error\': errors.identifier, \'bg-hover text-sub cursor-not-allowed\': editing}" :value="form.identifier" @input="onId" :readonly="editing" :title="editing ? \'The identifier cannot be changed\' : null" placeholder="identifier" maxlength="10" />' +
     '<p v-if="errors.identifier" class="text-[12px] text-danger mt-1">{{ errors.identifier[0] }}</p>' +
     '<p v-else class="text-[11px] text-sub mt-1">Team handle: <span class="text-brand font-medium">{{ form.identifier ? handle(form.identifier) : \'@…\' }}</span></p></div>' +
     '</div>' +

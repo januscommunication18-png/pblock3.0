@@ -42,16 +42,27 @@ class ProjectSettingsController extends ManagesProjectController
 
         $project->forceFill([
             'name' => $request->validated('name'),
-            'identifier' => strtoupper($request->validated('identifier')),
+            // `identifier` is deliberately absent: it cannot change after creation.
             'description' => $request->validated('description'),
             'visibility' => $request->validated('visibility'),
             'lead_user_id' => $request->validated('lead_user_id'),
             'timezone' => $request->validated('timezone'),
+            'work_item_view' => $request->validated('work_item_view') ?? $project->work_item_view,
+            'default_assignee_id' => $request->validated('default_assignee_id'),
         ])->save();
 
         $this->syncLead($project);
 
-        return response()->json(['ok' => true]);
+        // §13: replace the subscriber set outright — the form sends the full list, so a
+        // removed member has to disappear rather than linger.
+        if ($request->has('subscriber_ids')) {
+            $project->subscribers()->sync(array_values(array_unique($request->validated('subscriber_ids') ?? [])));
+        }
+
+        return response()->json([
+            'ok' => true,
+            'message' => 'Project settings updated successfully.',
+        ]);
     }
 
     /** POST /projects/{project}/settings/cover (PRJ-027). */
@@ -68,15 +79,52 @@ class ProjectSettingsController extends ManagesProjectController
         return response()->json(['ok' => true, 'cover_url' => $project->cover_url]);
     }
 
-    /** POST /projects/{project}/settings/features/toggle */
+    /**
+     * POST /projects/{project}/settings/features/toggle
+     *
+     * Both gates §3 describes are enforced HERE, not only in the UI (Cycles §13's closing
+     * line): a hand-rolled POST is refused exactly as the disabled toggle implies.
+     */
     public function toggleFeature(Request $request, Project $project): JsonResponse
     {
         $this->guardManage($project);
-        $key = (string) $request->input('feature');
-        abort_unless(array_key_exists($key, config('projects.features')), 422, 'Unknown feature.');
 
+        $catalog = config('projects.features');
+        $key = (string) $request->input('feature');
+        abort_unless(array_key_exists($key, $catalog), 422, 'Unknown feature.');
+
+        $enabling = $request->boolean('enabled');
         $features = $project->featureFlags();
-        $features[$key] = $request->boolean('enabled');
+
+        if ($enabling) {
+            // Cycles §13: a paid feature the workspace's plan does not include.
+            $entitlement = $catalog[$key]['entitlement'] ?? null;
+            abort_if($entitlement && ! $project->entitledTo($entitlement), 422,
+                "{$catalog[$key]['label']} is not included in your plan.");
+
+            // Cycles §3.3.1: Parallel cycles only means anything with Cycles switched on.
+            // An `if` rather than abort_if(): the message names the prerequisite, and PHP
+            // builds every argument before the call — so `$catalog[null]` would be read on
+            // every feature that has no prerequisite at all.
+            $requires = $catalog[$key]['requires'] ?? null;
+            if ($requires && ! ($features[$requires] ?? false)) {
+                abort(422, "Turn on {$catalog[$requires]['label']} first.");
+            }
+        }
+
+        $features[$key] = $enabling;
+
+        // Switching a feature off switches off whatever depended on it, rather than leaving a
+        // dependent flag stored as ON with nothing behind it — a state the UI would have no
+        // honest way to render. Only the flags change; §3.2.4's data is untouched.
+        if (! $enabling) {
+            foreach ($catalog as $dependent => $meta) {
+                if (($meta['requires'] ?? null) === $key) {
+                    $features[$dependent] = false;
+                }
+            }
+        }
+
         $project->forceFill(['features' => $features])->save();
 
         return response()->json(['ok' => true, 'features' => $project->featureFlags()]);
@@ -103,6 +151,20 @@ class ProjectSettingsController extends ManagesProjectController
                     'description' => $project->description, 'visibility' => $project->visibility,
                     'lead_user_id' => $project->lead_user_id, 'timezone' => $project->timezone,
                     'cover_url' => $project->cover_url, 'status' => $project->status,
+                    // Shown on the cover banner alongside the name and ID (§4).
+                    'emoji' => $project->emoji,
+                    'work_item_view' => $project->work_item_view,
+                    'default_assignee_id' => $project->default_assignee_id,
+                    'subscriber_ids' => $project->subscribers()->pluck('users.id')->all(),
+                    // §17: read-only, from the original creation timestamp.
+                    'created_on' => optional($project->created_at)->format('M j, Y'),
+                ],
+                // §10's two options, described the way the spec words them.
+                'workItemViews' => [
+                    ['value' => 'all', 'label' => 'All work items',
+                        'hint' => 'Project members can view all work items in this project based on their project permissions.'],
+                    ['value' => 'assigned', 'label' => 'Assigned work items only',
+                        'hint' => 'Members can only view work items assigned to them.'],
                 ],
                 'members' => $this->workspaceMembers($project),
                 'visibilities' => config('projects.visibilities'),
@@ -132,7 +194,12 @@ class ProjectSettingsController extends ManagesProjectController
             ],
             'features' => [
                 'features' => $project->featureFlags(),
-                'catalog' => config('projects.features'),
+                // The catalog travels with each entry's plan verdict resolved, so the screen
+                // renders Upgrade from the same answer the server enforces (§13).
+                'catalog' => collect(config('projects.features'))->map(fn (array $meta) => $meta + [
+                    'requires' => $meta['requires'] ?? null,
+                    'entitled' => ! isset($meta['entitlement']) || $project->entitledTo($meta['entitlement']),
+                ])->all(),
                 'endpoints' => ['toggle' => route('projects.settings.features.toggle', $project)],
             ],
             'states' => [
@@ -169,6 +236,8 @@ class ProjectSettingsController extends ManagesProjectController
             ->map(fn (WorkspaceMembership $m) => [
                 'id' => $m->user_id, 'name' => $m->user?->displayName(),
                 'email' => $m->user?->email, 'initial' => $m->user?->initial(),
+                // The subscriber chips show faces, so the photo has to travel with them.
+                'avatar_url' => $m->user?->avatar_url,
             ])->all();
     }
 }

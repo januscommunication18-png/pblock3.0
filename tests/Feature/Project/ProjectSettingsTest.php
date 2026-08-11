@@ -60,10 +60,10 @@ class ProjectSettingsTest extends ProjectTestCase
         $project = $this->makeProject($owner, $workspace);
 
         $this->actingAs($owner)->postJson(route('projects.settings.features.toggle', $project), [
-            'feature' => 'intake', 'enabled' => true,
-        ])->assertOk()->assertJsonPath('features.intake', true);
+            'feature' => 'cycles', 'enabled' => true,
+        ])->assertOk()->assertJsonPath('features.cycles', true);
 
-        $this->assertTrue($workspace->run(fn () => Project::find($project->id)->featureFlags()['intake']));
+        $this->assertTrue($workspace->run(fn () => Project::find($project->id)->featureFlags()['cycles']));
     }
 
     public function test_states_and_labels_crud(): void
@@ -110,7 +110,7 @@ class ProjectSettingsTest extends ProjectTestCase
         $project = $this->makeProject($owner, $workspace, ['visibility' => 'public']);
         $member = $this->member($workspace, 'member', 'plain@example.com');
 
-        $this->actingAs($member)->postJson(route('projects.settings.features.toggle', $project), ['feature' => 'intake', 'enabled' => true])
+        $this->actingAs($member)->postJson(route('projects.settings.features.toggle', $project), ['feature' => 'cycles', 'enabled' => true])
             ->assertForbidden();
     }
 }

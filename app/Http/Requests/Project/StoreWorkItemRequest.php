@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Project;
 
 use App\Models\WorkspaceMembership;
+use App\Rules\CycleAssignable;
 use App\Services\RichTextSanitizer;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -32,6 +33,7 @@ class StoreWorkItemRequest extends FormRequest
             // The modal posts "" for every untouched picker.
             'state_id' => $this->filled('state_id') ? $this->input('state_id') : null,
             'parent_id' => $this->filled('parent_id') ? $this->input('parent_id') : null,
+            'cycle_id' => $this->filled('cycle_id') ? $this->input('cycle_id') : null,
             'start_date' => $this->filled('start_date') ? $this->input('start_date') : null,
             'due_date' => $this->filled('due_date') ? $this->input('due_date') : null,
             'priority' => $this->filled('priority') ? $this->input('priority') : 'none',
@@ -65,6 +67,13 @@ class StoreWorkItemRequest extends FormRequest
                 'nullable', 'integer',
                 Rule::exists('work_items', 'id')->where('project_id', $projectId),
             ],
+            // Cycles §8.3.6: project-scoped, so a crafted payload cannot plan this item into
+            // another project's sprint. The rest of the cycle rules live in CycleAssignable.
+            'cycle_id' => [
+                'nullable', 'integer',
+                Rule::exists('cycles', 'id')->where('project_id', $projectId),
+                new CycleAssignable($project),
+            ],
             // One assignee per work item (§4.3, revised) — see UpdateWorkItemRequest.
             'assignee_ids' => ['array', 'max:1'],
             'assignee_ids.*' => [
@@ -90,6 +99,7 @@ class StoreWorkItemRequest extends FormRequest
             'label_ids.*.exists' => 'One of those labels is not configured for this project.',
             'assignee_ids.*.exists' => 'Assignees must be active members of this workspace.',
             'parent_id.exists' => 'The parent work item must belong to this project.',
+            'cycle_id.exists' => 'That cycle does not belong to this project.',
         ];
     }
 

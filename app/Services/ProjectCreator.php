@@ -37,7 +37,10 @@ class ProjectCreator
                 /** @var Project $project */
                 $project = Project::create([
                     'name' => $data['name'],
-                    'identifier' => $data['identifier'],
+                    // Identifiers are lower case everywhere. Normalising HERE — not only in
+                    // the form request — means every creation path produces the canonical
+                    // form, including seeds, tests and any future importer.
+                    'identifier' => strtolower(trim((string) $data['identifier'])),
                     'description' => $data['description'] ?? null,
                     'visibility' => $data['visibility'],
                     'lead_user_id' => $data['lead_user_id'] ?? null,

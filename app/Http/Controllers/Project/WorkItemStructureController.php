@@ -5,9 +5,11 @@ namespace App\Http\Controllers\Project;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Project\StoreWorkItemLinkRequest;
 use App\Models\Project;
+use App\Models\ProjectItemLabel;
 use App\Models\WorkItem;
 use App\Models\WorkItemLink;
 use App\Models\WorkItemRelation;
+use App\Policies\WorkItemPolicy;
 use App\Services\WorkItemLinkManager;
 use App\Services\WorkItemRelationManager;
 use Illuminate\Http\JsonResponse;
@@ -54,9 +56,14 @@ class WorkItemStructureController extends Controller
         $term = trim((string) $request->query('q', ''));
         $workspaceWide = $request->boolean('all_projects');
 
+        $user = Auth::user();
+        // §10: the picker cannot become a way to read titles the setting hides.
+        $assignedOnly = ! app(WorkItemPolicy::class)->canSeeEveryItem($user, $project);
+
         $items = WorkItem::query()
             ->active()
             ->when(! $workspaceWide, fn ($q) => $q->forProject($project->id))
+            ->when($assignedOnly, fn ($q) => $q->whereHas('assignees', fn ($a) => $a->whereKey($user->id)))
             ->whereKeyNot($workItem->id) // never offer the item itself (§25/§36)
             ->when($term !== '', fn ($q) => $q->where(function ($w) use ($term) {
                 $w->where('title', 'like', "%{$term}%")->orWhere('identifier', 'like', "%{$term}%");
@@ -131,6 +138,64 @@ class WorkItemStructureController extends Controller
         $this->relations->removeRelation($relation, Auth::user());
 
         return $this->payload($workItem, 'Relation removed.');
+    }
+
+    /**
+     * POST /projects/{project}/work-items/{workItem}/labels — create a label without leaving
+     * the picker, and put it straight on this work item.
+     *
+     * Gated on the WORK ITEM create ability rather than project-manage: labelling is part of
+     * working on an item, and a contributor who has to ask an admin before they can tag
+     * something will simply not tag it. Editing and deleting labels stay in Project Settings,
+     * where they affect every item that carries them.
+     */
+    public function storeLabel(Request $request, Project $project, WorkItem $workItem): JsonResponse
+    {
+        $this->guard($project, $workItem, 'update');
+
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:60'],
+            'color' => ['nullable', 'string', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+        ]);
+
+        $name = trim($data['name']);
+
+        // Re-picking an existing name applies it rather than creating a duplicate: the
+        // picker's "create" row appears while typing, and a near-miss on an existing label
+        // should not fork the project's vocabulary.
+        $label = ProjectItemLabel::query()
+            ->where('project_id', $project->id)
+            ->whereRaw('LOWER(name) = ?', [mb_strtolower($name)])
+            ->first();
+
+        if (! $label) {
+            $label = ProjectItemLabel::create([
+                'project_id' => $project->id,
+                'name' => $name,
+                // `nullable` means the key may be absent entirely, not merely null.
+                'color' => ($data['color'] ?? null) ?: $this->nextLabelColor($project),
+                'position' => (int) ProjectItemLabel::query()->where('project_id', $project->id)->max('position') + 1,
+            ]);
+        }
+
+        // Creating the label is all this does. Putting it ON the item goes through the same
+        // PATCH every other label change uses, so there is one path that applies labels and
+        // one that refreshes the row.
+        return response()->json([
+            'ok' => true,
+            'label' => ['id' => $label->id, 'name' => $label->name, 'color' => $label->color],
+            'labels' => ProjectItemLabel::query()->where('project_id', $project->id)->orderBy('position')
+                ->get()->map(fn (ProjectItemLabel $l) => ['id' => $l->id, 'name' => $l->name, 'color' => $l->color])->all(),
+        ]);
+    }
+
+    /** A colour from the shared palette, stepped by how many labels the project already has. */
+    private function nextLabelColor(Project $project): string
+    {
+        $palette = config('projects.label_colors', ['#6366F1', '#EC4899', '#F59E0B', '#10B981', '#3B82F6', '#EF4444', '#8B5CF6', '#14B8A6']);
+        $count = ProjectItemLabel::query()->where('project_id', $project->id)->count();
+
+        return $palette[$count % count($palette)];
     }
 
     /** POST /projects/{project}/work-items/{workItem}/links (§38). */

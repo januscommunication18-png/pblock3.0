@@ -27,10 +27,58 @@ class WorkItemPolicy
         return $user->can('view', $project);
     }
 
-    /** Can the user open this specific work item? */
+    /**
+     * Can the user open this specific work item?
+     *
+     * Reach first, then §10's Work Item View: a project set to "assigned work items only"
+     * shows an ordinary member just the items they are an assignee of. Enforced here rather
+     * than by hiding rows, so a hand-typed URL or a direct API call is refused too (§10
+     * Security Requirement) — 404 at the controller, which never confirms the item exists.
+     */
     public function view(User $user, WorkItem $item): bool
     {
-        return $user->can('view', $item->project);
+        if (! $user->can('view', $item->project)) {
+            return false;
+        }
+
+        return $this->canSeeEveryItem($user, $item->project) || $this->isAssignee($user, $item);
+    }
+
+    /**
+     * Who keeps sight of every work item regardless of the setting (§10): workspace
+     * owners/admins, this project's admins, and the project lead — the people who have to
+     * administer the project rather than only work in it.
+     */
+    public function canSeeEveryItem(User $user, Project $project): bool
+    {
+        if (! $project->restrictsToAssigned()) {
+            return true;
+        }
+
+        if ((int) $project->lead_user_id === (int) $user->id) {
+            return true;
+        }
+
+        $workspaceRole = WorkspaceMembership::query()
+            ->where('workspace_id', $project->tenant_id)
+            ->where('user_id', $user->id)
+            ->where('status', WorkspaceMembership::STATUS_ACTIVE)
+            ->value('role');
+
+        if (in_array($workspaceRole, [WorkspaceMembership::ROLE_OWNER, 'admin'], true)) {
+            return true;
+        }
+
+        return ProjectMember::query()
+            ->where('project_id', $project->id)
+            ->where('user_id', $user->id)
+            ->where('role', 'admin')
+            ->exists();
+    }
+
+    private function isAssignee(User $user, WorkItem $item): bool
+    {
+        return $item->assignees()->whereKey($user->id)->exists();
     }
 
     /**

@@ -38,7 +38,8 @@ class CreateProjectTest extends ProjectTestCase
         $project = $workspace->run(fn () => Project::first());
         $this->assertNotNull($project);
         $this->assertSame('Website Redesign 2026', $project->name);
-        $this->assertSame('WEB', $project->identifier);
+        // Stored lower case whatever the casing sent: normalisation lives in ProjectCreator.
+        $this->assertSame('web', $project->identifier);
         $this->assertSame('private', $project->visibility);
         $this->assertSame($owner->id, $project->created_by);
         $this->assertSame($workspace->id, $project->tenant_id);
@@ -67,7 +68,7 @@ class CreateProjectTest extends ProjectTestCase
         ])->assertCreated();
 
         // Uppercase alphanumerics, capped at the configured length (PRJ-023).
-        $this->assertSame('WEBSITERED', $workspace->run(fn () => Project::first()->identifier));
+        $this->assertSame('websitered', $workspace->run(fn () => Project::first()->identifier));
     }
 
     public function test_duplicate_identifier_in_same_workspace_is_rejected(): void
@@ -79,7 +80,7 @@ class CreateProjectTest extends ProjectTestCase
             'name' => 'Another', 'identifier' => 'WEB', 'visibility' => 'public',
         ])->assertStatus(422)->assertJsonValidationErrors('identifier');
 
-        $this->assertSame(1, $workspace->run(fn () => Project::where('identifier', 'WEB')->count()));
+        $this->assertSame(1, $workspace->run(fn () => Project::where('identifier', 'web')->count()));
     }
 
     public function test_same_identifier_is_allowed_in_a_different_workspace(): void
@@ -93,7 +94,7 @@ class CreateProjectTest extends ProjectTestCase
             'name' => 'Web B', 'identifier' => 'WEB', 'visibility' => 'public',
         ])->assertCreated();
 
-        $this->assertTrue($wsB->run(fn () => Project::where('identifier', 'WEB')->exists()));
+        $this->assertTrue($wsB->run(fn () => Project::where('identifier', 'web')->exists()));
     }
 
     public function test_lead_must_be_a_workspace_member(): void

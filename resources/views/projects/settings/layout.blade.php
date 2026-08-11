@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="csrf-token" content="{{ csrf_token() }}" />
-  <title>{{ $project->name }} · {{ ucfirst($section) }} — Project settings</title>
+  <title>{{ $project->name }} · {{ $sectionLabel }} — Project settings</title>
 
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="{{ pb_asset('assets/js/tailwind.config.js') }}"></script>
@@ -64,7 +64,7 @@
 
     <main class="flex-1 min-w-0 overflow-y-auto">
       <div id="settings-root" data-section="{{ $section }}" data-bootstrap='@json($bootstrap)'>
-        <div class="max-w-[820px] mx-auto px-5 sm:px-8 py-10 text-sub text-[13px]">Loading {{ ucfirst($section) }}…</div>
+        <div class="max-w-[820px] mx-auto px-5 sm:px-8 py-10 text-sub text-[13px]">Loading {{ $sectionLabel }}…</div>
       </div>
     </main>
   </div>

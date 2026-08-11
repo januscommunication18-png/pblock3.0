@@ -3,6 +3,7 @@
 namespace Tests\Feature\Project;
 
 use App\Mail\WorkItemBlockedMail;
+use App\Models\ProjectItemLabel;
 use App\Models\ProjectItemState;
 use App\Models\ProjectMember;
 use App\Models\WorkItem;
@@ -341,6 +342,51 @@ class WorkItemStructureTest extends ProjectTestCase
         $this->assertSame([$copy['id']], array_column(
             $this->actingAs($owner)->getJson($this->structureUrl($project, $original))->json('structure.relations.duplicated_by'), 'id'
         ));
+    }
+
+    public function test_a_label_can_be_created_from_the_work_item_picker(): void
+    {
+        [$owner, $ws] = $this->owner();
+        $project = $this->makeProject($owner, $ws, ['identifier' => 'TESTI']);
+        $this->actingAs($owner)->get(route('projects.work-items', $project));
+        $item = $this->makeItem($owner, $project, 'Needs a label');
+
+        $url = route('projects.work-items.labels.store', ['project' => $project->id, 'workItem' => $item['id']]);
+
+        $created = $this->actingAs($owner)->postJson($url, ['name' => 'Needs QA'])->assertOk();
+        $label = $created->json('label');
+        $this->assertSame('Needs QA', $label['name']);
+        $this->assertMatchesRegularExpression('/^#[0-9A-F]{6}$/i', $label['color'], 'A colour is chosen when none is given.');
+        $this->assertSame(['Needs QA'], array_column($created->json('labels'), 'name'));
+
+        // The same name again applies the existing label rather than forking the vocabulary.
+        $again = $this->actingAs($owner)->postJson($url, ['name' => 'needs qa'])->assertOk();
+        $this->assertSame($label['id'], $again->json('label.id'));
+        $this->assertCount(1, $again->json('labels'));
+
+        // It belongs to this project only.
+        $this->assertSame(1, $ws->run(fn () => ProjectItemLabel::where('project_id', $project->id)->count()));
+    }
+
+    public function test_creating_a_label_from_the_picker_needs_contributor_rights(): void
+    {
+        [$owner, $ws] = $this->owner();
+        $project = $this->makeProject($owner, $ws, ['identifier' => 'TESTI']);
+        $this->actingAs($owner)->get(route('projects.work-items', $project));
+        $item = $this->makeItem($owner, $project, 'Guarded');
+
+        // A read-only member may open the item but not extend the project's vocabulary.
+        $viewer = $this->member($ws, 'viewer', 'viewer@example.com');
+        $ws->run(fn () => ProjectMember::create([
+            'project_id' => $project->id, 'user_id' => $viewer->id, 'role' => 'guest',
+        ]));
+
+        $this->actingAs($viewer)->postJson(
+            route('projects.work-items.labels.store', ['project' => $project->id, 'workItem' => $item['id']]),
+            ['name' => 'Sneaky'],
+        )->assertStatus(403);
+
+        $this->assertSame(0, $ws->run(fn () => ProjectItemLabel::where('project_id', $project->id)->count()));
     }
 
     public function test_links_are_added_edited_removed_and_javascript_urls_are_rejected(): void

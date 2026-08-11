@@ -27,6 +27,12 @@
 
   <script src="{{ pb_asset('assets/js/vendor/vue.global.prod.js') }}"></script>
   <script defer src="{{ pb_asset('assets/js/settings/app.js') }}"></script>
+  {{-- Shared with the Cycles screen, and loaded before the screen script that uses them:
+       the row vocabulary (state/priority icons, chips, avatars) and the date picker
+       component the Start/Due chips mount. --}}
+  <script defer src="{{ pb_asset('assets/js/projects/work-item-ui.js') }}"></script>
+  <script defer src="{{ pb_asset('assets/js/projects/date-picker.js') }}"></script>
+  <script defer src="{{ pb_asset('assets/js/projects/work-item-list.js') }}"></script>
   <script defer src="{{ pb_asset('assets/js/projects/work-items.js') }}"></script>
 </head>
 <body class="bg-white text-ink h-screen flex flex-col overflow-hidden text-[13px]">

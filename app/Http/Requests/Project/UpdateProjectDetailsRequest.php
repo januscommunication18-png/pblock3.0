@@ -39,7 +39,7 @@ class UpdateProjectDetailsRequest extends FormRequest
     {
         $workspaceId = $this->user()->current_workspace_id;
 
-        // NOTE: `identifier` is deliberately absent. The project ID is the @mention handle
+        // NOTE: `identifier` is deliberately absent. The identifier is the @mention handle
         // work items are referenced by, so it is immutable once created — the modal renders
         // it read-only and the controller never writes it, whatever the client posts.
         return [

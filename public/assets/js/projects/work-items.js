@@ -5,61 +5,9 @@
  * This slice covers the list and creation. Row property editing and the detail drawer land in
  * the next slice, so every chip below is display-only — no dead controls. */
 
-// ---- State icons, keyed by the state's stable `group` (names stay user-editable) ----
-function wiDot(color, dashed) {
-  return '<svg width="15" height="15" viewBox="0 0 24 24" fill="none">' +
-    (dashed
-      ? '<circle cx="12" cy="12" r="8" stroke="' + color + '" stroke-width="2" stroke-dasharray="3 3"/>'
-      : '<circle cx="12" cy="12" r="8" stroke="' + color + '" stroke-width="2"/>') + '</svg>';
-}
-function wiFilled(color, glyph) {
-  return '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" fill="' + color + '"/>' + glyph + '</svg>';
-}
-var WI_STATE_ICON = {
-  backlog: function (c) { return wiDot(c || '#9ca3af', true); },
-  unstarted: function (c) { return wiDot(c || '#6b7280', false); },
-  started: function (c) {
-    return '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" stroke="' + (c || '#f59e0b') + '" stroke-width="2"/><path d="M12 4a8 8 0 010 16z" fill="' + (c || '#f59e0b') + '"/></svg>';
-  },
-  active: function (c) { return wiDot(c || '#14b8a6', false); },
-  completed: function (c) { return wiFilled(c || '#22c55e', '<path d="M8 12l3 3 5-6" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'); },
-  cancelled: function (c) { return wiFilled(c || '#ef4444', '<path d="M9 9l6 6M15 9l-6 6" stroke="#fff" stroke-width="2" stroke-linecap="round"/>'); }
-};
-function wiStateIcon(state) {
-  if (!state) return wiDot('#cbd5e1', true);
-  var fn = WI_STATE_ICON[state.group] || WI_STATE_ICON.backlog;
-  return fn(state.color);
-}
-
-// ---- Priority icons (fixed vocabulary, spec §4.3) ----
-function wiBars(c) {
-  return '<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="4" y="13" width="3.5" height="7" rx="1" fill="' + c + '"/><rect x="10.25" y="9" width="3.5" height="11" rx="1" fill="' + c + '"/><rect x="16.5" y="5" width="3.5" height="15" rx="1" fill="' + c + '"/></svg>';
-}
-var WI_PRI = {
-  urgent: { label: 'Urgent', icon: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="16" height="16" rx="3" fill="#ef4444"/><path d="M12 7v6M12 16v.5" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>', cls: 'text-red-600' },
-  high: { label: 'High', icon: wiBars('#f97316'), cls: 'text-ink' },
-  medium: { label: 'Medium', icon: wiBars('#f59e0b'), cls: 'text-ink' },
-  low: { label: 'Low', icon: wiBars('#3b82f6'), cls: 'text-ink' },
-  none: { label: 'None', icon: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.5" stroke="#9ca3af" stroke-width="1.6"/><path d="M6 6l12 12" stroke="#9ca3af" stroke-width="1.6" stroke-linecap="round"/></svg>', cls: 'text-sub' }
-};
-var WI_CAL = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" class="text-faint"><rect x="4" y="5" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
-var WI_NO_STATE = 'none';
-
-// Escape user content before it reaches a Tabulator formatter (formatters return raw HTML).
-function wiEsc(s) {
-  return String(s == null ? '' : s)
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-}
-// "Blocked" marker for a work item waiting on an unresolved dependency (§27-§29). Red
-// rather than a neutral chip: it is the one row state that needs someone to act.
-function wiBlockedChip(count) {
-  var label = count > 1 ? 'Blocked · ' + count : 'Blocked';
-  return '<span class="inline-flex items-center gap-1 h-5 px-1.5 rounded border border-danger/30 bg-danger/5 text-[11px] font-semibold text-danger shrink-0" ' +
-    'title="Waiting on ' + count + ' unresolved ' + (count > 1 ? 'work items' : 'work item') + '">' +
-    '<svg width="11" height="11" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="2"/><path d="M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>' +
-    label + '</span>';
-}
+// State icons, priority icons, chips, avatars and wiEsc live in
+// assets/js/projects/work-item-ui.js — shared with the Cycles screen so a cycle's work item
+// list reads exactly like this one.
 
 // ---- Event icons for the activity/history feeds (Activity & Audit spec §6.4) ------------
 // A feed row's icon says what KIND of change it was before the sentence is read, which is
@@ -84,7 +32,8 @@ var WI_EVENT_ICON = {
   text: '<path d="M4 20h4l10-10-4-4L4 16v4z"/>',
   update: '<path d="M5 21V5a1 1 0 011-1h9l-1.5 3L15 10H6"/><path d="M5 21h4"/>',
   archive: '<rect x="3" y="4" width="18" height="5" rx="1.5"/><path d="M5 9v9a1 1 0 001 1h12a1 1 0 001-1V9M10 13h4"/>',
-  created: '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/>'
+  created: '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/>',
+  cycle: '<path d="M21 12a9 9 0 11-3.6-7.2"/><path d="M21 4v4h-4"/>'
 };
 /** Which icon a feed row gets. */
 function wiEventKind(entry) {
@@ -102,255 +51,13 @@ function wiEventKind(entry) {
   if (field.indexOf('link') === 0) return 'link';
   if (field.indexOf('relation') === 0 || field.indexOf('subtask') === 0) return 'relation';
   if (field === 'parent') return 'parent';
+  if (field === 'cycle') return 'cycle';
   return 'text';
 }
 
-/**
- * A person's avatar: their uploaded photo when they have one, their initial when they do not.
- * The initial used to be the only option, which is why assigning someone with a profile
- * picture never showed it.
- */
-function wiAvatar(person, px) {
-  var size = px || 24;
-  var box = 'h-[' + size + 'px] w-[' + size + 'px] rounded-full shrink-0';
-  var title = wiEsc(person.name || '');
-
-  if (person.avatar_url) {
-    return '<img src="' + wiEsc(person.avatar_url) + '" alt="' + title + '" title="' + title + '" ' +
-      'class="' + box + ' object-cover border border-line" />';
-  }
-
-  return '<span class="' + box + ' bg-brand text-white grid place-items-center text-[10px] font-bold" title="' + title + '">' +
-    wiEsc(person.initial || '?') + '</span>';
-}
-
-// Display chip — the POC's chip style: 24px tall, white, 12px label.
-function wiChip(inner, extra) {
-  return '<span class="inline-flex items-center gap-1.5 h-6 px-2 rounded border border-line bg-white text-[12px] ' + (extra || 'text-ink') + ' shrink-0">' + inner + '</span>';
-}
-
-// ---------------------------------------------------------------------------------------
-// Date picker — a direct port of the POC's `datePicker()` (html/work-items.html): an
-// anchored popover that opens on quick options (Today / Tomorrow / Next 3 / Next 5 days,
-// divider, Custom Date) and switches to a month grid with month + year dropdowns.
-//
-// A local component so the two date chips share one implementation. `min`/`max` are ours,
-// not the POC's: the API rejects a due date before the start date, so out-of-range days are
-// struck through here rather than surfacing as a 422.
-// ---------------------------------------------------------------------------------------
-var WI_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-var WI_CAL_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0"><rect x="4" y="5" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
-
-function wiParseISO(raw) {
-  if (!raw) return null;
-  var p = String(raw).slice(0, 10).split('-');
-  if (p.length !== 3) return null;
-  var d = new Date(+p[0], (+p[1] || 1) - 1, +p[2] || 1);
-  d.setHours(0, 0, 0, 0);
-  return isNaN(d.getTime()) ? null : d;
-}
-function wiISO(d) {
-  var pad = function (n) { return (n < 10 ? '0' : '') + n; };
-  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
-}
-// The POC labels dates MM/DD/YYYY, in both the chips and the grid rows.
-function wiFmtDate(raw) {
-  var d = wiParseISO(raw);
-  if (!d) return '';
-  var pad = function (n) { return (n < 10 ? '0' : '') + n; };
-  return pad(d.getMonth() + 1) + '/' + pad(d.getDate()) + '/' + d.getFullYear();
-}
-
-var WI_YEAR_MIN = 2015, WI_YEAR_MAX = 2035;
-
-/**
- * Does month `m` of year `y` contain at least one selectable day?
- *
- * Bounds are exclusive, so a month qualifies only if it reaches past them: its LAST day must
- * be after `after`, and its FIRST day before `before`. That correctly drops e.g. September
- * when the start date is Sep 30 — the only dates after it are in October.
- */
-function wiMonthAllowed(after, before, y, m) {
-  if (after && new Date(y, m + 1, 0) <= after) return false;
-  if (before && new Date(y, m, 1) >= before) return false;
-  return true;
-}
-function wiYearAllowed(after, before, y) {
-  if (after && new Date(y, 11, 31) <= after) return false;
-  if (before && new Date(y, 0, 1) >= before) return false;
-  return true;
-}
-
-var WiCalendar = {
-  /**
-   * `after` / `before` are EXCLUSIVE bounds: a due date must fall strictly after the start
-   * date, and a start date strictly before the due date. The bounding day itself is disabled
-   * along with everything beyond it, so the pair can never be equal or inverted — the same
-   * rule the API enforces with `after:start_date`.
-   *
-   * The bounds also drive navigation, not just the day grid: months and years with nothing
-   * selectable in them are removed from the two dropdowns and the arrows stop at the edge,
-   * so a due-date picker only ever offers dates forward of the start date.
-   */
-  props: { value: String, after: String, before: String },
-  emits: ['pick', 'clear'],
-  data: function () {
-    var after = wiParseISO(this.after), before = wiParseISO(this.before);
-    var seed = wiParseISO(this.value);
-    // Open on the current value; failing that (or if it sits outside the bounds), on the
-    // first day that IS selectable, so the grid never opens on a fully disabled month.
-    if (!seed || !wiMonthAllowed(after, before, seed.getFullYear(), seed.getMonth())) {
-      if (after) seed = new Date(after.getFullYear(), after.getMonth(), after.getDate() + 1);
-      else if (before) seed = new Date(before.getFullYear(), before.getMonth(), before.getDate() - 1);
-      else seed = new Date();
-    }
-    return { mode: 'quick', vy: seed.getFullYear(), vm: seed.getMonth(), monthOpen: false, yearOpen: false };
-  },
-  computed: {
-    selected: function () { return wiParseISO(this.value); },
-    bounds: function () { return { after: wiParseISO(this.after), before: wiParseISO(this.before) }; },
-    // Only months/years that still hold a selectable day are offered.
-    months: function () {
-      var b = this.bounds, y = this.vy;
-      return WI_MONTHS
-        .map(function (name, i) { return { i: i, name: name }; })
-        .filter(function (mo) { return wiMonthAllowed(b.after, b.before, y, mo.i); });
-    },
-    years: function () {
-      var b = this.bounds, out = [];
-      for (var y = WI_YEAR_MIN; y <= WI_YEAR_MAX; y++) {
-        if (wiYearAllowed(b.after, b.before, y)) out.push(y);
-      }
-      return out;
-    },
-    canPrev: function () { return this.stepAllowed(-1); },
-    canNext: function () { return this.stepAllowed(1); },
-    monthLabel: function () { return WI_MONTHS[this.vm]; },
-    calIcon: function () { return WI_CAL_ICON; },
-    cells: function () {
-      var y = this.vy, m = this.vm, sel = this.selected, b = this.bounds;
-      var today = new Date(); today.setHours(0, 0, 0, 0);
-      var start = new Date(y, m, 1); start.setDate(1 - start.getDay());
-      var same = function (a, c) { return a && c && a.getTime() === c.getTime(); };
-      var out = [];
-      for (var i = 0; i < 42; i++) {
-        var d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
-        out.push({
-          key: d.getFullYear() + '-' + d.getMonth() + '-' + d.getDate(),
-          day: d.getDate(), iso: wiISO(d), inMonth: d.getMonth() === m,
-          isSel: same(d, sel), isToday: same(d, today),
-          disabled: this.outOfRange(d)
-        });
-      }
-      return out;
-    }
-  },
-  methods: {
-    addDays: function (n) { var d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + n); return d; },
-    /** Exclusive on both sides — the bounding day itself is not selectable. */
-    outOfRange: function (d) {
-      var b = this.bounds;
-      return !!((b.after && d <= b.after) || (b.before && d >= b.before));
-    },
-    quickDisabled: function (n) { return this.outOfRange(this.addDays(n)); },
-    quickPick: function (n) { if (!this.quickDisabled(n)) this.$emit('pick', wiISO(this.addDays(n))); },
-    custom: function () {
-      if (this.selected) { this.vy = this.selected.getFullYear(); this.vm = this.selected.getMonth(); }
-      this.monthOpen = false; this.yearOpen = false; this.mode = 'cal';
-    },
-    back: function () { this.mode = 'quick'; this.monthOpen = false; this.yearOpen = false; },
-    /** The month `delta` steps away, or null at a year boundary of the allowed range. */
-    step: function (delta) {
-      var m = this.vm + delta, y = this.vy;
-      if (m < 0) { m = 11; y--; } else if (m > 11) { m = 0; y++; }
-      if (y < WI_YEAR_MIN || y > WI_YEAR_MAX) return null;
-      var b = this.bounds;
-      return wiMonthAllowed(b.after, b.before, y, m) ? { y: y, m: m } : null;
-    },
-    stepAllowed: function (delta) { return this.step(delta) !== null; },
-    nav: function (delta) {
-      var next = this.step(delta);
-      if (!next) return;
-      this.vy = next.y; this.vm = next.m;
-    },
-    setMonth: function (i) { this.vm = i; this.monthOpen = false; },
-    setYear: function (y) {
-      this.vy = y;
-      this.yearOpen = false;
-      // The visible month may not exist in the newly-picked year (e.g. jumping back to the
-      // start date's year, where earlier months are out of range) — snap to the nearest one.
-      var allowed = this.months;
-      if (allowed.length && !allowed.some(function (mo) { return mo.i === this.vm; }, this)) {
-        this.vm = this.vm < allowed[0].i ? allowed[0].i : allowed[allowed.length - 1].i;
-      }
-    },
-    pick: function (c) { if (!c.disabled) this.$emit('pick', c.iso); },
-    quickClass: function (n) {
-      return 'w-full text-left flex items-center gap-2.5 px-2 h-9 rounded-md text-[13px] text-ink '
-        + (this.quickDisabled(n) ? 'opacity-40 cursor-not-allowed' : 'hover:bg-hover');
-    },
-    cellClass: function (c) {
-      var base = 'h-8 w-8 grid place-items-center rounded-md text-[13px] ';
-      if (c.disabled) return base + 'text-faint/50 line-through cursor-not-allowed';
-      var cls = base + 'cursor-pointer ';
-      if (c.isSel) return cls + 'bg-brand text-white font-medium';
-      if (!c.inMonth) return cls + 'text-faint hover:bg-hover';
-      return cls + 'text-ink hover:bg-hover' + (c.isToday ? ' ring-1 ring-brand' : '');
-    }
-  },
-  template:
-    '<div class="absolute left-0 bottom-full mb-1 w-[300px] rounded-lg bg-white p-2 shadow-lg outline outline-1 outline-black/5 z-50" @click.stop>' +
-
-    // -- Quick options --
-    '<template v-if="mode===\'quick\'">' +
-    '<button type="button" :disabled="quickDisabled(0)" @click="quickPick(0)" :class="quickClass(0)"><span v-html="calIcon"></span>Today</button>' +
-    '<button type="button" :disabled="quickDisabled(1)" @click="quickPick(1)" :class="quickClass(1)"><span v-html="calIcon"></span>Tomorrow</button>' +
-    '<button type="button" :disabled="quickDisabled(3)" @click="quickPick(3)" :class="quickClass(3)"><span v-html="calIcon"></span>Next 3 days</button>' +
-    '<button type="button" :disabled="quickDisabled(5)" @click="quickPick(5)" :class="quickClass(5)"><span v-html="calIcon"></span>Next 5 days</button>' +
-    '<div class="my-1 border-t border-line"></div>' +
-    '<button type="button" @click="custom" class="w-full text-left flex items-center gap-2.5 px-2 h-9 rounded-md text-[13px] text-ink hover:bg-hover"><span v-html="calIcon"></span>Custom Date</button>' +
-    '<template v-if="selected">' +
-    '<div class="my-1 border-t border-line"></div>' +
-    '<button type="button" @click="$emit(\'clear\')" class="w-full text-left flex items-center gap-2.5 px-2 h-9 rounded-md text-[13px] text-danger hover:bg-hover">' +
-    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="shrink-0"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Clear</button>' +
-    '</template>' +
-    '</template>' +
-
-    // -- Custom Date grid --
-    '<template v-else>' +
-    '<button type="button" @click="back" class="mb-2 inline-flex items-center gap-1 text-[12px] text-sub hover:text-ink"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Back</button>' +
-    '<div class="flex items-center gap-1.5 mb-2">' +
-    '<button type="button" :disabled="!canPrev" @click="nav(-1)" :class="[\'h-8 w-8 grid place-items-center rounded-md text-sub shrink-0\', canPrev ? \'hover:bg-hover\' : \'opacity-30 cursor-not-allowed\']"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
-    // Month dropdown
-    '<div class="relative flex-1 min-w-0">' +
-    '<button type="button" @click="monthOpen=!monthOpen; yearOpen=false" class="w-full flex items-center justify-between h-8 px-2.5 rounded-md text-[13px] text-ink outline outline-1 -outline-offset-1 outline-stroke hover:bg-hover"><span class="truncate">{{ monthLabel }}</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0 ml-1"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
-    '<ul v-if="monthOpen" class="absolute z-50 mt-1 w-full max-h-52 overflow-auto rounded-md bg-white border border-line shadow-lg py-1">' +
-    '<li v-for="mo in months" :key="mo.i" @click="setMonth(mo.i)" :class="[\'group relative flex items-center cursor-pointer select-none py-1.5 pl-3 pr-8 text-[13px] hover:bg-brand hover:text-white\', mo.i===vm ? \'text-brand font-medium\' : \'text-ink\']">' +
-    '<span class="truncate">{{ mo.name }}</span>' +
-    '<span v-if="mo.i===vm" class="absolute right-2 text-brand group-hover:text-white"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5 9-11" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>' +
-    '</li></ul></div>' +
-    // Year dropdown
-    '<div class="relative w-[92px] shrink-0">' +
-    '<button type="button" @click="yearOpen=!yearOpen; monthOpen=false" class="w-full flex items-center justify-between h-8 px-2.5 rounded-md text-[13px] text-ink outline outline-1 -outline-offset-1 outline-stroke hover:bg-hover"><span class="shrink-0 whitespace-nowrap">{{ vy }}</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0 ml-1"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
-    '<ul v-if="yearOpen" class="absolute z-50 mt-1 w-full max-h-52 overflow-auto rounded-md bg-white border border-line shadow-lg py-1">' +
-    '<li v-for="y in years" :key="y" @click="setYear(y)" :class="[\'group relative flex items-center cursor-pointer select-none py-1.5 pl-3 pr-8 text-[13px] hover:bg-brand hover:text-white\', y===vy ? \'text-brand font-medium\' : \'text-ink\']">' +
-    '<span class="truncate">{{ y }}</span>' +
-    '<span v-if="y===vy" class="absolute right-2 text-brand group-hover:text-white"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5 9-11" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>' +
-    '</li></ul></div>' +
-    '<button type="button" :disabled="!canNext" @click="nav(1)" :class="[\'h-8 w-8 grid place-items-center rounded-md text-sub shrink-0\', canNext ? \'hover:bg-hover\' : \'opacity-30 cursor-not-allowed\']"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
-    '</div>' +
-    // Day-of-week header
-    '<div class="grid grid-cols-7 gap-0.5 mb-1">' +
-    '<div v-for="d in [\'Su\',\'Mo\',\'Tu\',\'We\',\'Th\',\'Fr\',\'Sa\']" :key="d" class="h-7 grid place-items-center text-[11px] font-medium text-faint">{{ d }}</div>' +
-    '</div>' +
-    // Day grid
-    '<div class="grid grid-cols-7 gap-0.5">' +
-    '<button v-for="c in cells" :key="c.key" type="button" :disabled="c.disabled" @click="pick(c)" :class="cellClass(c)">{{ c.day }}</button>' +
-    '</div>' +
-    '</template>' +
-
-    '</div>'
-};
+// The date picker lives in assets/js/projects/date-picker.js — shared with the Cycles
+// screen, and registered below as <wi-calendar>. Its helpers (wiParseISO / wiISO /
+// wiFmtDate / WI_MONTHS …) come from that file too and are used throughout this one.
 
 
 // ---------------------------------------------------------------------------------------
@@ -401,10 +108,10 @@ var WiAvatar = {
     name: function () { return this.person ? (this.person.name || '') : ''; }
   },
   template:
-    '<img v-if="person && person.avatar_url" :src="person.avatar_url" :alt="name" :title="name" ' +
+    '<img v-if="person && person.avatar_url" :src="person.avatar_url" :alt="name" :data-tip="name" ' +
     'class="rounded-full object-cover border border-line shrink-0" :style="box" />' +
     '<span v-else class="rounded-full bg-brand text-white grid place-items-center font-bold shrink-0" ' +
-    ':style="box" :title="name">{{ person ? (person.initial || \'?\') : \'?\' }}</span>'
+    ':style="box" :data-tip="name" :aria-label="name">{{ person ? (person.initial || \'?\') : \'?\' }}</span>'
 };
 
 var WiEditor = {
@@ -430,29 +137,89 @@ var WiEditor = {
     this.quill = new window.Quill(this.$refs.area, {
       theme: 'snow',
       placeholder: this.placeholder,
-      readOnly: this.disabled,
+      // Explicit: a Quill in readOnly mode is not editable and cannot be pasted into, and
+      // `disabled` is optional at every call site.
+      readOnly: this.disabled === true,
       modules: {
         toolbar: {
           container: WI_EDITOR_TOOLBAR,
           handlers: {
             image: function () { self.pickImage(); }
           }
-        }
+        },
+        // matchVisual re-creates the source's spacing by inserting blank lines, which turns
+        // a pasted paragraph into a gappy mess and is the usual cause of paste "not working"
+        // the way people expect.
+        clipboard: { matchVisual: false }
       }
     });
 
     if (this.modelValue) this.setHtml(this.modelValue);
 
-    // Update the model on blur, not on every keystroke: callers save on blur, and a
-    // per-keystroke sync would be one request per character.
+    // Paste, handled explicitly.
+    //
+    // Quill's own clipboard drops content whose formats it does not recognise, so pasting
+    // from a document or a mail client could put nothing in the editor at all. Taking the
+    // event ourselves makes the outcome deterministic: HTML goes through Quill's parser (so
+    // it arrives as Quill formats), and anything else lands as plain text rather than
+    // vanishing. What is stored is sanitized server-side either way.
+    this.quill.root.addEventListener('paste', function (e) {
+      var data = e.clipboardData || window.clipboardData;
+      if (!data) return;
+
+      var html = data.getData('text/html');
+      var text = data.getData('text/plain');
+      if (!html && !text) return;
+
+      // No caret means the editor is not really the target — let the browser deal with it
+      // rather than cancel a paste we cannot place.
+      var range = self.quill.getSelection(true);
+      if (!range) return;
+
+      e.preventDefault();
+
+      try {
+        if (range.length) self.quill.deleteText(range.index, range.length, 'user');
+
+        if (html) {
+          self.quill.clipboard.dangerouslyPasteHTML(range.index, html, 'user');
+        } else {
+          self.quill.insertText(range.index, text, 'user');
+          self.quill.setSelection(range.index + text.length, 0, 'silent');
+        }
+      } catch (err) {
+        // A parser that objects to the source must not cost the user their paste.
+        try { self.quill.insertText(range.index, text || '', 'user'); } catch (ignored) {}
+      }
+
+      self.emitValue();
+    }, true);
+
+    // Keep the model in step with typing, debounced.
+    //
+    // This used to sync on blur only, on the reasoning that callers save on blur anyway. But
+    // clicking a Save/Comment/Add-update button IS the first blur, and the click was handled
+    // before the model had caught up — so the submit saw empty content and did nothing, and
+    // a button disabled until there is content looked broken. Syncing costs nothing: it is a
+    // property assignment, not a request.
+    this._syncTimer = null;
+    this.quill.on('text-change', function () {
+      clearTimeout(self._syncTimer);
+      self._syncTimer = setTimeout(function () { self.emitValue(); }, 120);
+    });
+
+    // Blur still emits — immediately, ahead of any pending debounce — and tells the caller,
+    // which is what triggers save-on-blur for the description.
     this.quill.on('selection-change', function (range, oldRange) {
       if (range === null && oldRange !== null) {
+        clearTimeout(self._syncTimer);
         self.emitValue();
         self.$emit('blur');
       }
     });
   },
   beforeUnmount: function () {
+    clearTimeout(this._syncTimer);
     // Quill has no destroy(); dropping the reference and letting the v-if remove the DOM is
     // the documented way to tear one down.
     this.quill = null;
@@ -480,6 +247,18 @@ var WiEditor = {
     emitValue: function () {
       var html = this.html();
       if (html !== this.modelValue) this.$emit('update:modelValue', html);
+    },
+    /**
+     * Push the current content to the model NOW.
+     *
+     * Typing syncs on a debounce, so a Save clicked inside that window read the previous
+     * value and concluded nothing had changed — the edit looked discarded. Every submit path
+     * calls this first, which closes the window.
+     */
+    flush: function () {
+      if (!this.quill) return;
+      clearTimeout(this._syncTimer);
+      this.emitValue();
     },
     insert: function (embed, value) {
       var range = this.quill.getSelection(true) || { index: this.quill.getLength() };
@@ -539,12 +318,12 @@ var WiEditor = {
 
     // Gallery picker: this project's uploads, plus a way to add a new one.
     '<div v-if="gallery.open" class="fixed inset-0 z-[120] flex items-start justify-center p-4 sm:pt-24">' +
-    '<div class="absolute inset-0 bg-black/40" @click="gallery.open = false"></div>' +
+    '<div class="absolute inset-0 bg-black/40" @mousedown="backdropDown" @click="backdropClick($event, function () { gallery.open = false; })"></div>' +
     '<div class="relative w-full max-w-[560px] bg-white rounded-xl shadow-xl flex flex-col max-h-[70vh]">' +
     '<div class="flex items-center gap-3 px-5 py-3 border-b border-line shrink-0">' +
     '<span class="text-[14px] font-semibold text-head">Insert image</span>' +
     '<button type="button" @click="$refs.file.click()" class="ml-auto h-8 px-3 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold">Upload</button>' +
-    '<button type="button" @click="gallery.open = false" class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover" title="Close">' +
+    '<button type="button" @click="gallery.open = false" class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover" data-tip="Close" aria-label="Close">' +
     '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>' +
     '</div>' +
     '<div class="p-3 overflow-y-auto">' +
@@ -583,6 +362,9 @@ PB.boot('work-items', {
       items: Array.isArray(b.items) ? b.items : [],
       states: Array.isArray(b.states) ? b.states : [],
       labels: Array.isArray(b.labels) ? b.labels : [],
+      // Cycles §8.1: the property is only offered when the project has the feature on.
+      cyclesEnabled: !!b.cyclesEnabled,
+      cycles: Array.isArray(b.cycles) ? b.cycles : [],
       members: Array.isArray(b.members) ? b.members : [],
       priorities: Array.isArray(b.priorities) ? b.priorities : [],
       defaultStateId: b.defaultStateId || '',
@@ -629,6 +411,13 @@ PB.boot('work-items', {
       // always-mounted rich-text editor costs its own initialisation on every open, and the
       // detail view is read far more often than it is written.
       editingDescription: false,
+      // The title is a heading first and a field second: it turns into an input on a double
+      // click, so a stray click on the item's name cannot start an edit nobody intended.
+      editingTitle: false,
+      // Long descriptions are clamped with a Show more / Show less toggle (prototype
+      // behaviour). `overflows` is measured, not guessed, so the control only appears when
+      // there is genuinely something hidden.
+      desc: { expanded: false, overflows: false },
       // Title/description are free text, so they are edited as drafts and saved on blur
       // rather than PATCHed on every keystroke.
       draft: {
@@ -638,6 +427,9 @@ PB.boot('work-items', {
       // Row editing: which chip picker / action menu is open, and for which item.
       rowMenu: { open: false, kind: '', item: null, style: {} },
       rowQuery: '',
+      // Creating a label from inside the picker (§4.3): name + colour, saved without
+      // leaving the popover.
+      newLabel: { open: false, name: '', color: '', busy: false, error: '' },
       deleteConfirm: { open: false, item: null, busy: false },
       table: null,
       // Create modal
@@ -657,9 +449,6 @@ PB.boot('work-items', {
   computed: {
     // Tabulator group order: the project's states in their configured order, then a trailing
     // bucket for items whose state was deleted.
-    groupValues: function () {
-      return this.states.map(function (s) { return String(s.id); }).concat([WI_NO_STATE]);
-    },
     statesById: function () {
       var map = {};
       this.states.forEach(function (s) { map[String(s.id)] = s; });
@@ -713,6 +502,13 @@ PB.boot('work-items', {
      * which way the dependency points, so the direction is named and colour-coded: being
      * blocked is the state that needs attention, so it reads as a warning.
      */
+    /** Assignee tooltip: the full name, which the label itself may have truncated. */
+    assigneeTip: function () {
+      var who = this.drawerItem && this.drawerItem.assignees && this.drawerItem.assignees.length
+        ? this.drawerItem.assignees[0].name : '';
+      if (!who) return this.canEdit ? 'Assign someone' : 'Unassigned';
+      return (this.canEdit ? 'Change assignee — ' : 'Assigned to ') + who;
+    },
     depGroups: function () {
       return [
         {
@@ -734,11 +530,10 @@ PB.boot('work-items', {
         { key: 'duplicate_of', label: 'duplicate of', icon: copy },
         { key: 'duplicated_by', label: 'duplicated by', icon: copy }
       ];
-    },
+    }
   },
-  components: { 'wi-calendar': WiCalendar, 'wi-editor': WiEditor, 'wi-avatar': WiAvatar },
+  components: { 'wi-calendar': WiCalendar, 'wi-editor': WiEditor, 'wi-avatar': WiAvatar, 'wi-list': WiList },
   mounted: function () {
-    this.buildTable();
     this.bindGlobalCreate();
 
     // Escape closes the parent search panel first, then the create modal (POC behaviour).
@@ -747,7 +542,8 @@ PB.boot('work-items', {
       if (e.key !== 'Escape') return;
       // Innermost first: pickers, then the parent panel, then the create modal, then the
       // detail drawer — so Escape never closes the drawer out from under an open picker.
-      if (self.rowMenu.open) { self.closeRowMenu(); }
+      if (self.editingTitle) { self.cancelEditTitle(); }
+      else if (self.rowMenu.open) { self.closeRowMenu(); }
       else if (self.commentModal.open) { self.closeCommentModal(); }
       else if (self.linkModal.open) { self.linkModal.open = false; }
       else if (self.picker.open) { self.closePicker(); }
@@ -817,175 +613,16 @@ PB.boot('work-items', {
       el.addEventListener('click', handler);
       this._globalCreate = { el: el, handler: handler };
     },
-    // ---------- Tabulator ----------
-    buildTable: function () {
-      if (!window.Tabulator || !this.$refs.grid) return;
-      var self = this;
-
-      this.table = new Tabulator(this.$refs.grid, {
-        data: this.rows(),
-        index: 'id',
-        layout: 'fitColumns',
-        headerVisible: false,
-        rowHeight: 44,
-        // Let Tabulator own the scroll container (and virtualise long lists) inside the
-        // flex column; `main` itself does not scroll.
-        height: '100%',
-        columnDefaults: { vertAlign: 'middle', headerSort: false },
-        groupBy: 'gkey',
-        groupToggleElement: 'header',
-        groupValues: [this.groupValues],
-        groupHeader: function (value, count) { return self.groupHeader(value, count); },
-        columns: [
-          { title: 'ID', field: 'identifier', width: self.idWidth(), formatter: function (cell) { return '<span class="text-[12px] text-sub">' + wiEsc(cell.getValue()) + '</span>'; } },
-          { title: 'Title', field: 'title', minWidth: 160, widthGrow: 1, formatter: function (cell) {
-            // An item waiting on an unresolved blocker says so on the row itself — a
-            // dependency you have to open the item to discover is a dependency people miss.
-            var d = cell.getRow().getData();
-            var chip = d.blocked_by_count > 0 ? wiBlockedChip(d.blocked_by_count) : '';
-            return '<span class="inline-flex items-center gap-2">' + chip + '<span class="text-[14px] text-ink">' + wiEsc(cell.getValue()) + '</span></span>';
-          } },
-          { title: '', field: 'meta', width: 620, hozAlign: 'right', formatter: function (cell) { return self.metaCell(cell.getRow().getData()); } }
-        ]
-      });
-
-      // A row opens the detail drawer, except when the click landed on one of the row's own
-      // controls — those edit in place and must not also open the panel behind them.
-      this.table.on('rowClick', function (e, row) {
-        if (e.target.closest('[data-act]')) return;
-        self.openDrawer(row.getData());
-      });
-
-      // Per-group "+" creates an item already in that group's state (spec §4.2 / §11.2).
-      // Capture phase so the click does not also toggle the group.
-      this.$refs.grid.addEventListener('click', function (e) {
-        var add = e.target.closest('[data-gadd]');
-        if (!add) return;
-        e.stopPropagation();
-        self.openCreate(add.getAttribute('data-gadd'));
-      }, true);
-
-      // Row chips + the ⋯ menu. Delegated, because Tabulator re-renders rows on every
-      // data change and re-bound listeners would leak.
-      this.$refs.grid.addEventListener('click', function (e) {
-        var btn = e.target.closest('[data-act]');
-        if (!btn) return;
-        e.stopPropagation();
-        var item = self.items.find(function (i) { return String(i.id) === btn.getAttribute('data-id'); });
-        if (item) self.openRowMenu(btn.getAttribute('data-act'), item, btn);
-      }, true);
-    },
-    /**
-     * Width of the ID column, sized to the longest ID actually on screen.
-     *
-     * A fixed width was left over from the `<PROJECT>-<n>` format; against a plain number it
-     * strands ~50px of empty cell between the ID and the title. Measuring instead keeps that
-     * gap at the grid's own 8px + 8px cell padding whatever the number grows to, while the
-     * column stays a column — so titles still line up down the list.
-     * 24 = the first cell's left padding, 8 = its right padding, 7.5px per digit at 12px.
-     */
-    idWidth: function () {
-      var longest = this.items.reduce(function (n, i) {
-        return Math.max(n, String(i.identifier || '').length);
-      }, 1);
-
-      return 24 + 8 + Math.ceil(longest * 7.5);
-    },
-    /** Bootstrap rows + the group key Tabulator buckets on. */
-    rows: function () {
-      var self = this;
-      return this.items.map(function (i) { return self.row(i); });
-    },
-    refreshTable: function () {
-      if (!this.table) return;
-      var self = this;
-      // The grid is v-show'd off while the list is empty, and an element that was
-      // display:none measures zero width — so a redraw is needed the first time it appears,
-      // and only then. (This used to trigger on every refresh of a one-item list.)
-      var wasHidden = this._gridWasEmpty === true;
-      this._gridWasEmpty = this.items.length === 0;
-      this.table.replaceData(this.rows()).then(function () {
-        // Creating the item that adds a digit widens the column with it.
-        var id = self.table.getColumn('identifier');
-        if (id) id.setWidth(self.idWidth());
-        // A grid that was display:none at mount measures zero width; force a re-layout the
-        // first time it becomes visible.
-        if (wasHidden) self.$nextTick(function () { self.table.redraw(true); });
-      });
-    },
-    groupHeader: function (value, count) {
-      var state = this.statesById[String(value)] || null;
-      var name = state ? state.name : 'No state';
-      var add = this.canCreate
-        ? '<button type="button" data-gadd="' + wiEsc(value) + '" class="ml-auto h-6 w-6 grid place-items-center rounded text-sub hover:bg-line" title="Add work item"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>'
-        : '';
-      return '<span class="wi-chevron grid place-items-center" style="color:#9ca3af"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>' +
-        '<span class="grid place-items-center">' + wiStateIcon(state) + '</span>' +
-        '<span class="text-[13px] font-semibold" style="color:#0f0f10">' + wiEsc(name) + '</span>' +
-        '<span class="text-[11px] font-semibold rounded-full px-1.5 py-0.5" style="color:#6b7280;background:#f3f4f6">' + count + '</span>' +
-        add;
-    },
-    /**
-     * Right-aligned chip cluster. Every chip is a BUTTON that opens its own picker (§4.2:
-     * "Row property buttons should open a picker without navigating away from the row"), and
-     * the trailing kebab opens the row action menu (§4.4). Read-only users get plain chips.
-     */
-    metaCell: function (d) {
-      var pri = WI_PRI[d.priority] || WI_PRI.none;
-      var edit = this.canEdit;
-      var chip = function (inner, act, extra) {
-        if (!edit) return wiChip(inner, extra);
-        return '<button type="button" data-act="' + act + '" data-id="' + d.id + '" class="inline-flex items-center gap-1.5 h-6 px-2 rounded border border-stroke bg-white text-[12px] hover:bg-hover shrink-0 ' + (extra || 'text-ink') + '">' + inner + '</button>';
-      };
-      var out = [
-        chip(wiStateIcon(d.state) + wiEsc(d.state ? d.state.name : 'No state'), 'state'),
-        chip(pri.icon + pri.label, 'priority', pri.cls)
-      ];
-
-      // Dates: a set date shows its chip; an empty one shows a compact calendar button so
-      // it can still be filled in from the row.
-      out.push('<span class="hidden xl:inline-flex">' + (d.start_date
-        ? chip(WI_CAL + this.fmtDate(d.start_date), 'start_date')
-        : chip(WI_CAL, 'start_date', 'text-faint')) + '</span>');
-      out.push('<span class="hidden xl:inline-flex">' + (d.due_date
-        ? chip(WI_CAL + this.fmtDate(d.due_date), 'due_date')
-        : chip(WI_CAL, 'due_date', 'text-faint')) + '</span>');
-
-      // Assignees: stacked avatars, or a dashed placeholder when unassigned.
-      var avatars = (d.assignees || []).slice(0, 3).map(function (a) {
-        return wiAvatar(a, 24);
-      }).join('');
-      if ((d.assignees || []).length > 3) avatars += '<span class="text-[11px] text-sub">+' + (d.assignees.length - 3) + '</span>';
-      if (!avatars) {
-        avatars = '<span class="h-6 w-6 rounded-full border border-dashed border-stroke grid place-items-center text-faint shrink-0"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3" stroke="currentColor" stroke-width="1.7"/><path d="M5 20a7 7 0 0114 0" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></span>';
-      }
-      out.push(edit
-        ? '<button type="button" data-act="assignees" data-id="' + d.id + '" class="inline-flex items-center gap-0.5 shrink-0" title="Assignees">' + avatars + '</button>'
-        : '<span class="inline-flex items-center gap-0.5 shrink-0">' + avatars + '</span>');
-
-      // Labels
-      var labels = (d.labels || []).slice(0, 2).map(function (l) {
-        return '<span class="h-2 w-2 rounded-full shrink-0" style="background:' + wiEsc(l.color) + '"></span>' + wiEsc(l.name);
-      });
-      var labelInner = labels.length
-        ? labels.join('</span><span class="mx-1"></span><span>')
-        : '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" class="text-faint"><path d="M3 12l7-7h7a2 2 0 012 2v7l-7 7-9-9z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>';
-      var extraLabels = (d.labels || []).length > 2 ? ' +' + (d.labels.length - 2) : '';
-      out.push('<span class="hidden lg:inline-flex">' + chip(labelInner + extraLabels, 'labels', labels.length ? 'text-ink' : 'text-faint') + '</span>');
-
-      // Row action menu (§4.4)
-      if (edit) {
-        out.push('<button type="button" data-act="menu" data-id="' + d.id + '" title="Work item actions" class="h-7 w-7 grid place-items-center rounded-md text-sub hover:bg-line shrink-0">' +
-          '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></button>');
-      }
-
-      return '<div class="flex items-center justify-end gap-1.5 flex-nowrap">' + out.join('') + '</div>';
-    },
+    // ---------- The list (wi-list) ----------
+    /** A row chip was clicked: open that property's picker, anchored to the chip. */
+    onChip: function (e) { this.openRowMenu(e.kind, e.item, e.el); },
+    /** Ask the list to redraw after the items array was mutated in place. */
+    refreshTable: function () { if (this.$refs.list) this.$refs.list.refresh(); },
     // ---------- Inline row editing (§4.2) ----------
     /** Open a chip picker or the action menu, anchored to the clicked control. */
     openRowMenu: function (kind, item, btn) {
       if (!this.canEdit) return;
-      var widths = { state: 208, priority: 200, assignees: 256, labels: 256, start_date: 300, due_date: 300, menu: 200 };
+      var widths = { state: 208, priority: 200, assignees: 256, labels: 256, cycle: 256, start_date: 300, due_date: 300, menu: 200 };
       var w = widths[kind] || 208;
       var heights = { menu: 220, start_date: 340, due_date: 340 };
       var h = heights[kind] || 260;
@@ -996,6 +633,7 @@ PB.boot('work-items', {
       else style.top = (r.bottom + 6) + 'px';
 
       this.rowQuery = '';
+      this.newLabel = { open: false, name: '', color: '', busy: false, error: '' };
       this.rowMenu = { open: true, kind: kind, item: item, style: style };
     },
     closeRowMenu: function () { this.rowMenu = { open: false, kind: '', item: null, style: {} }; },
@@ -1008,6 +646,44 @@ PB.boot('work-items', {
     rowLabels: function () {
       var q = (this.rowQuery || '').toLowerCase();
       return this.labels.filter(function (l) { return !q || (l.name || '').toLowerCase().indexOf(q) > -1; });
+    },
+    /** Palette offered when creating a label inline; the server picks one if none is set. */
+    labelColors: function () {
+      return ['#6366F1', '#EC4899', '#F59E0B', '#10B981', '#3B82F6', '#EF4444', '#8B5CF6', '#14B8A6'];
+    },
+    /** Is the typed name already a label? Then "create" would fork the vocabulary. */
+    labelExists: function (name) {
+      var q = (name || '').trim().toLowerCase();
+      return !!q && this.labels.some(function (l) { return (l.name || '').toLowerCase() === q; });
+    },
+    startNewLabel: function () {
+      this.newLabel = {
+        open: true,
+        // Whatever was typed into the search is almost always the label being looked for.
+        name: (this.rowQuery || '').trim(),
+        color: this.labelColors()[this.labels.length % this.labelColors().length],
+        busy: false, error: ''
+      };
+    },
+    cancelNewLabel: function () { this.newLabel.open = false; },
+    saveNewLabel: async function () {
+      var name = (this.newLabel.name || '').trim();
+      var item = this.rowMenu.item;
+      if (!name || this.newLabel.busy || !item || !this.endpoints.createLabel) return;
+
+      this.newLabel.busy = true; this.newLabel.error = '';
+      try {
+        var resp = await this.$pb.api(this.$pb.withId(this.endpoints.createLabel, item.id), {
+          method: 'POST', body: { name: name, color: this.newLabel.color }
+        });
+        // The project's vocabulary grew, so every picker on this screen should know.
+        this.labels = resp.labels || this.labels;
+        this.newLabel.open = false;
+        this.rowQuery = '';
+        // Applying it goes through the same PATCH as any other label change.
+        if (!this.rowHasLabel(resp.label)) this.toggleRowLabel(resp.label);
+      } catch (e) { this.newLabel.error = this.$pb.firstError(e); }
+      this.newLabel.busy = false;
     },
     rowHasAssignee: function (m) {
       var it = this.rowMenu.item;
@@ -1050,24 +726,12 @@ PB.boot('work-items', {
         if (this.items[i].id === card.id) { previous = this.items[i]; this.items.splice(i, 1, card); break; }
       }
 
+      // Same state group: update that one row and keep scroll position and collapsed
+      // groups. A state change moves the row between groups, which needs a rebuild.
       var sameGroup = previous && String(previous.state_id || '') === String(card.state_id || '');
-      if (sameGroup && this.table) {
-        var self = this;
-        this.table.updateData([this.row(card)]).then(function () {
-          // The chip cluster is drawn by a formatter on a column with no field of its own,
-          // so Tabulator sees nothing changed there and leaves the old HTML in place —
-          // an added assignee would not appear until a reload. Reformat the row explicitly.
-          var row = self.table.getRow(card.id);
-          if (row) row.reformat();
-        }).catch(function () { self.refreshTable(); });
-        return;
-      }
+      if (sameGroup && this.$refs.list && this.$refs.list.updateRow(card)) return;
 
       this.refreshTable();
-    },
-    /** One card as the grid's row shape — the group key is derived, not stored. */
-    row: function (i) {
-      return Object.assign({}, i, { gkey: i.state_id ? String(i.state_id) : WI_NO_STATE });
     },
     removeItem: function (item) {
       var i = this.items.indexOf(item);
@@ -1078,6 +742,25 @@ PB.boot('work-items', {
       this.refreshTable();
     },
     setRowState: function (s) { this.patchItem(this.rowMenu.item, { state_id: s ? s.id : '' }, true, 'State updated.'); },
+    /** Cycles offered by the picker, filtered by the same search box the others use. */
+    rowCycles: function () {
+      var q = (this.rowQuery || '').toLowerCase();
+      return this.cycles.filter(function (c) { return !q || (c.name || '').toLowerCase().indexOf(q) > -1; });
+    },
+    /**
+     * Put the item in a cycle, or take it out (§8.3).
+     *
+     * Picking the cycle it is already in clears it, so the same control both assigns and
+     * removes — and picking a DIFFERENT one is a move, which the server does in one update
+     * rather than a remove followed by an add.
+     */
+    setRowCycle: function (c) {
+      var it = this.rowMenu.item;
+      if (!it) return;
+      var same = c && it.cycle_id === c.id;
+      this.patchItem(it, { cycle_id: same || !c ? '' : c.id }, true,
+        same || !c ? 'Removed from the cycle.' : 'Moved to ' + c.name + '.');
+    },
     setRowPriority: function (p) { this.patchItem(this.rowMenu.item, { priority: p.key }, true, 'Priority updated.'); },
     /**
      * A work item has exactly one assignee (§4.3, revised), so picking a member replaces
@@ -1121,6 +804,7 @@ PB.boot('work-items', {
       this.drawer.id = null;
       this.feed = null;
     },
+
     // ---------- Collaboration tabs (§4-§11) ----------
     /** The seven tabs, minus Worklogs when the project has time tracking off (§9.2). */
     tabList: function () {
@@ -1177,6 +861,7 @@ PB.boot('work-items', {
       return (html || '').replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim() !== '';
     },
     submitCommentModal: async function () {
+      this.flushEditor('commentModalEditor');
       var m = this.commentModal;
       if (!this.hasText(m.content) || m.busy) return;
       m.busy = true;
@@ -1196,6 +881,7 @@ PB.boot('work-items', {
     },
     /** The inline composer now only ever posts a new top-level comment (§5.3). */
     postComment: async function () {
+      this.flushEditor('commentEditor');
       if (!this.hasText(this.composer.content) || this.composer.busy) return;
       this.composer.busy = true;
       try {
@@ -1224,6 +910,7 @@ PB.boot('work-items', {
       };
     },
     saveUpdate: async function () {
+      this.flushEditor('updateEditor');
       var body = (this.updateForm.content || '').replace(/<[^>]*>/g, '').trim();
       if (!body || this.updateForm.busy) return;
       this.updateForm.busy = true;
@@ -1320,6 +1007,28 @@ PB.boot('work-items', {
         s.links.length);
     },
 
+    /**
+     * Did this click start on the backdrop it ended on?
+     *
+     * Selecting text by dragging routinely ends with the mouse outside the panel — over the
+     * backdrop — and a plain `@click` there fired on that mouse-up and closed the dialog
+     * mid-selection. Which is what made copying (and then pasting) inside the editor look
+     * broken: the selection, and the dialog, were gone before the keystroke.
+     */
+    backdropDown: function (e) { this._backdropArmed = e.target === e.currentTarget; },
+    backdropClick: function (e, close) {
+      var armed = this._backdropArmed;
+      this._backdropArmed = false;
+      if (armed && e.target === e.currentTarget) close();
+    },
+    /** Flush a named editor before reading its model — see WiEditor.flush(). */
+    flushEditor: function (name) {
+      var editor = this.$refs[name];
+      if (editor && editor.flush) { editor.flush(); return true; }
+      // A missing editor means the submit is about to read a stale model; better to know.
+      if (window.console) window.console.warn('[work-items] editor ref not found: ' + name);
+      return false;
+    },
     toggleSection: function (key) { this.secOpen[key] = !this.secOpen[key]; },
 
     /** Row ⋯ menu: Open · Copy link · Remove (§26/§32/§41). */
@@ -1494,9 +1203,29 @@ PB.boot('work-items', {
       var it = this.drawerItem;
       this.draft.title = it ? (it.title || '') : '';
       this.draft.description = it ? (it.description || '') : '';
-      // Opening a different work item always starts in read mode.
+      // Opening a different work item always starts in read mode, collapsed.
       this.editingDescription = false;
+      this.editingTitle = false;
+      this.desc = { expanded: false, overflows: false };
+      this.measureDescription();
     },
+    /**
+     * Does the description exceed the clamp? Measured from the DOM after it renders — the
+     * alternative, guessing from character count, is wrong the moment someone pastes a table
+     * or an image.
+     */
+    measureDescription: function () {
+      var self = this;
+      this.$nextTick(function () {
+        var el = self.$refs.descriptionBody;
+        // scrollHeight vs clientHeight only differs while the clamp is applied, so the
+        // measurement is taken in the collapsed state and kept while expanded.
+        if (!el) { self.desc.overflows = false; return; }
+        if (self.desc.expanded) return;
+        self.desc.overflows = el.scrollHeight - el.clientHeight > 4;
+      });
+    },
+    toggleDescription: function () { this.desc.expanded = !this.desc.expanded; },
     /** ⋯ → Edit, and the "add a description" affordance, both land here. */
     editDescription: function () {
       if (!this.canEdit) return;
@@ -1504,13 +1233,33 @@ PB.boot('work-items', {
       this.editingDescription = true;
     },
     finishEditingDescription: async function () {
+      this.flushEditor('descriptionEditor');
       await this.saveDescription();
       this.editingDescription = false;
+      // The text just changed; whether it still overflows is a fresh question.
+      this.desc.expanded = false;
+      this.measureDescription();
+    },
+    /** Double-click on the heading opens it for editing (and selects what is there). */
+    startEditTitle: function () {
+      if (!this.canEdit || !this.drawerItem) return;
+      this.draft.title = this.drawerItem.title || '';
+      this.editingTitle = true;
+      var self = this;
+      this.$nextTick(function () {
+        var el = self.$refs.titleField;
+        if (el) { el.focus(); el.select(); }
+      });
+    },
+    cancelEditTitle: function () {
+      this.draft.title = this.drawerItem ? (this.drawerItem.title || '') : '';
+      this.editingTitle = false;
     },
     /** Save the title if it actually changed; an emptied title is refused, not sent. */
     saveTitle: function () {
       var it = this.drawerItem;
       var next = (this.draft.title || '').trim();
+      this.editingTitle = false;
       if (!it || !this.canEdit) return;
       if (!next) { this.draft.title = it.title; return; }
       if (next === it.title) return;
@@ -1518,10 +1267,25 @@ PB.boot('work-items', {
     },
     saveDescription: async function () {
       var it = this.drawerItem;
-      if (!it || !this.canEdit) return;
+      if (!it || !this.canEdit) return false;
+
       var next = this.draft.description || '';
-      if (next === (it.description || '')) return;
+      if (next === (it.description || '')) {
+        // Say so rather than close in silence: "I edited it and nothing happened" is
+        // indistinguishable from a broken save when the no-op path says nothing.
+        this.$pb.toast('No changes to save.');
+        return false;
+      }
+
       await this.patchItem(it, { description: next }, false, 'Description updated.');
+
+      // Start the next edit from what the server actually stored — the sanitizer may have
+      // adjusted the markup, and comparing against a stale draft would make a real edit look
+      // like a no-op.
+      var saved = this.drawerItem;
+      if (saved) this.draft.description = saved.description || '';
+
+      return true;
     },
     /** One line of the audit feed, phrased from the stored display values (§6). */
     activityLine: function (a) {
@@ -1535,7 +1299,24 @@ PB.boot('work-items', {
       } else if (a.field === 'state') {
         text = 'changed state to ' + (meta.new_label || 'none');
       } else if (a.field === 'parent') {
-        text = meta.new_label ? 'set parent to ' + meta.new_label : 'removed the parent';
+        text = meta.new_label ? 'set the parent to ' + meta.new_label : 'removed the parent';
+      } else if (a.field === 'relation_added' || a.field === 'relation_removed') {
+        // "blocking 1" read as a count. Name the relation, then the item it points at.
+        var what = this.itemRef(meta);
+        var kind = meta.relation || 'related to';
+        text = a.field === 'relation_added'
+          ? 'marked this as ' + kind + ' ' + what
+          : 'removed the "' + kind + '" relation to ' + what;
+      } else if (a.field === 'subtask_added') {
+        text = 'added ' + this.itemRef(meta) + ' as a sub-task';
+      } else if (a.field === 'subtask_removed') {
+        text = 'removed ' + this.itemRef(meta) + ' from sub-tasks';
+      } else if (a.field === 'comment' || a.field === 'comment_reply') {
+        text = a.field === 'comment' ? 'commented' : 'replied to a comment';
+      } else if (a.field === 'worklog') {
+        text = 'logged ' + (a.new_value || 'time');
+      } else if (a.field === 'update') {
+        text = 'posted an update' + (a.new_value ? ' — ' + a.new_value : '');
       } else if (a.field === 'assignees' || a.field === 'labels') {
         var names = (meta.new_labels || []).join(', ');
         text = 'set ' + a.field + ' to ' + (names || 'none');
@@ -1720,9 +1501,53 @@ PB.boot('work-items', {
       }
       this.saving = false;
     },
+    /**
+     * Tint the header's state chip from the state's own colour — states are user-defined, so
+     * a fixed palette here would drift the moment someone adds one.
+     */
+    stateChipStyle: function (state) {
+      var color = (state && state.color) || '#6b7280';
+      return { color: color, background: color + '14', border: '1px solid ' + color + '33' };
+    },
+    /** "#4 Build API" — an identifier is a bare number now, so it needs its title with it. */
+    itemRef: function (meta) {
+      var id = meta && meta.target ? '#' + meta.target : 'a work item';
+      return meta && meta.target_title ? id + ' ' + meta.target_title : id;
+    },
     /** The round event badge shown at the start of a feed row (§6.4). */
     eventIcon: function (entry) {
       return wiEventSvg(WI_EVENT_ICON[wiEventKind(entry)] || WI_EVENT_ICON.text, 15);
+    },
+    /**
+     * What one side of a History row should read.
+     *
+     * Preference order: the display names frozen into the audit row, then the single label
+     * (state, parent), then the stored value. Assignees and labels store IDS in the value
+     * column — showing that raw is how "None → 4" reached the screen — so a value that is
+     * nothing but ids is suppressed rather than printed.
+     */
+    historyValue: function (entry, side) {
+      var meta = entry.meta || {};
+      var many = meta[side + '_labels'];
+      if (Array.isArray(many)) return many.length ? many.join(', ') : 'None';
+
+      var one = meta[side + '_label'];
+      if (one) return one;
+
+      // Relation rows keep the kind and the target apart; assembled they read as a phrase.
+      if (meta.relation && entry[side + '_value']) return meta.relation + ' ' + this.itemRef(meta);
+
+      var raw = entry[side + '_value'];
+      if (!raw) return 'None';
+
+      // An id list is a machine value; it means nothing to a reader.
+      var idsOnly = ['assignees', 'labels'].indexOf(entry.field) > -1 && /^[0-9,\s]+$/.test(String(raw));
+      if (idsOnly) return 'None';
+
+      // Dates are stored ISO; the audit trail should read the way the item does.
+      if (entry.field === 'start_date' || entry.field === 'due_date') return this.fmtDate(raw);
+
+      return String(raw);
     },
     /** The small icon that precedes a before/after value in History. */
     valueIcon: function (entry) {
@@ -1755,7 +1580,9 @@ PB.boot('work-items', {
     '</div></div>' +
 
     // ===== Grid (desktop) =====
-    '<div v-show="items.length" ref="grid" id="wi-table" class="flex-1 min-h-0 hidden sm:block"></div>' +
+    '<wi-list v-show="items.length" ref="list" class="flex-1 min-h-0 hidden sm:block" ' +
+    ':items="items" :states="states" :can-edit="canEdit" :can-add="canCreate" row-action="menu" ' +
+    '@open="openDrawer" @chip="onChip" @group-add="openCreate" />' +
 
     // ===== Cards (mobile) — same data, grouped by state =====
     '<div class="sm:hidden flex-1 overflow-y-auto">' +
@@ -1764,7 +1591,7 @@ PB.boot('work-items', {
     '<span class="grid place-items-center" v-html="stateIcon(s)"></span>' +
     '<span class="text-[13px] font-semibold text-head">{{ s.name }}</span>' +
     '<span class="text-[11px] font-semibold rounded-full px-1.5 py-0.5 text-sub bg-hover">{{ items.filter(i => i.state_id === s.id).length }}</span>' +
-    '<button v-if="canCreate" type="button" @click="openCreate(String(s.id))" class="ml-auto h-6 w-6 grid place-items-center rounded text-sub hover:bg-line" title="Add work item"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>' +
+    '<button v-if="canCreate" type="button" @click="openCreate(String(s.id))" class="ml-auto h-6 w-6 grid place-items-center rounded text-sub hover:bg-line" data-tip="Add work item" aria-label="Add work item"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>' +
     '</div>' +
     '<div v-for="i in items.filter(i => i.state_id === s.id)" :key="i.id" @click="openDrawer(i)" class="border-b border-line px-4 py-3">' +
     '<div class="text-[12px] text-sub">{{ i.identifier }}</div>' +
@@ -1793,15 +1620,15 @@ PB.boot('work-items', {
     // ===== Detail view (§4.4) — a right-hand drawer over the list, or the whole page when
     // the per-item URL was opened. Same markup either way; `pageMode` swaps the framing. =====
     '<div v-if="drawer.open && drawerItem" :class="pageMode ? \'flex-1 min-h-0 flex flex-col\' : \'fixed inset-0 z-[85]\'">' +
-    '<div v-if="!pageMode" class="absolute inset-0 bg-black/20" @click="closeDrawer"></div>' +
+    '<div v-if="!pageMode" class="absolute inset-0 bg-black/20" @mousedown="backdropDown" @click="backdropClick($event, closeDrawer)"></div>' +
     '<aside :class="pageMode ? \'flex-1 min-h-0 flex flex-col bg-white\' : \'absolute right-0 top-0 h-full w-full sm:w-[80%] bg-white shadow-2xl flex flex-col\'">' +
 
     // ---- Toolbar ----
     '<div class="flex items-center gap-1 px-4 h-14 border-b border-line shrink-0">' +
     '<template v-if="!pageMode">' +
-    '<button type="button" @click="closeDrawer" title="Close" class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover">' +
+    '<button type="button" @click="closeDrawer" data-tip="Close" aria-label="Close" class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover">' +
     '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
-    '<a :href="itemUrl(drawerItem)" title="Open as full page" class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover">' +
+    '<a :href="itemUrl(drawerItem)" data-tip="Open as full page" aria-label="Open as full page" class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover">' +
     '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 9V4h5M20 15v5h-5M15 4h5v5M9 20H4v-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></a>' +
     '</template>' +
     // On the item page the toolbar carries a breadcrumb back to the list instead.
@@ -1813,9 +1640,9 @@ PB.boot('work-items', {
     '</div>' +
 
     '<div class="ml-auto flex items-center gap-1.5">' +
-    '<button type="button" @click="drawerCopyLink" title="Copy link" class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover">' +
+    '<button type="button" @click="drawerCopyLink" data-tip="Copy link" aria-label="Copy link" class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover">' +
     '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 15l6-6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M10.5 6.5l1-1a3.5 3.5 0 015 5l-1 1M13.5 17.5l-1 1a3.5 3.5 0 01-5-5l1-1" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
-    '<button v-if="canEdit" type="button" @click="openRowMenu(\'menu\', drawerItem, $event.currentTarget)" title="More" class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover">' +
+    '<button v-if="canEdit" type="button" @click="openRowMenu(\'menu\', drawerItem, $event.currentTarget)" data-tip="More" aria-label="More" class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover">' +
     '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="5" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="19" cy="12" r="1.6" fill="currentColor"/></svg></button>' +
     '</div></div>' +
 
@@ -1823,28 +1650,46 @@ PB.boot('work-items', {
     '<div class="flex-1 min-h-0 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden">' +
 
     '<div class="flex-1 min-w-0 px-6 sm:px-8 py-6 lg:overflow-y-auto">' +
+    // Header line: the item's current state, then its ID, then anything demanding attention
+    // — the same shape as the reference. The state chip is the answer to "where is this?",
+    // which is the first thing anyone opening a work item wants.
     '<div class="flex items-center gap-2">' +
-    '<span class="text-[12px] text-sub">{{ drawerItem.identifier }}</span>' +
+    '<span class="inline-flex items-center gap-1.5 h-6 px-2 rounded-md text-[12px] font-medium" ' +
+    ':style="stateChipStyle(drawerItem.state)" :data-tip="\'State: \' + (drawerItem.state ? drawerItem.state.name : \'No state\')">' +
+    '<span class="grid place-items-center" v-html="stateIcon(drawerItem.state)"></span>' +
+    '{{ drawerItem.state ? drawerItem.state.name : \'No state\' }}</span>' +
+    '<span class="text-[12px] text-sub tracking-wide">{{ drawerItem.identifier }}</span>' +
     '<span v-if="drawerItem.blocked_by_count" class="inline-flex items-center gap-1 h-5 px-1.5 rounded border border-danger/30 bg-danger/5 text-[11px] font-semibold text-danger">' +
     '<svg width="11" height="11" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="2"/><path d="M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Blocked</span>' +
     '</div>' +
-    '<input v-if="canEdit" v-model="draft.title" @blur="saveTitle" @keydown.enter.prevent="$event.target.blur()" ' +
-    'class="w-full text-[22px] font-semibold text-head mt-1 bg-transparent outline-none rounded px-1 -ml-1 hover:bg-hover focus:bg-hover" />' +
-    '<h1 v-else class="text-[22px] font-semibold text-head mt-1">{{ drawerItem.title }}</h1>' +
+    // A heading until it is double-clicked. Enter commits, Escape backs out, blur saves —
+    // and it never looks like a form field while you are only reading.
+    '<input v-if="editingTitle" ref="titleField" v-model="draft.title" @blur="saveTitle" ' +
+    '@keydown.enter.prevent="$event.target.blur()" @keydown.esc.prevent="cancelEditTitle" ' +
+    'class="w-full text-[22px] font-semibold text-head mt-2 bg-white outline-none rounded px-1 -ml-1 ring-1 ring-brand/40" />' +
+    '<h1 v-else class="text-[22px] font-semibold text-head mt-2 rounded px-1 -ml-1" ' +
+    ':class="canEdit ? \'cursor-text\' : \'\'" @dblclick="startEditTitle" ' +
+    ':data-tip="canEdit ? \'Double-click to rename\' : null">{{ drawerItem.title }}</h1>' +
 
     '<div class="mt-4 border-b border-line"></div>' +
 
     // The editor is mounted only while editing (⋯ → Edit). Reading is the common case, and
     // an editor that is always there pays its start-up cost on every open.
     '<div v-if="editingDescription && canEdit" class="mt-5">' +
-    '<wi-editor v-model="draft.description" min-height="180px" class="block" ' +
+    '<wi-editor ref="descriptionEditor" v-model="draft.description" min-height="180px" class="block" ' +
     ':media-upload="endpoints.mediaUpload" :media-gallery="endpoints.mediaGallery" :media-max-bytes="mediaMaxBytes" />' +
     '<div class="flex justify-end gap-2 mt-2">' +
     '<button type="button" @click="editingDescription = false" class="h-8 px-3 rounded-md border border-stroke text-[13px] font-semibold text-ink hover:bg-hover">Cancel</button>' +
     '<button type="button" @click="finishEditingDescription" class="h-8 px-4 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold">Save</button>' +
     '</div></div>' +
-    // Read view: the stored markup, which the server sanitized on the way in.
-    '<div v-else-if="drawerItem.description" class="wi-rich text-[14px] text-ink leading-relaxed mt-5" v-html="drawerItem.description"></div>' +
+    // Read view: the stored markup, which the server sanitized on the way in. Clamped until
+    // asked for in full, so a long description does not bury the sections below it.
+    '<div v-else-if="drawerItem.description" class="mt-5">' +
+    '<div ref="descriptionBody" class="wi-rich text-[14px] text-ink leading-relaxed" ' +
+    ':class="desc.expanded ? \'\' : \'wi-desc-clamp\'" v-html="drawerItem.description"></div>' +
+    '<button v-if="desc.overflows" type="button" @click="toggleDescription" ' +
+    'class="mt-2 text-[13px] font-medium text-link hover:underline">{{ desc.expanded ? \'Show less\' : \'Show more\' }}</button>' +
+    '</div>' +
     '<button v-else-if="canEdit" type="button" @click="editDescription" class="mt-5 text-[14px] text-sub hover:text-ink">Add a description…</button>' +
     '<p v-else class="text-[14px] text-sub mt-5">No description.</p>' +
 
@@ -1871,7 +1716,7 @@ PB.boot('work-items', {
     '<span class="isolate inline-flex rounded-md shadow-sm">' +
 
     '<span class="relative" data-add-menu>' +
-    '<button type="button" @click="addMenu = addMenu === \'dep\' ? \'\' : \'dep\'" title="Add dependency" class="relative inline-flex items-center gap-1 rounded-l-md h-9 pl-2.5 pr-1.5 text-sub ring-1 ring-inset ring-stroke hover:bg-hover focus:z-10">' +
+    '<button type="button" @click="addMenu = addMenu === \'dep\' ? \'\' : \'dep\'" data-tip="Add dependency" aria-label="Add dependency" class="relative inline-flex items-center gap-1 rounded-l-md h-9 pl-2.5 pr-1.5 text-sub ring-1 ring-inset ring-stroke hover:bg-hover focus:z-10">' +
     '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M7 4v16M7 20l-3-3M7 20l3-3M17 20V4M17 4l-3 3M17 4l3 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
     '<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
     '<div v-if="addMenu === \'dep\'" class="absolute left-0 top-full mt-1 w-44 rounded-md bg-white py-1 shadow-lg outline outline-1 outline-black/5 z-[90]">' +
@@ -1880,7 +1725,7 @@ PB.boot('work-items', {
     '</div></span>' +
 
     '<span class="relative -ml-px" data-add-menu>' +
-    '<button type="button" @click="addMenu = addMenu === \'rel\' ? \'\' : \'rel\'" title="Add relation" class="relative inline-flex items-center gap-1 h-9 pl-2.5 pr-1.5 text-sub ring-1 ring-inset ring-stroke hover:bg-hover focus:z-10">' +
+    '<button type="button" @click="addMenu = addMenu === \'rel\' ? \'\' : \'rel\'" data-tip="Add relation" aria-label="Add relation" class="relative inline-flex items-center gap-1 h-9 pl-2.5 pr-1.5 text-sub ring-1 ring-inset ring-stroke hover:bg-hover focus:z-10">' +
     '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><rect x="3" y="8.5" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.6"/><rect x="14" y="8.5" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M10 12h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>' +
     '<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
     '<div v-if="addMenu === \'rel\'" class="absolute left-0 top-full mt-1 w-44 rounded-md bg-white py-1 shadow-lg outline outline-1 outline-black/5 z-[90]">' +
@@ -1888,14 +1733,14 @@ PB.boot('work-items', {
     '<button type="button" @click="openPicker(\'relation\', \'duplicate_of\', \'Duplicate of\')" class="w-full text-left px-3 h-9 text-[13px] text-ink hover:bg-hover">Duplicate of</button>' +
     '</div></span>' +
 
-    '<button type="button" @click="openLinkModal(null)" title="Add link" class="relative -ml-px inline-flex items-center justify-center h-9 w-9 text-sub ring-1 ring-inset ring-stroke hover:bg-hover focus:z-10">' +
+    '<button type="button" @click="openLinkModal(null)" data-tip="Add link" aria-label="Add link" class="relative -ml-px inline-flex items-center justify-center h-9 w-9 text-sub ring-1 ring-inset ring-stroke hover:bg-hover focus:z-10">' +
     '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M9 15l6-6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M10.5 6.5l1-1a3.5 3.5 0 015 5l-1 1M13.5 17.5l-1 1a3.5 3.5 0 01-5-5l1-1" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
 
     // Attachments and Pages are drawn but inert until they ship (§42/§43) — a dead control
     // that silently does nothing is worse than one that says why.
-    '<span title="Attachments — coming soon" class="relative -ml-px inline-flex items-center justify-center h-9 w-9 text-faint ring-1 ring-inset ring-stroke cursor-not-allowed">' +
+    '<span data-tip="Attachments — coming soon" aria-label="Attachments — coming soon" class="relative -ml-px inline-flex items-center justify-center h-9 w-9 text-faint ring-1 ring-inset ring-stroke cursor-not-allowed">' +
     '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M21 11l-9 9a5 5 0 01-7-7l9-9a3.5 3.5 0 015 5l-9 9a2 2 0 01-3-3l8-8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>' +
-    '<span title="Link pages — coming soon" class="relative -ml-px inline-flex items-center justify-center rounded-r-md h-9 w-9 text-faint ring-1 ring-inset ring-stroke cursor-not-allowed">' +
+    '<span data-tip="Link pages — coming soon" aria-label="Link pages — coming soon" class="relative -ml-px inline-flex items-center justify-center rounded-r-md h-9 w-9 text-faint ring-1 ring-inset ring-stroke cursor-not-allowed">' +
     '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M8 3h6l4 4v13a1 1 0 01-1 1H8a1 1 0 01-1-1V4a1 1 0 011-1z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M14 3v4h4M9.5 12h5M9.5 15.5h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>' +
 
     '</span></div>' +
@@ -1914,11 +1759,11 @@ PB.boot('work-items', {
     '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="transition-transform" :class="secOpen.subtasks ? \'\' : \'-rotate-90\'"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
     '<span class="text-[13px] font-semibold text-head">Sub-work items</span>' +
     '<span class="text-[12px] text-sub">{{ structure.subtasks.items.length }}</span>' +
-    '<span class="inline-flex items-center gap-1.5 h-5 pl-1 pr-2 rounded-full border border-line text-[11px] text-sub" :title="structure.subtasks.progress.percent + \'% complete\'">' +
+    '<span class="inline-flex items-center gap-1.5 h-5 pl-1 pr-2 rounded-full border border-line text-[11px] text-sub" :data-tip="structure.subtasks.progress.percent + \'% complete\'" :aria-label="structure.subtasks.progress.percent + \'% complete\'">' +
     '<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" :stroke="structure.subtasks.progress.percent === 100 ? \'#22c55e\' : \'#9ca3af\'" stroke-width="2.5"/></svg>' +
     '{{ structure.subtasks.progress.completed }}/{{ structure.subtasks.progress.total }}</span>' +
     '<div v-if="canEdit" class="ml-auto relative" data-add-menu>' +
-    '<button type="button" @click="addMenu = addMenu === \'sec-sub\' ? \'\' : \'sec-sub\'" title="Add sub-work item" class="h-7 w-7 grid place-items-center rounded text-sub hover:bg-hover">' +
+    '<button type="button" @click="addMenu = addMenu === \'sec-sub\' ? \'\' : \'sec-sub\'" data-tip="Add sub-work item" aria-label="Add sub-work item" class="h-7 w-7 grid place-items-center rounded text-sub hover:bg-hover">' +
     '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>' +
     '<div v-if="addMenu === \'sec-sub\'" class="absolute right-0 top-full mt-1 w-52 rounded-md bg-white py-1 shadow-lg outline outline-1 outline-black/5 z-[90]">' +
     '<button type="button" @click="createSubtask" class="w-full text-left px-3 h-9 text-[13px] text-ink hover:bg-hover">Create new</button>' +
@@ -1929,13 +1774,15 @@ PB.boot('work-items', {
     '<a :href="rowUrl(row)" class="text-[12px] text-sub shrink-0 hover:underline">{{ row.identifier }}</a>' +
     '<a :href="rowUrl(row)" class="text-[13px] text-ink truncate hover:underline">{{ row.title }}</a>' +
     '<span class="ml-auto flex items-center gap-1.5 shrink-0">' +
-    '<span class="inline-flex items-center gap-1.5 h-6 px-2 rounded-md border border-line bg-white text-[12px] text-ink"><span class="grid place-items-center" v-html="stateIcon(row.state)"></span>{{ row.state ? row.state.name : \'No state\' }}</span>' +
-    '<span class="inline-flex items-center gap-1.5 h-6 px-2 rounded-md border border-line bg-white text-[12px]" :class="priorityMeta(row.priority).cls"><span class="grid place-items-center" v-html="priorityMeta(row.priority).icon"></span>{{ priorityMeta(row.priority).label }}</span>' +
+    '<span class="inline-flex items-center gap-1.5 h-6 px-2 rounded-md border border-line bg-white text-[12px] text-ink" ' +
+    ':data-tip="\'State: \' + (row.state ? row.state.name : \'No state\')"><span class="grid place-items-center" v-html="stateIcon(row.state)"></span>{{ row.state ? row.state.name : \'No state\' }}</span>' +
+    '<span class="inline-flex items-center gap-1.5 h-6 px-2 rounded-md border border-line bg-white text-[12px]" :class="priorityMeta(row.priority).cls" ' +
+    ':data-tip="\'Priority: \' + priorityMeta(row.priority).label"><span class="grid place-items-center" v-html="priorityMeta(row.priority).icon"></span>{{ priorityMeta(row.priority).label }}</span>' +
     '<span v-if="row.due_date" class="inline-flex items-center gap-1.5 h-6 px-2 rounded-md border border-line bg-white text-[12px] text-ink">{{ fmtDate(row.due_date) }}</span>' +
     '<wi-avatar v-if="row.assignees.length" :person="row.assignees[0]" :size="24" />' +
-    '<span v-else class="h-6 w-6 rounded-full border border-dashed border-stroke grid place-items-center text-faint" title="Unassigned">' +
+    '<span v-else class="h-6 w-6 rounded-full border border-dashed border-stroke grid place-items-center text-faint" data-tip="Unassigned" aria-label="Unassigned">' +
     '<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.2" stroke="currentColor" stroke-width="1.7"/><path d="M5 20a7 7 0 0114 0" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></span>' +
-    '<button type="button" @click="openStructMenu(\'subtask\', row, $event)" class="h-6 w-6 grid place-items-center rounded text-faint hover:bg-line" title="More">' +
+    '<button type="button" @click="openStructMenu(\'subtask\', row, $event)" class="h-6 w-6 grid place-items-center rounded text-faint hover:bg-line" data-tip="More" aria-label="More">' +
     '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="5" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="19" cy="12" r="1.5" fill="currentColor"/></svg></button>' +
     '</span></li></ul></div>' +
 
@@ -1947,7 +1794,7 @@ PB.boot('work-items', {
     '<span class="text-[13px] font-semibold text-head">Dependencies</span>' +
     '<span class="text-[12px] text-sub">{{ structure.dependencies.blocked_by.length + structure.dependencies.blocking.length }}</span>' +
     '<div v-if="canEdit" class="ml-auto relative" data-add-menu>' +
-    '<button type="button" @click="addMenu = addMenu === \'sec-dep\' ? \'\' : \'sec-dep\'" title="Add dependency" class="h-7 w-7 grid place-items-center rounded text-sub hover:bg-hover">' +
+    '<button type="button" @click="addMenu = addMenu === \'sec-dep\' ? \'\' : \'sec-dep\'" data-tip="Add dependency" aria-label="Add dependency" class="h-7 w-7 grid place-items-center rounded text-sub hover:bg-hover">' +
     '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>' +
     '<div v-if="addMenu === \'sec-dep\'" class="absolute right-0 top-full mt-1 w-44 rounded-md bg-white py-1 shadow-lg outline outline-1 outline-black/5 z-[90]">' +
     '<button type="button" @click="openPicker(\'relation\', \'blocked_by\', \'Blocked by\')" class="w-full text-left px-3 h-9 text-[13px] text-ink hover:bg-hover">Blocked by</button>' +
@@ -1963,12 +1810,14 @@ PB.boot('work-items', {
     '<a :href="rowUrl(row)" class="text-[12px] text-sub shrink-0 hover:underline">{{ row.identifier }}</a>' +
     '<a :href="rowUrl(row)" class="text-[13px] text-ink truncate hover:underline">{{ row.title }}</a>' +
     '<span class="ml-auto flex items-center gap-1.5 shrink-0">' +
-    '<span class="inline-flex items-center gap-1.5 h-6 px-2 rounded-md border border-line bg-white text-[12px] text-ink"><span class="grid place-items-center" v-html="stateIcon(row.state)"></span>{{ row.state ? row.state.name : \'No state\' }}</span>' +
-    '<span class="inline-flex items-center gap-1.5 h-6 px-2 rounded-md border border-line bg-white text-[12px]" :class="priorityMeta(row.priority).cls"><span class="grid place-items-center" v-html="priorityMeta(row.priority).icon"></span>{{ priorityMeta(row.priority).label }}</span>' +
+    '<span class="inline-flex items-center gap-1.5 h-6 px-2 rounded-md border border-line bg-white text-[12px] text-ink" ' +
+    ':data-tip="\'State: \' + (row.state ? row.state.name : \'No state\')"><span class="grid place-items-center" v-html="stateIcon(row.state)"></span>{{ row.state ? row.state.name : \'No state\' }}</span>' +
+    '<span class="inline-flex items-center gap-1.5 h-6 px-2 rounded-md border border-line bg-white text-[12px]" :class="priorityMeta(row.priority).cls" ' +
+    ':data-tip="\'Priority: \' + priorityMeta(row.priority).label"><span class="grid place-items-center" v-html="priorityMeta(row.priority).icon"></span>{{ priorityMeta(row.priority).label }}</span>' +
     '<wi-avatar v-if="row.assignees.length" :person="row.assignees[0]" :size="24" />' +
-    '<span v-else class="h-6 w-6 rounded-full border border-dashed border-stroke grid place-items-center text-faint" title="Unassigned">' +
+    '<span v-else class="h-6 w-6 rounded-full border border-dashed border-stroke grid place-items-center text-faint" data-tip="Unassigned" aria-label="Unassigned">' +
     '<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.2" stroke="currentColor" stroke-width="1.7"/><path d="M5 20a7 7 0 0114 0" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></span>' +
-    '<button type="button" @click="openStructMenu(\'relation\', row, $event)" class="h-6 w-6 grid place-items-center rounded text-faint hover:bg-line" title="More">' +
+    '<button type="button" @click="openStructMenu(\'relation\', row, $event)" class="h-6 w-6 grid place-items-center rounded text-faint hover:bg-line" data-tip="More" aria-label="More">' +
     '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="5" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="19" cy="12" r="1.5" fill="currentColor"/></svg></button>' +
     '</span></li></ul></div></template></div></div>' +
 
@@ -1980,7 +1829,7 @@ PB.boot('work-items', {
     '<span class="text-[13px] font-semibold text-head">Relations</span>' +
     '<span class="text-[12px] text-sub">{{ structure.relations.related.length + structure.relations.duplicate_of.length + structure.relations.duplicated_by.length }}</span>' +
     '<div v-if="canEdit" class="ml-auto relative" data-add-menu>' +
-    '<button type="button" @click="addMenu = addMenu === \'sec-rel\' ? \'\' : \'sec-rel\'" title="Add relation" class="h-7 w-7 grid place-items-center rounded text-sub hover:bg-hover">' +
+    '<button type="button" @click="addMenu = addMenu === \'sec-rel\' ? \'\' : \'sec-rel\'" data-tip="Add relation" aria-label="Add relation" class="h-7 w-7 grid place-items-center rounded text-sub hover:bg-hover">' +
     '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>' +
     '<div v-if="addMenu === \'sec-rel\'" class="absolute right-0 top-full mt-1 w-44 rounded-md bg-white py-1 shadow-lg outline outline-1 outline-black/5 z-[90]">' +
     '<button type="button" @click="openPicker(\'relation\', \'related\', \'Related to\')" class="w-full text-left px-3 h-9 text-[13px] text-ink hover:bg-hover">Related to</button>' +
@@ -1996,12 +1845,14 @@ PB.boot('work-items', {
     '<a :href="rowUrl(row)" class="text-[12px] text-sub shrink-0 hover:underline">{{ row.identifier }}</a>' +
     '<a :href="rowUrl(row)" class="text-[13px] text-ink truncate hover:underline">{{ row.title }}</a>' +
     '<span class="ml-auto flex items-center gap-1.5 shrink-0">' +
-    '<span class="inline-flex items-center gap-1.5 h-6 px-2 rounded-md border border-line bg-white text-[12px] text-ink"><span class="grid place-items-center" v-html="stateIcon(row.state)"></span>{{ row.state ? row.state.name : \'No state\' }}</span>' +
-    '<span class="inline-flex items-center gap-1.5 h-6 px-2 rounded-md border border-line bg-white text-[12px]" :class="priorityMeta(row.priority).cls"><span class="grid place-items-center" v-html="priorityMeta(row.priority).icon"></span>{{ priorityMeta(row.priority).label }}</span>' +
+    '<span class="inline-flex items-center gap-1.5 h-6 px-2 rounded-md border border-line bg-white text-[12px] text-ink" ' +
+    ':data-tip="\'State: \' + (row.state ? row.state.name : \'No state\')"><span class="grid place-items-center" v-html="stateIcon(row.state)"></span>{{ row.state ? row.state.name : \'No state\' }}</span>' +
+    '<span class="inline-flex items-center gap-1.5 h-6 px-2 rounded-md border border-line bg-white text-[12px]" :class="priorityMeta(row.priority).cls" ' +
+    ':data-tip="\'Priority: \' + priorityMeta(row.priority).label"><span class="grid place-items-center" v-html="priorityMeta(row.priority).icon"></span>{{ priorityMeta(row.priority).label }}</span>' +
     '<wi-avatar v-if="row.assignees.length" :person="row.assignees[0]" :size="24" />' +
-    '<span v-else class="h-6 w-6 rounded-full border border-dashed border-stroke grid place-items-center text-faint" title="Unassigned">' +
+    '<span v-else class="h-6 w-6 rounded-full border border-dashed border-stroke grid place-items-center text-faint" data-tip="Unassigned" aria-label="Unassigned">' +
     '<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.2" stroke="currentColor" stroke-width="1.7"/><path d="M5 20a7 7 0 0114 0" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></span>' +
-    '<button type="button" @click="openStructMenu(\'relation\', row, $event)" class="h-6 w-6 grid place-items-center rounded text-faint hover:bg-line" title="More">' +
+    '<button type="button" @click="openStructMenu(\'relation\', row, $event)" class="h-6 w-6 grid place-items-center rounded text-faint hover:bg-line" data-tip="More" aria-label="More">' +
     '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="5" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="19" cy="12" r="1.5" fill="currentColor"/></svg></button>' +
     '</span></li></ul></div></template></div></div>' +
 
@@ -2012,7 +1863,7 @@ PB.boot('work-items', {
     '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="transition-transform" :class="secOpen.links ? \'\' : \'-rotate-90\'"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
     '<span class="text-[13px] font-semibold text-head">Links</span>' +
     '<span class="text-[12px] text-sub">{{ structure.links.length }}</span>' +
-    '<button v-if="canEdit" type="button" @click="openLinkModal(null)" title="Add link" class="ml-auto h-7 w-7 grid place-items-center rounded text-sub hover:bg-hover">' +
+    '<button v-if="canEdit" type="button" @click="openLinkModal(null)" data-tip="Add link" aria-label="Add link" class="ml-auto h-7 w-7 grid place-items-center rounded text-sub hover:bg-hover">' +
     '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>' +
     '</div>' +
     '<ul v-show="secOpen.links" class="mt-1 space-y-1">' +
@@ -2020,9 +1871,9 @@ PB.boot('work-items', {
     '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-link shrink-0"><path d="M9 15l6-6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M10.5 6.5l1-1a3.5 3.5 0 015 5l-1 1M13.5 17.5l-1 1a3.5 3.5 0 01-5-5l1-1" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
     '<a :href="l.url" target="_blank" rel="noopener noreferrer" class="text-[13px] text-ink truncate hover:underline">{{ l.label }}</a>' +
     '<span class="ml-auto text-[12px] text-faint shrink-0 hidden sm:inline">{{ relativeTime(l.created_at) }}</span>' +
-    '<button type="button" @click="copyText(l.url)" title="Copy link" class="h-6 w-6 grid place-items-center rounded text-faint hover:bg-line shrink-0">' +
+    '<button type="button" @click="copyText(l.url)" data-tip="Copy link" aria-label="Copy link" class="h-6 w-6 grid place-items-center rounded text-faint hover:bg-line shrink-0">' +
     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="9" y="9" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M15 9V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7a2 2 0 002 2h3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>' +
-    '<button v-if="canEdit" type="button" @click="openStructMenu(\'link\', l, $event)" class="h-6 w-6 grid place-items-center rounded text-faint hover:bg-line shrink-0" title="More">' +
+    '<button v-if="canEdit" type="button" @click="openStructMenu(\'link\', l, $event)" class="h-6 w-6 grid place-items-center rounded text-faint hover:bg-line shrink-0" data-tip="More" aria-label="More">' +
     '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="5" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="19" cy="12" r="1.5" fill="currentColor"/></svg></button>' +
     '</li></ul></div>' +
 
@@ -2063,7 +1914,7 @@ PB.boot('work-items', {
 
     // ===== Comment composer — on All and Comments (§5.3/§7.3) =====
     '<div v-if="canEdit && (tab === \'all\' || tab === \'comments\')" class="mb-5">' +
-    '<wi-editor v-model="composer.content" placeholder="Add comment" min-height="90px" class="block" ' +
+    '<wi-editor ref="commentEditor" v-model="composer.content" placeholder="Add comment" min-height="90px" class="block" ' +
     ':media-upload="endpoints.mediaUpload" :media-gallery="endpoints.mediaGallery" :media-max-bytes="mediaMaxBytes" />' +
     '<div class="flex items-center mt-2">' +
     '<button type="button" @click="postComment" :disabled="composer.busy || !hasText(composer.content)" ' +
@@ -2121,19 +1972,19 @@ PB.boot('work-items', {
 
     '<div class="flex items-start gap-2.5 p-3">' +
     '<wi-avatar :person="c.author" :size="28" />' +
-    '<div class="min-w-0 flex-1">' +
+    '<div class="min-w-0 flex-1 overflow-hidden">' +
     '<div class="flex items-center gap-2">' +
     '<span class="text-[13px] font-medium text-ink truncate">{{ c.author ? c.author.name : \'Someone\' }}</span>' +
     '<span class="text-[12px] text-faint shrink-0">{{ relativeTime(c.created_at) }}</span>' +
     '<span v-if="c.edited" class="text-[11px] text-faint shrink-0">(edited)</span>' +
     '<span class="ml-auto flex items-center gap-0.5 shrink-0">' +
-    '<button v-if="canEdit" type="button" @click="startReply(c)" title="Reply" aria-label="Reply" ' +
+    '<button v-if="canEdit" type="button" @click="startReply(c)" data-tip="Reply" aria-label="Reply" ' +
     'class="h-6 w-6 grid place-items-center rounded text-faint hover:text-ink hover:bg-hover">' +
     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M9 14l-5-5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 9h9a7 7 0 010 14h-2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
-    '<button v-if="canEditComment(c)" type="button" @click="startEditComment(c)" title="Edit" aria-label="Edit comment" ' +
+    '<button v-if="canEditComment(c)" type="button" @click="startEditComment(c)" data-tip="Edit" aria-label="Edit comment" ' +
     'class="h-6 w-6 grid place-items-center rounded text-faint hover:text-ink hover:bg-hover">' +
     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M4 20h4l10-10-4-4L4 16v4z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg></button>' +
-    '<button v-if="canEdit" type="button" @click="deleteComment(c)" title="Delete" aria-label="Delete comment" ' +
+    '<button v-if="canEdit" type="button" @click="deleteComment(c)" data-tip="Delete" aria-label="Delete comment" ' +
     'class="h-6 w-6 grid place-items-center rounded text-faint hover:text-danger hover:bg-hover">' +
     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 7h14M10 4h4M9 7l.8 12a1 1 0 001 1h4.4a1 1 0 001-1L17 7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
     '</span></div>' +
@@ -2144,15 +1995,15 @@ PB.boot('work-items', {
     '<ul v-if="c.replies.length" class="border-t border-line bg-[#fafbfc] rounded-b-lg divide-y divide-line">' +
     '<li v-for="r in c.replies" :key="r.id" class="flex items-start gap-2.5 p-3 pl-6">' +
     '<wi-avatar :person="r.author" :size="24" />' +
-    '<div class="min-w-0 flex-1"><div class="flex items-center gap-2">' +
+    '<div class="min-w-0 flex-1 overflow-hidden"><div class="flex items-center gap-2">' +
     '<span class="text-[13px] font-medium text-ink truncate">{{ r.author ? r.author.name : \'Someone\' }}</span>' +
     '<span class="text-[12px] text-faint shrink-0">{{ relativeTime(r.created_at) }}</span>' +
     '<span v-if="r.edited" class="text-[11px] text-faint shrink-0">(edited)</span>' +
     '<span class="ml-auto flex items-center gap-0.5 shrink-0">' +
-    '<button v-if="canEditComment(r)" type="button" @click="startEditComment(r)" title="Edit" aria-label="Edit reply" ' +
+    '<button v-if="canEditComment(r)" type="button" @click="startEditComment(r)" data-tip="Edit" aria-label="Edit reply" ' +
     'class="h-6 w-6 grid place-items-center rounded text-faint hover:text-ink hover:bg-hover">' +
     '<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M4 20h4l10-10-4-4L4 16v4z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg></button>' +
-    '<button v-if="canEdit" type="button" @click="deleteComment(r)" title="Delete" aria-label="Delete reply" ' +
+    '<button v-if="canEdit" type="button" @click="deleteComment(r)" data-tip="Delete" aria-label="Delete reply" ' +
     'class="h-6 w-6 grid place-items-center rounded text-faint hover:text-danger hover:bg-hover">' +
     '<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M5 7h14M10 4h4M9 7l.8 12a1 1 0 001 1h4.4a1 1 0 001-1L17 7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
     '</span></div>' +
@@ -2175,7 +2026,7 @@ PB.boot('work-items', {
     'class="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border text-[12px] font-semibold" ' +
     ':class="updateForm.status === st ? updateMeta(st).cls : \'border-line text-sub\'">' +
     '<span v-html="updateMeta(st).icon"></span>{{ updateMeta(st).label }}</button></div>' +
-    '<wi-editor v-model="updateForm.content" placeholder="Add an update…" min-height="90px" class="block" />' +
+    '<wi-editor ref="updateEditor" v-model="updateForm.content" placeholder="Add an update…" min-height="90px" class="block" />' +
     '<div class="flex justify-end gap-2 mt-2">' +
     '<button type="button" @click="updateForm.open = false" class="h-8 px-3 rounded-md border border-stroke text-[13px] font-semibold text-ink hover:bg-hover">Cancel</button>' +
     '<button type="button" @click="saveUpdate" :disabled="updateForm.busy" class="h-8 px-4 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold disabled:opacity-50">' +
@@ -2263,11 +2114,11 @@ PB.boot('work-items', {
     '<div class="flex items-center gap-2 mt-1.5 text-[12px]">' +
     '<span class="inline-flex items-center gap-1.5 h-6 px-2 rounded border border-line text-sub">' +
     '<span v-if="valueIcon(h)" class="grid place-items-center text-faint" v-html="valueIcon(h)"></span>' +
-    '{{ h.meta && h.meta.old_label ? h.meta.old_label : (h.old_value || \'None\') }}</span>' +
+    '{{ historyValue(h, \'old\') }}</span>' +
     '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
     '<span class="inline-flex items-center gap-1.5 h-6 px-2 rounded border border-line text-ink">' +
     '<span v-if="valueIcon(h)" class="grid place-items-center text-faint" v-html="valueIcon(h)"></span>' +
-    '{{ h.meta && h.meta.new_label ? h.meta.new_label : (h.new_value || \'None\') }}</span>' +
+    '{{ historyValue(h, \'new\') }}</span>' +
     '</div></div></li>' +
     '<li v-if="!feed.history.length" class="py-8 text-center"><div class="text-[13px] font-semibold text-head">No history yet</div>' +
     '<div class="text-[13px] text-sub mt-1">Changes to work item properties will appear here.</div></li>' +
@@ -2292,38 +2143,60 @@ PB.boot('work-items', {
     '<h3 class="text-[15px] font-semibold text-head">Properties</h3>' +
     '<div class="mt-4 grid grid-cols-2 gap-x-4 gap-y-4">' +
 
-    '<div><div class="text-[12px] text-sub mb-1.5">State</div>' +
-    '<button type="button" :disabled="!canEdit" @click="openRowMenu(\'state\', drawerItem, $event.currentTarget)" class="inline-flex items-center gap-1.5 text-[13px] text-ink rounded px-1.5 py-0.5 -ml-1.5 hover:bg-hover">' +
-    '<span class="grid place-items-center" v-html="stateIcon(drawerItem.state)"></span>{{ drawerItem.state ? drawerItem.state.name : \'No state\' }}</button></div>' +
+    '<div class="min-w-0"><div class="text-[12px] text-sub mb-1.5">State</div>' +
+    '<button type="button" :disabled="!canEdit" @click="openRowMenu(\'state\', drawerItem, $event.currentTarget)" ' +
+    ':data-tip="(canEdit ? \'Change state — \' : \'State: \') + (drawerItem.state ? drawerItem.state.name : \'No state\')" ' +
+    'class="flex items-center gap-1.5 max-w-full text-[13px] text-ink rounded px-1.5 py-0.5 -ml-1.5 hover:bg-hover">' +
+    '<span class="grid place-items-center shrink-0" v-html="stateIcon(drawerItem.state)"></span>' +
+    '<span class="truncate">{{ drawerItem.state ? drawerItem.state.name : \'No state\' }}</span></button></div>' +
 
-    '<div><div class="text-[12px] text-sub mb-1.5">Priority</div>' +
-    '<button type="button" :disabled="!canEdit" @click="openRowMenu(\'priority\', drawerItem, $event.currentTarget)" class="inline-flex items-center gap-1.5 text-[13px] rounded px-1.5 py-0.5 -ml-1.5 hover:bg-hover" :class="priorityMeta(drawerItem.priority).cls">' +
+    '<div class="min-w-0"><div class="text-[12px] text-sub mb-1.5">Priority</div>' +
+    '<button type="button" :disabled="!canEdit" @click="openRowMenu(\'priority\', drawerItem, $event.currentTarget)" ' +
+    ':data-tip="canEdit ? \'Change priority\' : \'Priority\'" class="inline-flex items-center gap-1.5 text-[13px] rounded px-1.5 py-0.5 -ml-1.5 hover:bg-hover" :class="priorityMeta(drawerItem.priority).cls">' +
     '<span class="grid place-items-center" v-html="priorityMeta(drawerItem.priority).icon"></span>{{ priorityMeta(drawerItem.priority).label }}</button></div>' +
 
-    '<div><div class="text-[12px] text-sub mb-1.5">Assignee</div>' +
-    '<button type="button" :disabled="!canEdit" @click="openRowMenu(\'assignees\', drawerItem, $event.currentTarget)" class="inline-flex items-center gap-1.5 text-[13px] text-ink rounded px-1.5 py-0.5 -ml-1.5 hover:bg-hover">' +
+    // A long name truncates instead of wrapping: these cells are half a narrow column, and a
+    // name breaking across two lines pushes every property below it out of alignment. The
+    // full name stays available in the tooltip.
+    '<div class="min-w-0"><div class="text-[12px] text-sub mb-1.5">Assignee</div>' +
+    '<button type="button" :disabled="!canEdit" @click="openRowMenu(\'assignees\', drawerItem, $event.currentTarget)" ' +
+    ':data-tip="assigneeTip" class="flex items-center gap-1.5 max-w-full text-[13px] text-ink rounded px-1.5 py-0.5 -ml-1.5 hover:bg-hover">' +
     '<template v-if="drawerItem.assignees && drawerItem.assignees.length">' +
     '<wi-avatar :person="drawerItem.assignees[0]" :size="20" />' +
-    '{{ drawerItem.assignees[0].name }}</template>' +
+    '<span class="truncate">{{ drawerItem.assignees[0].name }}</span></template>' +
     '<span v-else class="text-sub">Unassigned</span></button></div>' +
 
-    '<div><div class="text-[12px] text-sub mb-1.5">Start date</div>' +
-    '<button type="button" :disabled="!canEdit" @click="openRowMenu(\'start_date\', drawerItem, $event.currentTarget)" class="text-[13px] text-left rounded px-1.5 py-0.5 -ml-1.5 hover:bg-hover" :class="drawerItem.start_date ? \'text-ink\' : \'text-sub\'">' +
+    '<div class="min-w-0"><div class="text-[12px] text-sub mb-1.5">Start date</div>' +
+    '<button type="button" :disabled="!canEdit" @click="openRowMenu(\'start_date\', drawerItem, $event.currentTarget)" ' +
+    ':data-tip="canEdit ? \'Change start date\' : \'Start date\'" class="text-[13px] text-left rounded px-1.5 py-0.5 -ml-1.5 hover:bg-hover" :class="drawerItem.start_date ? \'text-ink\' : \'text-sub\'">' +
     '{{ drawerItem.start_date ? fmtDate(drawerItem.start_date) : \'None\' }}</button></div>' +
 
-    '<div><div class="text-[12px] text-sub mb-1.5">Due date</div>' +
-    '<button type="button" :disabled="!canEdit" @click="openRowMenu(\'due_date\', drawerItem, $event.currentTarget)" class="text-[13px] text-left rounded px-1.5 py-0.5 -ml-1.5 hover:bg-hover" :class="drawerItem.due_date ? \'text-ink\' : \'text-sub\'">' +
+    '<div class="min-w-0"><div class="text-[12px] text-sub mb-1.5">Due date</div>' +
+    '<button type="button" :disabled="!canEdit" @click="openRowMenu(\'due_date\', drawerItem, $event.currentTarget)" ' +
+    ':data-tip="canEdit ? \'Change due date\' : \'Due date\'" class="text-[13px] text-left rounded px-1.5 py-0.5 -ml-1.5 hover:bg-hover" :class="drawerItem.due_date ? \'text-ink\' : \'text-sub\'">' +
     '{{ drawerItem.due_date ? fmtDate(drawerItem.due_date) : \'None\' }}</button></div>' +
     '</div>' +
 
     '<div class="text-[13px] font-medium text-sub mt-6 mb-1">Details</div>' +
     '<div class="divide-y divide-line">' +
     '<div class="py-2.5"><div class="text-[12px] text-sub mb-1.5">Parent</div>' +
-    '<span class="text-[13px]" :class="drawerItem.parent_id ? \'text-ink\' : \'text-sub\'">{{ parentLabel(drawerItem) }}</span></div>' +
+    '<span class="block truncate text-[13px]" :class="drawerItem.parent_id ? \'text-ink\' : \'text-sub\'" ' +
+    ':data-tip="drawerItem.parent_id ? parentLabel(drawerItem) : null">{{ parentLabel(drawerItem) }}</span></div>' +
+    // §8.1: "Add cycle" when there is none, the cycle's name as a chip when there is. The
+    // whole row disappears with the feature, rather than sitting there refusing to work.
+    '<div v-if="cyclesEnabled" class="py-2.5"><div class="text-[12px] text-sub mb-1.5">Cycle</div>' +
+    '<button type="button" :disabled="!canEdit" @click="openRowMenu(\'cycle\', drawerItem, $event.currentTarget)" ' +
+    ':data-tip="drawerItem.cycle ? (canEdit ? \'Change cycle — \' + drawerItem.cycle.name : \'Cycle: \' + drawerItem.cycle.name) : (canEdit ? \'Add to a cycle\' : \'No cycle\')" ' +
+    'class="flex items-center gap-1.5 max-w-full text-[13px] text-left rounded px-1.5 py-0.5 -ml-1.5 hover:bg-hover">' +
+    '<span v-if="drawerItem.cycle" class="inline-flex items-center gap-1.5 h-6 px-2 rounded-md border border-line text-[12px] text-ink max-w-full">' +
+    '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" class="text-brand shrink-0"><path d="M21 12a9 9 0 11-3.6-7.2" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><path d="M21 4v4h-4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+    '<span class="truncate">{{ drawerItem.cycle.name }}</span></span>' +
+    '<span v-else class="text-sub">{{ canEdit ? \'Add cycle\' : \'No cycle\' }}</span></button></div>' +
     '<div class="py-2.5"><div class="text-[12px] text-sub mb-1.5">Labels</div>' +
-    '<button type="button" :disabled="!canEdit" @click="openRowMenu(\'labels\', drawerItem, $event.currentTarget)" class="flex flex-wrap items-center gap-1.5 text-left rounded px-1.5 py-0.5 -ml-1.5 hover:bg-hover">' +
-    '<span v-for="l in drawerItem.labels" :key="l.id" class="inline-flex items-center gap-1 h-5 px-1.5 rounded border border-line text-[11px] text-ink">' +
-    '<span class="h-2 w-2 rounded-full" :style="{background: l.color}"></span>{{ l.name }}</span>' +
+    '<button type="button" :disabled="!canEdit" @click="openRowMenu(\'labels\', drawerItem, $event.currentTarget)" ' +
+    ':data-tip="canEdit ? \'Change labels\' : \'Labels\'" class="flex flex-wrap items-center gap-1.5 text-left rounded px-1.5 py-0.5 -ml-1.5 hover:bg-hover">' +
+    '<span v-for="l in drawerItem.labels" :key="l.id" class="inline-flex items-center gap-1 h-5 px-1.5 rounded border border-line text-[11px] text-ink max-w-full" :data-tip="l.name">' +
+    '<span class="h-2 w-2 rounded-full shrink-0" :style="{background: l.color}"></span><span class="truncate">{{ l.name }}</span></span>' +
     '<span v-if="!drawerItem.labels || !drawerItem.labels.length" class="text-[13px] text-sub">None</span></button></div>' +
     '</div>' +
 
@@ -2343,12 +2216,12 @@ PB.boot('work-items', {
     // particular comment, which may be scrolled out of sight, so the one being answered is
     // quoted right above the editor.
     '<div v-if="commentModal.open" class="fixed inset-0 z-[102] flex items-start justify-center p-4 sm:pt-20">' +
-    '<div class="absolute inset-0 bg-black/40" @click="closeCommentModal"></div>' +
+    '<div class="absolute inset-0 bg-black/40" @mousedown="backdropDown" @click="backdropClick($event, closeCommentModal)"></div>' +
     '<div class="relative w-full max-w-[640px] bg-white rounded-xl shadow-xl flex flex-col max-h-[85vh]">' +
 
     '<div class="flex items-center gap-3 px-5 py-4 border-b border-line shrink-0">' +
     '<h2 class="text-[15px] font-semibold text-head">{{ commentModal.mode === \'edit\' ? \'Edit comment\' : \'Reply to comment\' }}</h2>' +
-    '<button type="button" @click="closeCommentModal" title="Close" aria-label="Close" ' +
+    '<button type="button" @click="closeCommentModal" data-tip="Close" aria-label="Close" ' +
     'class="ml-auto h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover">' +
     '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>' +
     '</div>' +
@@ -2360,10 +2233,10 @@ PB.boot('work-items', {
     '<wi-avatar :person="commentModal.target.author" :size="22" />' +
     '<span class="text-[13px] font-medium text-ink">{{ commentModal.target.author ? commentModal.target.author.name : \'Someone\' }}</span>' +
     '<span class="text-[12px] text-faint">{{ relativeTime(commentModal.target.created_at) }}</span></div>' +
-    '<div class="wi-rich text-[13px] text-sub mt-1.5 max-h-24 overflow-hidden" v-html="commentModal.target.content"></div>' +
+    '<div class="wi-rich text-[13px] text-sub mt-1.5 max-h-24 overflow-y-auto overflow-x-hidden" v-html="commentModal.target.content"></div>' +
     '</div>' +
 
-    '<wi-editor v-model="commentModal.content" :placeholder="commentModal.mode === \'edit\' ? \'Edit your comment\' : \'Write a reply\'" ' +
+    '<wi-editor ref="commentModalEditor" v-model="commentModal.content" :placeholder="commentModal.mode === \'edit\' ? \'Edit your comment\' : \'Write a reply\'" ' +
     'min-height="120px" class="block" ' +
     ':media-upload="endpoints.mediaUpload" :media-gallery="endpoints.mediaGallery" :media-max-bytes="mediaMaxBytes" />' +
     '</div>' +
@@ -2378,13 +2251,13 @@ PB.boot('work-items', {
     // ===== Work item picker (§22 / §30 / §34) — one dialog for sub-tasks and every relation
     // type; only the title and what happens on Add differ. =====
     '<div v-if="picker.open" class="fixed inset-0 z-[95] flex items-start justify-center p-4 sm:pt-24">' +
-    '<div class="absolute inset-0 bg-black/40" @click="closePicker"></div>' +
+    '<div class="absolute inset-0 bg-black/40" @mousedown="backdropDown" @click="backdropClick($event, closePicker)"></div>' +
     '<div class="relative w-full max-w-[640px] bg-white rounded-xl shadow-xl flex flex-col max-h-[75vh]">' +
     '<div class="flex items-center gap-3 px-5 py-3 border-b border-line shrink-0">' +
     '<span class="text-[14px] font-semibold text-head shrink-0">{{ picker.title }}</span>' +
     '<input ref="pickerSearch" v-model="picker.query" @input="onPickerQuery" type="text" placeholder="Search by ID or title" ' +
     'class="flex-1 h-8 text-[14px] text-ink placeholder:text-faint outline-none bg-transparent" />' +
-    '<button type="button" @click="closePicker" class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover" title="Close">' +
+    '<button type="button" @click="closePicker" class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover" data-tip="Close" aria-label="Close">' +
     '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>' +
     '</div>' +
 
@@ -2416,7 +2289,7 @@ PB.boot('work-items', {
 
     // ===== Add / edit link (§38) =====
     '<div v-if="linkModal.open" class="fixed inset-0 z-[95] flex items-start justify-center p-4 sm:pt-28">' +
-    '<div class="absolute inset-0 bg-black/40" @click="linkModal.open = false"></div>' +
+    '<div class="absolute inset-0 bg-black/40" @mousedown="backdropDown" @click="backdropClick($event, function () { linkModal.open = false; })"></div>' +
     '<div class="relative w-full max-w-[460px] bg-white rounded-xl shadow-xl">' +
     '<div class="px-5 py-4 border-b border-line">' +
     '<h2 class="text-[15px] font-semibold text-head">{{ linkModal.id ? \'Edit link\' : \'Add link\' }}</h2></div>' +
@@ -2475,7 +2348,53 @@ PB.boot('work-items', {
     '<span class="h-2.5 w-2.5 rounded-full shrink-0" :style="{background: l.color}"></span><span class="flex-1 truncate">{{ l.name }}</span>' +
     '<svg v-if="rowHasLabel(l)" width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-brand shrink-0"><path d="M5 12l4 4L19 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
     '</button>' +
-    '<div v-if="!rowLabels().length" class="px-2 py-3 text-[13px] text-sub text-center">No labels configured for this project</div>' +
+    '<div v-if="!rowLabels().length && !newLabel.open" class="px-2 py-3 text-[13px] text-sub text-center">' +
+    '{{ rowQuery ? \'No label matches\' : \'No labels yet\' }}</div>' +
+    '</div>' +
+
+    // Create a label without leaving the picker. The row quotes what was typed, so the
+    // common case — searched, not found, wanted anyway — is one click.
+    '<div v-if="!newLabel.open" class="border-t border-line mt-1 pt-1">' +
+    '<button type="button" @click="startNewLabel" :disabled="labelExists(rowQuery)" ' +
+    'class="w-full text-left flex items-center gap-2.5 px-2 h-9 rounded-md hover:bg-hover text-[13px] text-ink disabled:opacity-40">' +
+    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-sub shrink-0"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>' +
+    '<span class="truncate">{{ rowQuery.trim() ? \'Create “\' + rowQuery.trim() + \'”\' : \'Create new label\' }}</span></button>' +
+    '</div>' +
+
+    '<div v-else class="border-t border-line mt-1 pt-2">' +
+    '<div v-if="newLabel.error" class="mb-2 rounded-md border border-danger/40 bg-danger/5 px-2 py-1.5 text-[12px] text-danger">{{ newLabel.error }}</div>' +
+    '<input v-model="newLabel.name" placeholder="Label name" maxlength="60" @keydown.enter.prevent="saveNewLabel" ' +
+    'class="w-full h-9 px-3 rounded-md bg-hover text-[13px] text-ink placeholder:text-faint outline outline-1 -outline-offset-1 outline-transparent focus:bg-white focus:outline-stroke" />' +
+    '<div class="flex flex-wrap items-center gap-1.5 mt-2 px-0.5">' +
+    '<button v-for="c in labelColors()" :key="c" type="button" @click="newLabel.color = c" :data-tip="c" :aria-label="\'Colour \' + c" ' +
+    'class="h-5 w-5 rounded-full border-2" :style="{background: c, borderColor: newLabel.color === c ? \'#23272f\' : \'transparent\'}"></button>' +
+    '</div>' +
+    '<div class="flex justify-end gap-2 mt-2">' +
+    '<button type="button" @click="cancelNewLabel" class="h-8 px-3 rounded-md border border-stroke text-[12px] font-semibold text-ink hover:bg-hover">Cancel</button>' +
+    '<button type="button" @click="saveNewLabel" :disabled="newLabel.busy || !newLabel.name.trim()" ' +
+    'class="h-8 px-3 rounded-md bg-brand hover:bg-brand-dark text-white text-[12px] font-semibold disabled:opacity-50">{{ newLabel.busy ? \'Saving…\' : \'Save\' }}</button>' +
+    '</div></div>' +
+    '</div></template>' +
+
+    // -- Cycle (§8.2): search, current selection ticked, and picking the current one clears
+    //    it. Completed cycles are absent by construction — the server only sends assignable
+    //    ones, because offering an option it would refuse is worse than not offering it. --
+    '<template v-else-if="rowMenu.kind===\'cycle\'">' +
+    '<div class="p-2">' +
+    '<input v-model="rowQuery" placeholder="Search cycles..." class="w-full h-9 px-3 mb-1 rounded-md bg-hover text-[13px] text-ink placeholder:text-faint outline outline-1 -outline-offset-1 outline-transparent focus:bg-white focus:outline-stroke" />' +
+    '<div class="max-h-52 overflow-y-auto">' +
+    '<button v-for="c in rowCycles()" :key="c.id" type="button" @click="setRowCycle(c)" class="w-full text-left flex items-center gap-2.5 px-2 h-9 rounded-md hover:bg-hover text-[13px] text-ink">' +
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="text-sub shrink-0"><path d="M21 12a9 9 0 11-3.6-7.2" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><path d="M21 4v4h-4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+    '<span class="flex-1 truncate">{{ c.name }}</span>' +
+    '<span class="text-[11px] text-faint capitalize shrink-0">{{ c.status }}</span>' +
+    '<svg v-if="rowMenu.item && rowMenu.item.cycle_id===c.id" width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-brand shrink-0"><path d="M5 12l4 4L19 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+    '</button>' +
+    '<div v-if="!rowCycles().length" class="px-2 py-3 text-[13px] text-sub text-center">' +
+    '{{ rowQuery ? \'No cycle matches\' : \'No active or upcoming cycles\' }}</div>' +
+    '</div>' +
+    '<div v-if="rowMenu.item && rowMenu.item.cycle_id" class="border-t border-line mt-1 pt-1">' +
+    '<button type="button" @click="setRowCycle(null)" class="w-full text-left flex items-center gap-2.5 px-2 h-9 rounded-md hover:bg-hover text-[13px] text-ink">' +
+    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-sub shrink-0"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Remove from cycle</button>' +
     '</div></div></template>' +
 
     // -- Dates: the same calendar the create modal uses, with the same ordering bounds --
@@ -2502,7 +2421,7 @@ PB.boot('work-items', {
     '</div>' +
 
     // ===== Delete confirmation (§4.4: delete is permanent) =====
-    '<pb-modal :open="deleteConfirm.open" title="Delete work item?" @close="deleteConfirm.open=false">' +
+    '<pb-modal :open="deleteConfirm.open" data-tip="Delete work item?" @close="deleteConfirm.open=false">' +
     '<p class="text-[13px] text-sub leading-relaxed">This permanently deletes <span class="font-semibold text-ink">{{ deleteConfirm.item ? deleteConfirm.item.identifier : \'\' }}</span> and everything on it. This cannot be undone.</p>' +
     '<template #footer>' +
     '<button type="button" class="h-9 px-4 rounded-md border border-stroke text-[13px] font-semibold text-ink hover:bg-hover" @click="deleteConfirm.open=false">Cancel</button>' +
@@ -2514,7 +2433,7 @@ PB.boot('work-items', {
     // inside the drawer, and at a lower layer it rendered behind the drawer's panel — open,
     // but invisible.
     '<div v-if="open" class="fixed inset-0 z-[100] flex items-start justify-center p-4 sm:pt-20">' +
-    '<div class="absolute inset-0 bg-black/40" @click="closeCreate"></div>' +
+    '<div class="absolute inset-0 bg-black/40" @mousedown="backdropDown" @click="backdropClick($event, closeCreate)"></div>' +
     '<div class="relative w-full max-w-[720px] bg-white rounded-xl shadow-xl flex flex-col max-h-[86vh]">' +
 
     // Header
@@ -2523,7 +2442,7 @@ PB.boot('work-items', {
     '<span class="inline-flex items-center gap-1.5 h-7 px-2 rounded-md border border-stroke text-[13px] text-ink"><span>{{ project.emoji || \'📁\' }}</span>{{ project.name }}</span>' +
     '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" class="text-faint"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
     '<span class="text-[13px] text-sub">New work item</span>' +
-    '<button @click="closeCreate" class="ml-auto h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover" title="Close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>' +
+    '<button @click="closeCreate" class="ml-auto h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover" data-tip="Close" aria-label="Close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>' +
     '</div>' +
 
     // Body. `overflow-visible` (as in the POC) is load-bearing: every chip popover opens
@@ -2639,7 +2558,7 @@ PB.boot('work-items', {
 
     // ===== Parent search panel (POC: ParentSearchModal) — sits above the create modal =====
     '<div v-if="parentOpen" class="fixed inset-0 z-[105] flex items-start justify-center p-4 sm:pt-24">' +
-    '<div class="absolute inset-0 bg-black/40" @click="closeParent"></div>' +
+    '<div class="absolute inset-0 bg-black/40" @mousedown="backdropDown" @click="backdropClick($event, closeParent)"></div>' +
     '<div class="relative w-full max-w-[720px] bg-white rounded-xl shadow-xl flex flex-col max-h-[70vh]">' +
 
     // Search header

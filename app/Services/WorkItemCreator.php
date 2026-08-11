@@ -33,7 +33,7 @@ class WorkItemCreator
     ) {}
 
     /**
-     * @param  array{title:string, description:?string, state_id:?int, priority:?string, start_date:?string, due_date:?string, parent_id:?int, assignee_ids?:array<int,int>, label_ids?:array<int,int>}  $data
+     * @param  array{title:string, description:?string, state_id:?int, priority:?string, start_date:?string, due_date:?string, parent_id:?int, cycle_id?:?int, assignee_ids?:array<int,int>, label_ids?:array<int,int>}  $data
      */
     public function create(User $creator, Project $project, array $data): WorkItem
     {
@@ -52,6 +52,11 @@ class WorkItemCreator
                 'start_date' => $data['start_date'] ?? null,
                 'due_date' => $data['due_date'] ?? null,
                 'parent_id' => $data['parent_id'] ?? null,
+                // Cycles §7.3: an item can be created already planned into a cycle, from the
+                // cycle detail page's "create new work item" action.
+                'cycle_id' => $data['cycle_id'] ?? null,
+                'cycle_assigned_by' => ! empty($data['cycle_id']) ? $creator->id : null,
+                'cycle_assigned_at' => ! empty($data['cycle_id']) ? now() : null,
                 'created_by' => $creator->id,
             ]);
 

@@ -143,8 +143,8 @@
             <p data-err="name" class="hidden text-[12px] text-red-600 mt-1"></p>
           </div>
           <div class="relative sm:w-44">
-            <input id="proj-id" type="text" placeholder="Project ID" class="pb-input pr-9 uppercase w-full" maxlength="{{ $config['identifierMax'] }}" />
-            <span class="absolute right-2.5 top-[18px] -translate-y-1/2 text-faint" title="Project identifier — used to prefix work item IDs"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/><path d="M12 11v5M12 8v.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>
+            <input id="proj-id" type="text" placeholder="Identifier" class="pb-input pr-9 lowercase w-full" maxlength="{{ $config['identifierMax'] }}" />
+            <span class="absolute right-2.5 top-[18px] -translate-y-1/2 text-faint" title="Identifier — used to prefix work item IDs"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/><path d="M12 11v5M12 8v.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>
             <p data-err="identifier" class="hidden text-[12px] text-red-600 mt-1"></p>
           </div>
         </div>
@@ -337,13 +337,14 @@
         modal.addEventListener('click', function (e) { if (e.target.closest('[data-proj-close]')) close(); });
         document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !modal.classList.contains('hidden')) close(); });
 
-        // Auto-derive Project ID from name until manually edited (PRJ-023)
+        // Auto-derive the identifier from the name until manually edited (PRJ-023).
+        // Lower case is the canonical form — the server normalises to it either way.
         nameEl.addEventListener('input', function () {
           if (idEdited) return;
-          idEl.value = nameEl.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, CFG.identifierMax || 10);
+          idEl.value = nameEl.value.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, CFG.identifierMax || 10);
         });
         idEl.addEventListener('input', function () {
-          idEl.value = idEl.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, CFG.identifierMax || 10);
+          idEl.value = idEl.value.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, CFG.identifierMax || 10);
           idEdited = idEl.value.length > 0;
         });
 
@@ -418,7 +419,7 @@
           if (submitting) return;
           clearErrors();
           if (!nameEl.value.trim()) { showError('name', 'Project name is required.'); nameEl.focus(); return; }
-          if (!idEl.value.trim()) { showError('identifier', 'Project ID is required.'); idEl.focus(); return; }
+          if (!idEl.value.trim()) { showError('identifier', 'Identifier is required.'); idEl.focus(); return; }
 
           submitting = true; createBtn.disabled = true; createBtn.textContent = 'Creating…';
           var fd = new FormData();

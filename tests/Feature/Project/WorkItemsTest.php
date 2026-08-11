@@ -36,16 +36,20 @@ class WorkItemsTest extends ProjectTestCase
             ->assertRedirect(route('projects.work-items', $project));
     }
 
-    public function test_work_items_screen_renders_all_six_tabs(): void
+    public function test_work_items_screen_renders_the_workspace_tabs(): void
     {
         [$owner, $ws] = $this->owner();
         $project = $this->makeProject($owner, $ws, ['identifier' => 'TESTI']);
 
         $response = $this->actingAs($owner)->get(route('projects.work-items', $project))->assertOk();
 
-        foreach (['Overview', 'Work items', 'Cycles', 'Modules', 'Views', 'Pages'] as $label) {
+        foreach (['Overview', 'Work items', 'Modules', 'Views', 'Pages'] as $label) {
             $response->assertSee($label, false);
         }
+
+        // Cycles is feature-gated per project (Cycles §3.2.4) and is covered by CycleTest;
+        // it is absent here because this project has not switched it on.
+        $this->assertFalse(collect($response->viewData('tabs'))->pluck('key')->contains('cycles'));
     }
 
     public function test_non_mvp_tabs_show_coming_soon_and_work_items_is_not_one(): void
@@ -53,7 +57,9 @@ class WorkItemsTest extends ProjectTestCase
         [$owner, $ws] = $this->owner();
         $project = $this->makeProject($owner, $ws, ['identifier' => 'TESTI']);
 
-        foreach (['overview', 'cycles', 'modules', 'views', 'pages'] as $tab) {
+        // Cycles is deliberately not in this list: it is a built feature with its own
+        // controller, routed ahead of the Coming Soon catch-all (Cycles §4).
+        foreach (['overview', 'modules', 'views', 'pages'] as $tab) {
             $this->actingAs($owner)
                 ->get(route('projects.workspace.tab', ['project' => $project->id, 'tab' => $tab]))
                 ->assertOk()
@@ -343,7 +349,7 @@ class WorkItemsTest extends ProjectTestCase
         // The ⋯ menu renders on every workspace tab, not just Work Items.
         foreach ([
             route('projects.work-items', $project),
-            route('projects.workspace.tab', ['project' => $project->id, 'tab' => 'cycles']),
+            route('projects.workspace.tab', ['project' => $project->id, 'tab' => 'modules']),
         ] as $url) {
             $response = $this->actingAs($owner)->get($url)->assertOk()->assertSee('Project actions', false);
 

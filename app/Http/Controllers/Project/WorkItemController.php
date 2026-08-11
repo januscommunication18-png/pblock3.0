@@ -5,15 +5,17 @@ namespace App\Http\Controllers\Project;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Project\StoreWorkItemRequest;
 use App\Http\Requests\Project\UpdateWorkItemRequest;
+use App\Models\Cycle;
 use App\Models\Project;
 use App\Models\ProjectItemLabel;
 use App\Models\ProjectItemState;
 use App\Models\WorkItem;
 use App\Models\WorkItemActivity;
-use App\Models\WorkItemRelation;
 use App\Models\WorkspaceMembership;
+use App\Policies\WorkItemPolicy;
 use App\Services\ProjectItemStateProvisioner;
 use App\Services\ProjectNavigation;
+use App\Services\WorkItemBlockers;
 use App\Services\WorkItemCreator;
 use App\Services\WorkItemUpdater;
 use Illuminate\Contracts\View\View;
@@ -35,6 +37,7 @@ class WorkItemController extends Controller
         private readonly WorkItemCreator $creator,
         private readonly WorkItemUpdater $updater,
         private readonly ProjectNavigation $navigation,
+        private readonly WorkItemBlockers $blockers,
     ) {}
 
     /** GET /projects/{project}/work-items */
@@ -63,7 +66,7 @@ class WorkItemController extends Controller
             'workspace' => Auth::user()->currentWorkspace,
             'user' => Auth::user(),
             'project' => $project,
-            'tabs' => config('projects.workspace_tabs'),
+            'tabs' => $this->navigation->tabs($project),
             'activeTab' => 'work-items',
             // Shared sidebar: project list + the gate on its "New work item" action.
             'projects' => $this->navigation->sidebarProjects(Auth::user()),
@@ -83,6 +86,9 @@ class WorkItemController extends Controller
                 ])->values()->all(),
                 'labels' => $this->labels($project),
                 'members' => $this->projectMembers($project),
+                // Cycles §8.1: the property only appears when the project has the feature on.
+                'cyclesEnabled' => $project->featureEnabled('cycles'),
+                'cycles' => $this->cycles($project),
                 'priorities' => collect(config('projects.work_item_priorities'))
                     ->map(fn ($label, $key) => ['key' => $key, 'label' => $label])->values()->all(),
                 'defaultStateId' => $this->states->defaultState($project)?->id,
@@ -120,6 +126,7 @@ class WorkItemController extends Controller
                     'subtasks' => route('projects.work-items.subtasks.store', ['project' => $project->id, 'workItem' => '__ID__']),
                     'relations' => route('projects.work-items.relations.store', ['project' => $project->id, 'workItem' => '__ID__']),
                     'links' => route('projects.work-items.links.store', ['project' => $project->id, 'workItem' => '__ID__']),
+                    'createLabel' => route('projects.work-items.labels.store', ['project' => $project->id, 'workItem' => '__ID__']),
                     'mediaUpload' => route('projects.work-items.media.store', $project),
                     'mediaGallery' => route('projects.work-items.media.index', $project),
                 ],
@@ -139,11 +146,18 @@ class WorkItemController extends Controller
         $data = $request->validated();
         $data['state_id'] ??= $this->states->defaultState($project)?->id;
 
+        // §12: an item created with no assignee chosen falls to the project's default; a
+        // manual choice overrides it. The create form always sends the key, so "none chosen"
+        // is an empty list rather than a missing one.
+        if (empty($data['assignee_ids']) && $project->default_assignee_id) {
+            $data['assignee_ids'] = [$project->default_assignee_id];
+        }
+
         $item = $this->creator->create(Auth::user(), $project, $data);
 
         return response()->json([
             'ok' => true,
-            'item' => $this->card($item->fresh(['state', 'assignees', 'labels', 'creator'])),
+            'item' => $this->card($item->fresh(['state', 'assignees', 'labels', 'cycle', 'creator'])),
         ], 201);
     }
 
@@ -208,13 +222,16 @@ class WorkItemController extends Controller
             'start_date' => $workItem->start_date?->format('Y-m-d'),
             'due_date' => $workItem->due_date?->format('Y-m-d'),
             'parent_id' => $workItem->parent_id,
+            // Cycle deliberately absent: a copy starts unplanned. Carrying it over would drop
+            // work into a sprint's scope without anyone deciding to, and would put items into
+            // a finished cycle that §8.3.5 refuses through every other route.
             'assignee_ids' => $workItem->assignees->pluck('id')->all(),
             'label_ids' => $workItem->labels->pluck('id')->all(),
         ]);
 
         return response()->json([
             'ok' => true,
-            'item' => $this->card($copy->fresh(['state', 'assignees', 'labels', 'creator'])),
+            'item' => $this->card($copy->fresh(['state', 'assignees', 'labels', 'cycle', 'creator'])),
             'message' => 'Work item copied.',
         ], 201);
     }
@@ -286,50 +303,27 @@ class WorkItemController extends Controller
      */
     private function items(Project $project, ?WorkItem $pageItem = null): array
     {
+        $user = Auth::user();
+        // §10: a project set to "assigned work items only" filters the LIST too — hiding rows
+        // in the client while the API still returns them is not a restriction.
+        $assignedOnly = ! app(WorkItemPolicy::class)->canSeeEveryItem($user, $project);
+
         $items = WorkItem::query()
             ->forProject($project->id)
             ->active()
-            ->with(['state', 'assignees', 'labels', 'creator'])
+            ->when($assignedOnly, fn ($q) => $q->whereHas('assignees', fn ($a) => $a->whereKey($user->id)))
+            ->with(['state', 'assignees', 'labels', 'cycle', 'creator'])
             ->orderBy('sequence_no')
             ->limit((int) config('projects.work_item_page_size'))
             ->get();
 
         if ($pageItem && ! $items->contains('id', $pageItem->id)) {
-            $items->push($pageItem->loadMissing(['state', 'assignees', 'labels', 'creator']));
+            $items->push($pageItem->loadMissing(['state', 'assignees', 'labels', 'cycle', 'creator']));
         }
 
-        $blocked = $this->blockedCounts($items->pluck('id')->all());
+        $blocked = $this->blockers->counts($items->pluck('id')->all());
 
         return $items->map(fn (WorkItem $i) => $this->card($i, $blocked[$i->id] ?? 0))->all();
-    }
-
-    /**
-     * How many UNRESOLVED blockers each of these work items has (§27–§29).
-     *
-     * A blocker that is itself done or cancelled is not holding anything up, so it does not
-     * count — otherwise an item stays flagged blocked forever after the thing blocking it
-     * shipped. One grouped query for the whole list rather than one per row.
-     *
-     * @param  array<int, int>  $itemIds
-     * @return array<int, int> work item id => open blocker count
-     */
-    private function blockedCounts(array $itemIds): array
-    {
-        if ($itemIds === []) {
-            return [];
-        }
-
-        return WorkItemRelation::query()
-            ->where('relation_type', WorkItemRelation::TYPE_BLOCKING)
-            ->whereIn('related_work_item_id', $itemIds)
-            ->whereHas('workItem', fn ($q) => $q->whereDoesntHave(
-                'state', fn ($s) => $s->whereIn('group', ['completed', 'cancelled']),
-            ))
-            ->selectRaw('related_work_item_id, COUNT(*) as blockers')
-            ->groupBy('related_work_item_id')
-            ->pluck('blockers', 'related_work_item_id')
-            ->map(fn ($n) => (int) $n)
-            ->all();
     }
 
     /**
@@ -339,7 +333,7 @@ class WorkItemController extends Controller
      */
     private function card(WorkItem $item, ?int $blockedBy = null): array
     {
-        $blockedBy ??= $this->blockedCounts([$item->id])[$item->id] ?? 0;
+        $blockedBy ??= $this->blockers->counts([$item->id])[$item->id] ?? 0;
 
         $state = $item->state;
 
@@ -356,6 +350,9 @@ class WorkItemController extends Controller
             'start_date' => $item->start_date?->format('Y-m-d'),
             'due_date' => $item->due_date?->format('Y-m-d'),
             'parent_id' => $item->parent_id,
+            // §8.1: the chip shows the cycle's name, so the name travels with the row.
+            'cycle_id' => $item->cycle_id,
+            'cycle' => $item->cycle ? ['id' => $item->cycle->id, 'name' => $item->cycle->name, 'status' => $item->cycle->status()] : null,
             'assignees' => $item->assignees->map(fn ($u) => [
                 'id' => $u->id, 'name' => $u->displayName(),
                 'initial' => $u->initial(), 'avatar_url' => $u->avatar_url,
@@ -370,6 +367,33 @@ class WorkItemController extends Controller
             'created_at' => $item->created_at?->toIso8601String(),
             'updated_at' => $item->updated_at?->toIso8601String(),
         ];
+    }
+
+    /**
+     * Cycles offered by the work item's Cycle picker (§8.2).
+     *
+     * Only cycles that can still take work: §8.3.5 keeps finished cycles out of new
+     * assignment, and offering them would mean showing options the server refuses. An item
+     * already sitting in a completed cycle still renders its chip — that comes from the row,
+     * not from this list.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function cycles(Project $project): array
+    {
+        if (! $project->featureEnabled('cycles')) {
+            return [];
+        }
+
+        return Cycle::query()
+            ->forProject($project->id)
+            ->assignable()
+            ->orderBy('start_date')
+            ->get()
+            ->map(fn (Cycle $c) => [
+                'id' => $c->id, 'name' => $c->name, 'status' => $c->status(),
+                'start_date' => $c->start_date?->format('Y-m-d'), 'end_date' => $c->end_date?->format('Y-m-d'),
+            ])->all();
     }
 
     /** @return array<int, array<string, mixed>> */

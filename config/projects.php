@@ -113,9 +113,9 @@ return [
     'settings_nav' => [
         ['key' => 'general', 'label' => 'General', 'status' => 'active'],
         ['key' => 'members', 'label' => 'Members', 'status' => 'active'],
-        // Coming Soon: Features needs a `projects.features` column and a feature registry
-        // before it can toggle anything — see docs/features/work-items.md.
-        ['key' => 'features', 'label' => 'Features', 'status' => 'soon'],
+        // The key stays `features` — it is the URL, the route name and the toggle endpoint.
+        // Only the label changes: everything this section configures is Cycles.
+        ['key' => 'features', 'label' => 'Cycle', 'status' => 'active'],
         ['key' => 'states', 'label' => 'States', 'status' => 'active'],
         ['key' => 'labels', 'label' => 'Labels', 'status' => 'active'],
         ['key' => 'estimates', 'label' => 'Estimates', 'status' => 'soon'],
@@ -129,13 +129,17 @@ return [
     */
 
     /**
-     * Project Workspace tab bar, in the order required by the Work Items spec §3. Only
-     * `work-items` is functional this phase; the rest render a Coming Soon page but stay
-     * visible so the information architecture is legible.
+     * Project Workspace tab bar, in the order required by the Work Items spec §3.
+     *
+     * `status` here is the DEFAULT. Feature-gated tabs are resolved per project by
+     * ProjectNavigation::tabs() — Cycles becomes functional where the project has the feature
+     * on and disappears where it does not (Cycles §3.2.3/§3.2.4). The rest render a Coming
+     * Soon page but stay visible so the information architecture is legible.
      */
     'workspace_tabs' => [
         ['key' => 'overview', 'label' => 'Overview', 'status' => 'soon'],
         ['key' => 'work-items', 'label' => 'Work items', 'status' => 'active'],
+        // Resolved per project — see ProjectNavigation::tabs().
         ['key' => 'cycles', 'label' => 'Cycles', 'status' => 'soon'],
         ['key' => 'modules', 'label' => 'Modules', 'status' => 'soon'],
         ['key' => 'views', 'label' => 'Views', 'status' => 'soon'],
@@ -173,4 +177,41 @@ return [
 
     /** Page size for the work item list. */
     'work_item_page_size' => 250,
+
+    /**
+     * Project Settings → Features (PRJ-042). The catalog is config, the on/off state is a
+     * JSON map on the project — so adding a feature here makes it readable on every existing
+     * project without a migration or a backfill.
+     *
+     * `requires` names a feature that must be on first (Cycles §3.3.1); `entitlement` names a
+     * key in `entitlements` below, which is checked SERVER-side, not only in the UI (§13).
+     */
+    'features' => [
+        'cycles' => [
+            'label' => 'Cycles',
+            'description' => 'Let this project plan work in cycles.',
+            'default' => false,
+        ],
+        'parallel_cycles' => [
+            'label' => 'Parallel cycles',
+            'description' => 'Run more than one cycle at a time, useful when teams work on separate streams.',
+            'default' => false,
+            'requires' => 'cycles',
+            'entitlement' => 'parallel_cycles',
+        ],
+    ],
+
+    /**
+     * Paid-plan gates (Cycles §13). This app has no subscription model yet, so the answer is
+     * a config value standing in for one — swap the body of Project::entitledTo() when a real
+     * plan check exists and nothing else has to move.
+     */
+    'entitlements' => [
+        'parallel_cycles' => true,
+    ],
+
+    /** Cycles (sprints) — Cycles §6.1. */
+    'cycle_name_max' => 120,
+
+    'cycle_description_max' => 2000,
 ];

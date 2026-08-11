@@ -1,25 +1,26 @@
 /* Work items list skin (Phase 5) — ported from html/work-items.html.
  *
- * Overrides Tabulator's own class names, scoped to #wi-table so the Members grid keeps the
- * shared tabulator-skin.css look. These are vendor-class overrides rather than new utility
+ * Overrides Tabulator's own class names, scoped to .wi-grid so the Members grid keeps the
+ * shared tabulator-skin.css look. It is a CLASS, not an id: the Cycles screen renders the
+ * same grid for a cycle's work items, and the two must not be able to drift apart. These are vendor-class overrides rather than new utility
  * classes, so the `_moretogether` prefix (CLAUDE.md §14) does not apply — same convention
  * assets/css/tabulator-skin.css already follows. */
 
-#wi-table.tabulator { border: none; border-radius: 0; background: #fff; }
-#wi-table .tabulator-tableholder { background: #fff; }
+.wi-grid.tabulator { border: none; border-radius: 0; background: #fff; }
+.wi-grid .tabulator-tableholder { background: #fff; }
 
 /* Rows: white, uniform height, subtle separator, hover, clickable */
-#wi-table .tabulator-row,
-#wi-table .tabulator-row.tabulator-row-even { background: #fff; }
-#wi-table .tabulator-row { border-bottom: 1px solid #f1f2f4; cursor: pointer; }
-#wi-table .tabulator-row:hover { background: #f8f9fa !important; }
-#wi-table .tabulator-row .tabulator-cell { padding: 0 8px; }
-#wi-table .tabulator-row .tabulator-cell:first-child { padding-left: 24px; }
-#wi-table .tabulator-row .tabulator-cell:last-child { padding-right: 20px; }
+.wi-grid .tabulator-row,
+.wi-grid .tabulator-row.tabulator-row-even { background: #fff; }
+.wi-grid .tabulator-row { border-bottom: 1px solid #f1f2f4; cursor: pointer; }
+.wi-grid .tabulator-row:hover { background: #f8f9fa !important; }
+.wi-grid .tabulator-row .tabulator-cell { padding: 0 8px; }
+.wi-grid .tabulator-row .tabulator-cell:first-child { padding-left: 24px; }
+.wi-grid .tabulator-row .tabulator-cell:last-child { padding-right: 20px; }
 
 /* Group header: light gray band, aligned with rows, uniform height */
-#wi-table .tabulator-group,
-#wi-table .tabulator-group.tabulator-group-visible {
+.wi-grid .tabulator-group,
+.wi-grid .tabulator-group.tabulator-group-visible {
   background: #f6f7f8;
   border-top: none;
   border-bottom: 1px solid #e5e7eb;
@@ -33,19 +34,19 @@
   color: #0f0f10;
   font-weight: 600;
 }
-#wi-table .tabulator-group:hover { background: #eef0f2; cursor: pointer; }
+.wi-grid .tabulator-group:hover { background: #eef0f2; cursor: pointer; }
 
 /* Hide Tabulator's native toggle so our own chevron sits at the group's left padding,
    aligned with the "Work items" toolbar label. */
-#wi-table .tabulator-group .tabulator-group-toggle { display: none !important; }
-#wi-table .tabulator-group .tabulator-arrow { display: none !important; }
+.wi-grid .tabulator-group .tabulator-group-toggle { display: none !important; }
+.wi-grid .tabulator-group .tabulator-arrow { display: none !important; }
 
 /* Tabulator's base theme sets group <span> { color:#d00; margin-left:10px } — reset both. */
-#wi-table .tabulator-group span { color: inherit; margin-left: 0; }
+.wi-grid .tabulator-group span { color: inherit; margin-left: 0; }
 
 /* Collapse/expand chevron — points right when collapsed, down when expanded. */
-#wi-table .tabulator-group .wi-chevron { transition: transform .15s ease; transform: rotate(0deg); }
-#wi-table .tabulator-group.tabulator-group-visible .wi-chevron { transform: rotate(90deg); }
+.wi-grid .tabulator-group .wi-chevron { transition: transform .15s ease; transform: rotate(0deg); }
+.wi-grid .tabulator-group.tabulator-group-visible .wi-chevron { transform: rotate(90deg); }
 
 /* ---------------------------------------------------------------------------
    Rich text (read view)
@@ -145,3 +146,72 @@
    a 1px-tall horizontal bar under seven tabs reads as damage, not affordance. */
 .wi-tabs { scrollbar-width: none; -ms-overflow-style: none; }
 .wi-tabs::-webkit-scrollbar { display: none; }
+
+/* ---------------------------------------------------------------------------
+   Pasted content must live inside its container
+
+   Copying from a document or an email brings markup that was laid out for a
+   different width — fixed pixel widths, tables, long unbroken strings. Left
+   alone it runs straight out of a comment card or the reply modal. These rules
+   apply to both the read view and the editing surface, so what is typed and
+   what is published behave the same way.
+   --------------------------------------------------------------------------- */
+.wi-rich,
+.wi-editor .ql-editor {
+  /* Break anywhere rather than push the container: a pasted URL or a long
+     token has no space to break at. */
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+/* `max-width` beats an inline `width` in the cascade, so a pasted
+   `style="width:600px"` is capped without having to strip it on the way in. */
+.wi-rich > *,
+.wi-rich table,
+.wi-rich img,
+.wi-rich pre,
+.wi-editor .ql-editor > *,
+.wi-editor .ql-editor table,
+.wi-editor .ql-editor img,
+.wi-editor .ql-editor pre { max-width: 100%; }
+
+/* A wide table scrolls on its own instead of widening the card around it. */
+.wi-rich table,
+.wi-editor .ql-editor table { display: block; overflow-x: auto; }
+
+/* Code keeps its formatting but still wraps rather than escaping the card. */
+.wi-rich pre,
+.wi-editor .ql-editor pre { white-space: pre-wrap; overflow-x: auto; }
+
+/* ---------------------------------------------------------------------------
+   Tooltips
+
+   One floating element, positioned by the screen's controller against whatever
+   carries `data-tip`. Native `title` waits about a second and cannot be styled,
+   which is no help on a row of icon-only buttons — the meaning of the icon is
+   exactly what is not written on it.
+   --------------------------------------------------------------------------- */
+.wi-tip {
+  position: fixed;
+  z-index: 200;                 /* above every panel, drawer and dialog */
+  pointer-events: none;         /* never eat the hover it is describing */
+  max-width: 260px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: #23272f;
+  color: #fff;
+  font-size: 11.5px;
+  line-height: 1.4;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(15, 15, 16, .18);
+}
+.wi-tip.hidden { display: none; }
+
+/* Description clamp: enough to read the opening of a long description without it
+   pushing the sub-tasks, dependencies and conversation off the screen. The fade
+   says there is more below without needing a second control to explain it. */
+.wi-desc-clamp {
+  max-height: 200px;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, #000 72%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 72%, transparent 100%);
+}

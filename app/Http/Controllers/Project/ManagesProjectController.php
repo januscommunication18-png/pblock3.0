@@ -34,6 +34,9 @@ abstract class ManagesProjectController extends Controller
             'user' => Auth::user(),
             'project' => $project,
             'section' => $section,
+            // Titles and the loading placeholder read this rather than ucfirst($section):
+            // the key is a URL segment, not a name to show people.
+            'sectionLabel' => collect(config('projects.settings_nav'))->firstWhere('key', $section)['label'] ?? ucfirst($section),
             'nav' => config('projects.settings_nav'),
             'bootstrap' => $bootstrap,
         ]);

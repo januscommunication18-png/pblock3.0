@@ -68,6 +68,11 @@ class ProjectPolicy
 
         // Everyone else needs an explicit project membership (§18), which the project's
         // creator receives automatically (§19).
+        //
+        // NOTE: the General settings spec §8 says a PUBLIC project should instead be
+        // reachable by any workspace member. That contradicts Project Member Management §38,
+        // which this implements deliberately, so it is left alone pending a decision — see
+        // the open question in docs/features/project-settings-general.md.
         return $this->isProjectMember($user, $project);
     }
 

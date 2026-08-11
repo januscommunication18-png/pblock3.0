@@ -22,6 +22,29 @@ use App\Models\WorkspaceMembership;
 class ProjectNavigation
 {
     /**
+     * The project workspace tab bar, with per-project features resolved (Cycles §3.2.3/§4).
+     *
+     * The config list is fixed; what varies is whether a feature-gated tab belongs in it at
+     * all. A disabled tab is REMOVED rather than shown as "Soon": §3.2.4 asks for it to be
+     * hidden or disabled for normal users, and a visible tab that refuses to open is worse
+     * than an absent one. Enabling the feature puts it back, functional.
+     *
+     * Every screen that renders partials/project-tabs goes through here, so a feature can
+     * never appear on one project page and not another.
+     *
+     * @return array<int, array<string, string>>
+     */
+    public function tabs(Project $project): array
+    {
+        $gated = ['cycles' => 'cycles'];
+
+        return collect(config('projects.workspace_tabs'))
+            ->reject(fn (array $tab) => isset($gated[$tab['key']]) && ! $project->featureEnabled($gated[$tab['key']]))
+            ->map(fn (array $tab) => isset($gated[$tab['key']]) ? ['status' => 'active'] + $tab : $tab)
+            ->values()->all();
+    }
+
+    /**
      * Active projects visible to the user, shaped for the sidebar.
      *
      * @return array<int, array<string, mixed>>

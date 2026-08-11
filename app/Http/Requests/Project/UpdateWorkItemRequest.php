@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Project;
 
 use App\Models\WorkspaceMembership;
+use App\Rules\CycleAssignable;
 use App\Services\RichTextSanitizer;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -43,7 +44,7 @@ class UpdateWorkItemRequest extends FormRequest
                 : ['due_date' => $item->due_date?->format('Y-m-d')]);
         }
 
-        foreach (['state_id', 'parent_id', 'start_date', 'due_date'] as $nullable) {
+        foreach (['state_id', 'parent_id', 'cycle_id', 'start_date', 'due_date'] as $nullable) {
             if ($this->has($nullable) && ! $this->filled($nullable)) {
                 $this->merge([$nullable => null]);
             }
@@ -72,6 +73,14 @@ class UpdateWorkItemRequest extends FormRequest
                 Rule::notIn([$item?->id]),
                 Rule::exists('work_items', 'id')->where('project_id', $projectId),
             ],
+            // Cycles §8.3: one cycle at a time, project-scoped, and never a finished one.
+            // Selecting a different cycle MOVES the item — there is nothing to remove first,
+            // because the association is this single column.
+            'cycle_id' => [
+                'sometimes', 'nullable', 'integer',
+                Rule::exists('cycles', 'id')->where('project_id', $projectId),
+                new CycleAssignable($this->route('project'), $item?->cycle_id),
+            ],
             // A work item has ONE owner (§4.3, revised): the picker replaces rather than
             // adds, and the array shape is kept so the client contract does not change.
             'assignee_ids' => ['sometimes', 'array', 'max:1'],
@@ -95,6 +104,7 @@ class UpdateWorkItemRequest extends FormRequest
             'due_date.after' => 'The due date must be after the start date.',
             'parent_id.not_in' => 'A work item cannot be its own parent.',
             'state_id.exists' => 'That state is not configured for this project.',
+            'cycle_id.exists' => 'That cycle does not belong to this project.',
         ];
     }
 }

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Stancl\Tenancy\Database\Concerns\BelongsToTenant;
 
@@ -34,6 +35,9 @@ class Project extends Model
         'description',
         'visibility',
         'lead_user_id',
+        'default_assignee_id',
+        'work_item_view',
+        'features',
         'cover_url',
         'timezone',
         'status',
@@ -45,7 +49,79 @@ class Project extends Model
     {
         return [
             'archived_at' => 'datetime',
+            'features' => 'array',
         ];
+    }
+
+    /**
+     * This project's feature switches, catalog defaults filled in (PRJ-042).
+     *
+     * Merged rather than read straight out of the column so a feature added to the catalog
+     * later is immediately readable on every existing project — no backfill, no null checks
+     * scattered through the callers.
+     *
+     * @return array<string, bool>
+     */
+    public function featureFlags(): array
+    {
+        $stored = is_array($this->features) ? $this->features : [];
+
+        return collect(config('projects.features'))
+            ->map(fn (array $meta, string $key) => (bool) ($stored[$key] ?? $meta['default'] ?? false))
+            ->all();
+    }
+
+    /** Is this capability switched on for this project? */
+    public function featureEnabled(string $key): bool
+    {
+        return $this->featureFlags()[$key] ?? false;
+    }
+
+    /**
+     * Does the plan behind this project include a gated feature (Cycles §13)?
+     *
+     * There is no subscription model yet, so the answer comes from config. When a real plan
+     * check arrives it replaces this method body and nothing else moves.
+     */
+    public function entitledTo(string $entitlement): bool
+    {
+        return (bool) config("projects.entitlements.{$entitlement}", true);
+    }
+
+    /** Sprint-style time boxes, when Cycles is enabled for this project (Cycles §5). */
+    public function cycles(): HasMany
+    {
+        return $this->hasMany(Cycle::class);
+    }
+
+    /** Work item visibility for ordinary members (General spec §10). */
+    public const VIEW_ALL = 'all';
+
+    public const VIEW_ASSIGNED = 'assigned';
+
+    /** Does this project restrict members to the work items assigned to them? */
+    public function restrictsToAssigned(): bool
+    {
+        return $this->work_item_view === self::VIEW_ASSIGNED;
+    }
+
+    /** Applied when a work item is created with no assignee chosen (§12). */
+    public function defaultAssignee(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'default_assignee_id');
+    }
+
+    /**
+     * Members who receive this project's notifications (§13).
+     *
+     * `withPivotValue` stamps the tenant on every row the relation writes — the pivot is
+     * tenant-scoped like everything else, and sync() would otherwise insert without it.
+     */
+    public function subscribers(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'project_subscribers')
+            ->withPivotValue('tenant_id', $this->tenant_id)
+            ->withTimestamps();
     }
 
     public function lead(): BelongsTo

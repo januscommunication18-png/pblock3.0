@@ -131,23 +131,41 @@
     // and any dropdown that benefits from type-ahead.
     app.component('pb-combo', {
       props: {
-        modelValue: { type: String, default: '' },
+        // A string in single mode; an array of values when `multiple` is set.
+        modelValue: { type: [String, Array], default: '' },
         // options may be plain strings, or {value, label} objects (Base Web style).
         options: { type: Array, default: function () { return []; } },
         placeholder: { type: String, default: 'Select…' },
         invalid: { type: Boolean, default: false },
         dense: { type: Boolean, default: false },
-        searchable: { type: Boolean, default: true }
+        searchable: { type: Boolean, default: true },
+        // Multi-select: picking toggles, the menu stays open, and the button summarises
+        // what is chosen. Single-select behaviour is untouched when this is false.
+        multiple: { type: Boolean, default: false }
       },
       emits: ['update:modelValue'],
       data: function () { return { open: false, query: '', menuStyle: {} }; },
       computed: {
         norm: function () {
           return this.options.map(function (o) {
+            // `avatar` / `initial` are optional: an option that represents a person shows a
+            // face, which is how you tell two people with similar names apart.
             return (o && typeof o === 'object')
-              ? { value: String(o.value), label: String(o.label != null ? o.label : o.value), desc: o.desc ? String(o.desc) : '' }
-              : { value: String(o), label: String(o), desc: '' };
+              ? {
+                value: String(o.value),
+                label: String(o.label != null ? o.label : o.value),
+                desc: o.desc ? String(o.desc) : '',
+                avatar: o.avatar || '',
+                initial: o.initial || ''
+              }
+              : { value: String(o), label: String(o), desc: '', avatar: '', initial: '' };
           });
+        },
+        /** The single-select option currently chosen, so the trigger can show its face. */
+        chosenOption: function () {
+          if (this.multiple) return null;
+          var mv = String(this.modelValue || '');
+          return this.norm.find(function (o) { return o.value === mv; }) || null;
         },
         filtered: function () {
           var q = this.query.trim().toLowerCase();
@@ -156,7 +174,20 @@
             return o.label.toLowerCase().indexOf(q) >= 0 || o.value.toLowerCase().indexOf(q) >= 0;
           });
         },
+        /** Selected values as strings, whichever mode this is in. */
+        selected: function () {
+          if (!this.multiple) return this.modelValue ? [String(this.modelValue)] : [];
+          return (this.modelValue || []).map(String);
+        },
         display: function () {
+          if (this.multiple) {
+            var chosen = this.selected;
+            if (!chosen.length) return this.placeholder;
+            var labels = this.norm.filter(function (o) { return chosen.indexOf(o.value) > -1; })
+              .map(function (o) { return o.label; });
+            // Two names read as names; more than that reads as a count.
+            return labels.length <= 2 ? labels.join(', ') : labels.length + ' selected';
+          }
           var mv = this.modelValue;
           var hit = this.norm.find(function (o) { return o.value === mv; });
           return hit ? hit.label : (mv || this.placeholder);
@@ -182,7 +213,20 @@
             this.$nextTick(function () { if (self.searchable && self.$refs.search) self.$refs.search.focus(); });
           }
         },
-        choose: function (o) { this.$emit('update:modelValue', o.value); this.open = false; },
+        isChosen: function (o) { return this.selected.indexOf(o.value) > -1; },
+        choose: function (o) {
+          if (!this.multiple) {
+            this.$emit('update:modelValue', o.value);
+            this.open = false;
+            return;
+          }
+          // Toggle, and stay open: picking several people one at a time should not mean
+          // reopening the menu between each.
+          var next = this.selected.slice();
+          var at = next.indexOf(o.value);
+          if (at > -1) next.splice(at, 1); else next.push(o.value);
+          this.$emit('update:modelValue', next);
+        },
         onDoc: function (e) {
           if (!this.open) return;
           var r = this.$refs.root, m = this.$refs.menu;
@@ -207,7 +251,10 @@
       template:
         '<div class="relative" ref="root">' +
         '<button type="button" class="pb-input pb-combo-btn flex items-center justify-between text-left" :class="[{\'is-error\': invalid}, dense ? \'!h-9\' : \'\']" @click.stop="toggle">' +
-        '<span class="truncate" :class="modelValue ? \'text-ink\' : \'text-faint\'">{{ display }}</span>' +
+        '<span class="flex items-center gap-2 min-w-0">' +
+        '<img v-if="chosenOption && chosenOption.avatar" :src="chosenOption.avatar" alt="" class="h-5 w-5 rounded-full object-cover shrink-0" />' +
+        '<span v-else-if="chosenOption && chosenOption.initial" class="h-5 w-5 rounded-full bg-brand text-white grid place-items-center text-[10px] font-bold shrink-0">{{ chosenOption.initial }}</span>' +
+        '<span class="truncate" :class="selected.length ? \'text-ink\' : \'text-faint\'">{{ display }}</span></span>' +
         '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0 ml-1.5"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
         '</button>' +
         '<teleport to="body">' +
@@ -216,12 +263,14 @@
         '<input ref="search" v-model="query" @click.stop placeholder="Search…" class="pb-input !h-9" />' +
         '</div>' +
         '<ul class="max-h-56 overflow-y-auto py-1">' +
-        '<li v-for="o in filtered" :key="o.value" @click="choose(o)" :class="[\'px-3 flex gap-2 text-[13px] cursor-pointer hover:bg-hover\', o.desc ? \'py-2 items-start\' : \'h-9 items-center\', o.value===modelValue ? \'text-brand\' : \'text-ink\']">' +
+        '<li v-for="o in filtered" :key="o.value" @click.stop="choose(o)" :class="[\'px-3 flex gap-2 text-[13px] cursor-pointer hover:bg-hover\', o.desc ? \'py-2 items-start\' : \'h-9 items-center\', isChosen(o) ? \'text-brand\' : \'text-ink\']">' +
+        '<img v-if="o.avatar" :src="o.avatar" alt="" class="h-6 w-6 rounded-full object-cover shrink-0" :class="o.desc ? \'mt-0.5\' : \'\'" />' +
+        '<span v-else-if="o.initial" class="h-6 w-6 rounded-full bg-brand text-white grid place-items-center text-[10px] font-bold shrink-0" :class="o.desc ? \'mt-0.5\' : \'\'">{{ o.initial }}</span>' +
         '<span class="min-w-0 flex-1">' +
         '<span class="block truncate">{{ o.label }}</span>' +
         '<span v-if="o.desc" class="block text-[12px] text-sub whitespace-normal">{{ o.desc }}</span>' +
         '</span>' +
-        '<svg v-if="o.value===modelValue" width="15" height="15" viewBox="0 0 24 24" fill="none" :class="[\'shrink-0\', o.desc ? \'mt-0.5\' : \'\']"><path d="M5 12l4 4L19 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+        '<svg v-if="isChosen(o)" width="15" height="15" viewBox="0 0 24 24" fill="none" :class="[\'shrink-0\', o.desc ? \'mt-0.5\' : \'\']"><path d="M5 12l4 4L19 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
         '</li>' +
         '<li v-if="!filtered.length" class="px-3 h-9 flex items-center text-[13px] text-faint">No matches</li>' +
         '</ul></div></teleport></div>'
@@ -374,6 +423,58 @@
     });
   }
 
+  // ================= tooltips =================
+  /**
+   * One floating tooltip for every `[data-tip]` on the page.
+   *
+   * Native `title` waits about a second and cannot be styled, which is no help on a row of
+   * icon-only buttons — the whole point of the icon is that its meaning is not written on it.
+   * Delegated from the document, so controls rendered later (grid formatters, drawers,
+   * dialogs) are covered without re-binding, and shown on focus as well as hover so keyboard
+   * users get the same label.
+   *
+   * Installed once per page by boot(): a second copy would mean two tooltips chasing the
+   * cursor. Styled by `.wi-tip` in assets/css/work-items.css.
+   */
+  function tooltips() {
+    if (window.__pbTips) return;
+
+    var el = document.createElement('div');
+    el.className = 'wi-tip hidden';
+    el.setAttribute('role', 'tooltip');
+    document.body.appendChild(el);
+    window.__pbTips = el;
+
+    function show(target) {
+      var text = target.getAttribute('data-tip');
+      if (!text) return;
+      el.textContent = text;
+      el.classList.remove('hidden');
+
+      var r = target.getBoundingClientRect();
+      var left = r.left + r.width / 2 - el.offsetWidth / 2;
+      // Keep it on screen when the control sits at either edge.
+      el.style.left = Math.max(6, Math.min(left, window.innerWidth - el.offsetWidth - 6)) + 'px';
+      // Above by default; below when there is no room above.
+      var above = r.top - el.offsetHeight - 8;
+      el.style.top = (above < 6 ? r.bottom + 8 : above) + 'px';
+    }
+    function hide() { el.classList.add('hidden'); }
+
+    function over(e) {
+      var t = e.target.closest ? e.target.closest('[data-tip]') : null;
+      if (t) show(t); else hide();
+    }
+
+    document.addEventListener('mouseover', over);
+    document.addEventListener('mouseleave', hide, true);
+    document.addEventListener('focusin', over);
+    document.addEventListener('focusout', hide);
+    // A tooltip left behind while the page moves is worse than none.
+    window.addEventListener('scroll', hide, true);
+    document.addEventListener('click', hide);
+  }
+
   // ================= boot =================
   function boot(name, component) {
     var root = document.getElementById('settings-root');
@@ -391,9 +492,10 @@
     var app = Vue.createApp(component, { bootstrap: bootstrap });
     app.config.globalProperties.$pb = { api: api, withId: withId, firstError: firstError, fieldErrors: fieldErrors, toast: toast };
     registerShared(app);
+    tooltips();
     root.innerHTML = '';
     app.mount(root);
   }
 
-  window.PB = { api: api, withId: withId, firstError: firstError, fieldErrors: fieldErrors, toast: toast, boot: boot };
+  window.PB = { api: api, withId: withId, firstError: firstError, fieldErrors: fieldErrors, toast: toast, boot: boot, tooltips: tooltips };
 })();

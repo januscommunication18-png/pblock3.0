@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Project\CycleController;
 use App\Http\Controllers\Project\ProjectController;
 use App\Http\Controllers\Project\ProjectLabelController;
 use App\Http\Controllers\Project\ProjectMembersController;
@@ -72,6 +73,10 @@ Route::middleware(['auth', 'workspace.tenancy'])
             ->whereNumber(['project', 'workItem'])->name('work-items.relations.store');
         Route::delete('/{project}/work-items/{workItem}/relations/{relation}', [WorkItemStructureController::class, 'destroyRelation'])
             ->whereNumber(['project', 'workItem', 'relation'])->name('work-items.relations.destroy');
+        // Create a project label from the work item's label picker (applied by the normal
+        // label PATCH straight after).
+        Route::post('/{project}/work-items/{workItem}/labels', [WorkItemStructureController::class, 'storeLabel'])
+            ->whereNumber(['project', 'workItem'])->middleware('throttle:30,1')->name('work-items.labels.store');
         Route::post('/{project}/work-items/{workItem}/links', [WorkItemStructureController::class, 'storeLink'])
             ->whereNumber(['project', 'workItem'])->name('work-items.links.store');
         Route::patch('/{project}/work-items/{workItem}/links/{link}', [WorkItemStructureController::class, 'updateLink'])
@@ -118,9 +123,32 @@ Route::middleware(['auth', 'workspace.tenancy'])
             ->whereNumber(['project', 'workItem'])->name('work-items.duplicate');
         Route::delete('/{project}/work-items/{workItem}', [WorkItemController::class, 'destroy'])
             ->whereNumber(['project', 'workItem'])->name('work-items.destroy');
+        // ---- Cycles (Cycles §17). Registered BEFORE the {tab} catch-all below, which would
+        //      otherwise swallow /cycles and render Coming Soon over a built feature.
+        //      Every action re-checks CyclePolicy, which refuses when the project has the
+        //      feature switched off — the routes existing is not permission to use them.
+        Route::get('/{project}/cycles', [CycleController::class, 'index'])
+            ->whereNumber('project')->name('cycles');
+        Route::post('/{project}/cycles', [CycleController::class, 'store'])
+            ->whereNumber('project')->name('cycles.store');
+        Route::get('/{project}/cycles/{cycle}/search', [CycleController::class, 'search'])
+            ->whereNumber(['project', 'cycle'])->name('cycles.search');
+        Route::post('/{project}/cycles/{cycle}/transfer', [CycleController::class, 'transfer'])
+            ->whereNumber(['project', 'cycle'])->name('cycles.transfer');
+        Route::post('/{project}/cycles/{cycle}/work-items', [CycleController::class, 'addWorkItems'])
+            ->whereNumber(['project', 'cycle'])->name('cycles.items.store');
+        Route::delete('/{project}/cycles/{cycle}/work-items/{workItem}', [CycleController::class, 'removeWorkItem'])
+            ->whereNumber(['project', 'cycle', 'workItem'])->name('cycles.items.destroy');
+        Route::get('/{project}/cycles/{cycle}', [CycleController::class, 'show'])
+            ->whereNumber(['project', 'cycle'])->name('cycles.show');
+        Route::patch('/{project}/cycles/{cycle}', [CycleController::class, 'update'])
+            ->whereNumber(['project', 'cycle'])->name('cycles.update');
+        Route::delete('/{project}/cycles/{cycle}', [CycleController::class, 'destroy'])
+            ->whereNumber(['project', 'cycle'])->name('cycles.destroy');
+
         Route::get('/{project}/{tab}', [ProjectWorkspaceController::class, 'tab'])
             ->whereNumber('project')
-            ->whereIn('tab', ['overview', 'cycles', 'modules', 'views', 'pages'])
+            ->whereIn('tab', ['overview', 'modules', 'views', 'pages'])
             ->name('workspace.tab');
 
         // Project settings actions

@@ -204,7 +204,7 @@ class ProjectController extends Controller
 
         $data = $request->validated();
 
-        // `identifier` is intentionally not writable here — the project ID is the permanent
+        // `identifier` is intentionally not writable here — the identifier is the permanent
         // @mention handle, so the modal shows it read-only and any posted value is ignored.
         $project->name = $data['name'];
         $project->description = $data['description'] ?? null;
@@ -352,7 +352,7 @@ class ProjectController extends Controller
     /** GET /projects/identifier-available?identifier=ABC (PRJ-022 live check). */
     public function identifierAvailable(Request $request): JsonResponse
     {
-        $id = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string) $request->query('identifier')));
+        $id = strtolower(preg_replace('/[^A-Za-z0-9]/', '', (string) $request->query('identifier')));
         $valid = $id !== ''
             && preg_match(config('projects.identifier.regex'), $id) === 1
             && ! in_array($id, config('projects.reserved_identifiers') ?? [], true);
@@ -400,7 +400,8 @@ class ProjectController extends Controller
         abort_unless(Auth::user()->can('delete', $project), 403);
 
         $confirm = strtoupper(trim((string) $request->input('confirm')));
-        abort_if($confirm !== strtoupper($project->identifier), 422, 'Type the project ID to confirm deletion.');
+        // Compared case-insensitively: the confirmation is about intent, not typing precision.
+        abort_if(strtolower($confirm) !== strtolower((string) $project->identifier), 422, 'Type the identifier to confirm deletion.');
 
         $this->lifecycle->delete($project);
 

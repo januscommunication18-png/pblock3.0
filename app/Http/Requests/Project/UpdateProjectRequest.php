@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Project;
 
+use App\Models\Project;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -20,24 +21,27 @@ class UpdateProjectRequest extends FormRequest
     {
         $this->merge([
             'name' => trim((string) $this->input('name')),
-            'identifier' => strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string) $this->input('identifier'))),
+            'identifier' => strtolower(preg_replace('/[^A-Za-z0-9]/', '', (string) $this->input('identifier'))),
         ]);
     }
 
     public function rules(): array
     {
         $workspaceId = $this->user()->current_workspace_id;
-        $projectId = $this->route('project')?->id;
 
         return [
             'name' => ['required', 'string', 'max:120'],
-            'identifier' => [
-                'required', 'string', 'max:10', 'regex:/^[A-Z0-9]{1,10}$/',
-                Rule::notIn(config('projects.reserved_identifiers')),
-                Rule::unique('projects', 'identifier')
-                    ->where(fn ($q) => $q->where('tenant_id', $workspaceId))
-                    ->ignore($projectId),
-            ],
+            // The identifier is FIXED once the project exists: it is baked into every work
+            // item identifier, every link anyone has shared, and every reference outside the
+            // app. The field is read-only in the UI; this refuses a changed value outright
+            // rather than ignoring it, so an attempt to change it is answered rather than
+            // silently dropped.
+            'identifier' => ['sometimes', 'string', function ($attribute, $value, $fail) {
+                $current = (string) $this->route('project')?->identifier;
+                if (strtolower((string) $value) !== strtolower($current)) {
+                    $fail('The identifier cannot be changed after the project is created.');
+                }
+            }],
             'description' => ['nullable', 'string', 'max:2000'],
             // Keys, not labels: `visibilities` is a key => label map, so validating against
             // the map itself compared the submitted value with "Public"/"Private" and
@@ -49,14 +53,27 @@ class UpdateProjectRequest extends FormRequest
                     ->where(fn ($q) => $q->where('workspace_id', $workspaceId)->where('status', 'active')),
             ],
             'timezone' => ['nullable', 'string', 'timezone:all'],
+            // §10: who can see which work items in this project.
+            'work_item_view' => ['sometimes', Rule::in([Project::VIEW_ALL, Project::VIEW_ASSIGNED])],
+            // §12/§13: both are limited to active members of THIS workspace, so a settings
+            // save cannot quietly attach someone from another tenant.
+            'default_assignee_id' => [
+                'nullable', 'integer',
+                Rule::exists('workspace_memberships', 'user_id')
+                    ->where(fn ($q) => $q->where('workspace_id', $workspaceId)->where('status', 'active')),
+            ],
+            'subscriber_ids' => ['sometimes', 'array', 'max:100'],
+            'subscriber_ids.*' => [
+                'integer',
+                Rule::exists('workspace_memberships', 'user_id')
+                    ->where(fn ($q) => $q->where('workspace_id', $workspaceId)->where('status', 'active')),
+            ],
         ];
     }
 
     public function messages(): array
     {
         return [
-            'identifier.regex' => 'The ID may only contain uppercase letters and numbers.',
-            'identifier.unique' => 'That project ID is already used in this workspace.',
         ];
     }
 }

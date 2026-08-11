@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Cycle;
 use App\Models\ProjectItemLabel;
 use App\Models\ProjectItemState;
 use App\Models\User;
@@ -21,7 +22,7 @@ use Illuminate\Support\Facades\DB;
 class WorkItemUpdater
 {
     /** Scalar columns, in the order the feed reads best. */
-    private const FIELDS = ['title', 'description', 'state_id', 'priority', 'start_date', 'due_date', 'parent_id'];
+    private const FIELDS = ['title', 'description', 'state_id', 'priority', 'start_date', 'due_date', 'parent_id', 'cycle_id'];
 
     public function __construct(
         private readonly WorkItemActivityRecorder $activity,
@@ -48,6 +49,13 @@ class WorkItemUpdater
                 $item->{$field} = $data[$field];
                 $this->log($item, $actor, $field, $old, $new);
 
+                // Cycles §16: who put this item in its current cycle, and when. The full move
+                // history is the activity row above; these two columns are just the latest.
+                if ($field === 'cycle_id') {
+                    $item->cycle_assigned_by = $new === null ? null : $actor->id;
+                    $item->cycle_assigned_at = $new === null ? null : now();
+                }
+
                 // §10.6/§13.2: a state change — and only a state change — also writes a
                 // transition, in the same transaction as the change itself.
                 if ($field === 'state_id') {
@@ -64,7 +72,7 @@ class WorkItemUpdater
                 $this->syncRelation($item, $actor, 'labels', $data['label_ids']);
             }
 
-            return $item->fresh(['state', 'assignees', 'labels', 'parent', 'creator']);
+            return $item->fresh(['state', 'assignees', 'labels', 'parent', 'cycle', 'creator']);
         });
     }
 
@@ -126,6 +134,14 @@ class WorkItemUpdater
                 'old_label' => $old ? WorkItem::find($old)?->identifier : null,
                 'new_label' => $new ? WorkItem::find($new)?->identifier : null,
             ];
+        } elseif ($field === 'cycle_id') {
+            // Cycles §8.4 wants the feed to read "moved this work item from Sprint 08 to
+            // Sprint 09". Names are resolved NOW and frozen into the row, so renaming or
+            // deleting a cycle later cannot rewrite what the history says happened.
+            $meta = [
+                'old_label' => $old ? Cycle::find($old)?->name : null,
+                'new_label' => $new ? Cycle::find($new)?->name : null,
+            ];
         }
 
         // The description is rich text and can run to 20k of markup. Storing both sides of
@@ -138,11 +154,33 @@ class WorkItemUpdater
 
         $this->activity->record($item, $actor, WorkItemActivity::EVENT_UPDATED, [
             // §6's Transition feed is exactly the rows where field = 'state'.
-            'field' => $field === 'state_id' ? 'state' : $field,
+            'field' => match ($field) {
+                'state_id' => 'state',
+                'cycle_id' => 'cycle',
+                default => $field,
+            },
             'old_value' => $old,
             'new_value' => $new,
             'meta' => $meta,
         ]);
+    }
+
+    /**
+     * Names for a set of assignee or label ids, resolved now and frozen into the audit row —
+     * renaming a label later must not rewrite what the history says happened.
+     *
+     * @param  array<int, int>  $ids
+     * @return array<int, string>
+     */
+    private function displayNames(string $relation, array $ids): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+
+        return $relation === 'assignees'
+            ? User::whereIn('id', $ids)->get()->map(fn (User $u) => $u->displayName())->values()->all()
+            : ProjectItemLabel::whereIn('id', $ids)->pluck('name')->values()->all();
     }
 
     /**
@@ -191,15 +229,17 @@ class WorkItemUpdater
             $this->notifyNewAssignees($item, $actor, $before, $after);
         }
 
-        $names = $relation === 'assignees'
-            ? User::whereIn('id', $ids)->get()->map(fn (User $u) => $u->displayName())->all()
-            : ProjectItemLabel::whereIn('id', $ids)->pluck('name')->all();
-
+        // Resolve BOTH sides to display values at write time. The value columns keep the ids
+        // — that is the machine record — but History renders before → after, and an audit
+        // trail that reads "None → 4" is telling the reader a database id.
         $this->activity->record($item, $actor, WorkItemActivity::EVENT_UPDATED, [
             'field' => $relation,
             'old_value' => implode(',', $before) ?: null,
             'new_value' => implode(',', $after) ?: null,
-            'meta' => ['new_labels' => $names],
+            'meta' => [
+                'old_labels' => $this->displayNames($relation, $before),
+                'new_labels' => $this->displayNames($relation, $after),
+            ],
         ]);
     }
 

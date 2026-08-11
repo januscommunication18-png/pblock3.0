@@ -81,7 +81,7 @@ class ProjectEditModalTest extends ProjectTestCase
             ])
             ->assertOk()
             ->assertJsonPath('project.name', 'Website Rebuild')
-            ->assertJsonPath('project.identifier', 'WEB')
+            ->assertJsonPath('project.identifier', 'web')
             ->assertJsonPath('project.state.id', $stateId)
             ->assertJsonPath('project.priority.id', $priorityId)
             ->assertJsonPath('project.lead.id', $owner->id)
@@ -168,9 +168,9 @@ class ProjectEditModalTest extends ProjectTestCase
                 'name' => 'Website Rebuild', 'identifier' => 'HACKED', 'visibility' => 'public',
             ])
             ->assertOk()
-            ->assertJsonPath('project.identifier', 'WEB');
+            ->assertJsonPath('project.identifier', 'web');
 
-        $this->assertSame('WEB', $ws->run(fn () => Project::find($project->id)->identifier));
+        $this->assertSame('web', $ws->run(fn () => Project::find($project->id)->identifier));
 
         // Saving without the field at all is valid — it is not a required input.
         $this->actingAs($owner)
@@ -178,7 +178,7 @@ class ProjectEditModalTest extends ProjectTestCase
                 'name' => 'Website Redesign', 'visibility' => 'public',
             ])
             ->assertOk()
-            ->assertJsonPath('project.identifier', 'WEB');
+            ->assertJsonPath('project.identifier', 'web');
     }
 
     public function test_non_manager_cannot_update(): void

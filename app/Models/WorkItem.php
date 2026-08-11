@@ -39,6 +39,9 @@ class WorkItem extends Model
         'start_date',
         'due_date',
         'parent_id',
+        'cycle_id',
+        'cycle_assigned_by',
+        'cycle_assigned_at',
         'created_by',
         'archived_at',
     ];
@@ -49,8 +52,25 @@ class WorkItem extends Model
             'sequence_no' => 'integer',
             'start_date' => 'date',
             'due_date' => 'date',
+            'cycle_assigned_at' => 'datetime',
             'archived_at' => 'datetime',
         ];
+    }
+
+    /** The one cycle this item is planned into, if any (Cycles §8.3.1). */
+    public function cycle(): BelongsTo
+    {
+        return $this->belongsTo(Cycle::class);
+    }
+
+    /**
+     * Is this item still outstanding (Cycles §10)? Anything whose state is not in a
+     * completed or cancelled group — including an item with no state at all, which has
+     * certainly not been finished.
+     */
+    public function scopeIncomplete(Builder $query): Builder
+    {
+        return $query->whereDoesntHave('state', fn ($s) => $s->whereIn('group', ['completed', 'cancelled']));
     }
 
     public function project(): BelongsTo
