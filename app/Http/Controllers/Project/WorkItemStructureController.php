@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Project\StoreWorkItemLinkRequest;
 use App\Models\Project;
 use App\Models\ProjectItemLabel;
+use App\Models\ProjectPage;
 use App\Models\WorkItem;
 use App\Models\WorkItemLink;
 use App\Models\WorkItemRelation;
@@ -299,6 +300,84 @@ class WorkItemStructureController extends Controller
             'structure' => $this->relations->structureFor($item->fresh()),
             'message' => $message,
         ], fn ($v) => $v !== null));
+    }
+
+    /**
+     * GET /projects/{project}/work-items/{workItem}/pages/search?q= — pages to link.
+     *
+     * The project's own PUBLISHED pages, and only when Pages is switched on: a picker that
+     * offered documentation the project cannot open would be offering nothing.
+     */
+    public function searchPages(Request $request, Project $project, WorkItem $workItem): JsonResponse
+    {
+        $this->guard($project, $workItem, 'view');
+
+        if (! $project->featureEnabled('pages')) {
+            return response()->json(['ok' => true, 'items' => []]);
+        }
+
+        $term = trim((string) $request->query('q', ''));
+        $linked = $workItem->pages()->pluck('project_pages.id')->all();
+
+        $items = ProjectPage::query()
+            ->forProject($project->id)
+            ->active()
+            // Published only. A draft is still being written, and pointing a work item at one
+            // links to something whose author has not said is ready to be read. Pages already
+            // linked keep showing on the work item even if they go back to draft later — that
+            // is history, and this is only what may be chosen now.
+            ->published()
+            ->when($term !== '', fn ($q) => $q->where('title', 'like', "%{$term}%"))
+            ->with('editor')
+            ->orderByDesc('updated_at')
+            ->limit(30)
+            ->get()
+            ->map(fn (ProjectPage $p) => [
+                'id' => $p->id,
+                'title' => $p->title,
+                'status' => $p->status,
+                'updated_by' => $p->editor?->displayName(),
+                'updated_at' => $p->updated_at?->toIso8601String(),
+                // Already linked pages show as such rather than being offered again.
+                'linked' => in_array($p->id, $linked, true),
+            ])->values()->all();
+
+        return response()->json(['ok' => true, 'items' => $items]);
+    }
+
+    /** POST /projects/{project}/work-items/{workItem}/pages — link one or more. */
+    public function storePages(Request $request, Project $project, WorkItem $workItem): JsonResponse
+    {
+        $this->guard($project, $workItem, 'update');
+        abort_unless($project->featureEnabled('pages'), 403, 'Pages are disabled for this project.');
+
+        $ids = $request->validate([
+            'page_ids' => ['required', 'array', 'max:50'],
+            'page_ids.*' => ['integer'],
+        ])['page_ids'];
+
+        // Only pages from THIS project: pages are project-scoped, and a crafted payload must
+        // not reach across into another project's documentation.
+        $pages = ProjectPage::query()->forProject($project->id)->whereIn('id', $ids)->pluck('id');
+
+        // syncWithoutDetaching, so linking one that is already there is a no-op rather than an
+        // error the author has to make sense of.
+        $workItem->pages()->syncWithoutDetaching(
+            $pages->mapWithKeys(fn ($id) => [$id => ['created_by' => Auth::id()]])->all(),
+        );
+
+        return $this->payload($workItem, $pages->count() === 1 ? '1 page linked.' : "{$pages->count()} pages linked.");
+    }
+
+    /** DELETE /projects/{project}/work-items/{workItem}/pages/{page} — unlink, never delete. */
+    public function destroyPage(Project $project, WorkItem $workItem, ProjectPage $page): JsonResponse
+    {
+        $this->guard($project, $workItem, 'update');
+
+        // Only the link goes. The page is documentation in its own right.
+        $workItem->pages()->detach($page->id);
+
+        return $this->payload($workItem, 'Page unlinked.');
     }
 
     /**

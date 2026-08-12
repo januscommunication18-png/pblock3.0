@@ -7,6 +7,7 @@ use App\Models\ProjectMember;
 use App\Models\ProjectPage;
 use App\Models\ProjectPageVersion;
 use App\Models\User;
+use App\Models\WorkItem;
 use App\Models\Workspace;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -657,6 +658,150 @@ class ProjectPageTest extends ProjectTestCase
         }
     }
 
+    // ================= linked from work items =================
+
+    public function test_a_work_item_links_several_pages_and_unlinks_them(): void
+    {
+        [$owner, $ws] = $this->owner();
+        $project = $this->enabled($owner, $ws);
+        $this->actingAs($owner)->get(route('projects.work-items', $project));
+
+        $spec = $this->publishedPage($owner, $project, 'The spec');
+        $notes = $this->publishedPage($owner, $project, 'Meeting notes');
+        $item = $this->workItem($owner, $project, 'Build the thing');
+
+        $url = ['project' => $project->id, 'workItem' => $item->id];
+
+        // Several at once: a work item cites a spec, a decision record and the meeting it was
+        // agreed in, which is why this is a link rather than a column.
+        $structure = $this->actingAs($owner)->postJson(route('projects.work-items.pages.store', $url), [
+            'page_ids' => [$spec['id'], $notes['id']],
+        ])->assertOk()->json('structure');
+
+        $this->assertEqualsCanonicalizing(['The spec', 'Meeting notes'], array_column($structure['pages'], 'title'));
+
+        // Linking the same page twice is a no-op, not a second row.
+        $structure = $this->actingAs($owner)->postJson(route('projects.work-items.pages.store', $url), [
+            'page_ids' => [$spec['id']],
+        ])->assertOk()->json('structure');
+        $this->assertCount(2, $structure['pages']);
+
+        // Unlinking removes the link and nothing else — the page is documentation in its own
+        // right and outlives any work item pointing at it.
+        $structure = $this->actingAs($owner)->deleteJson(route('projects.work-items.pages.destroy',
+            $url + ['page' => $spec['id']]))->assertOk()->json('structure');
+
+        $this->assertSame(['Meeting notes'], array_column($structure['pages'], 'title'));
+        $this->assertTrue($ws->run(fn () => ProjectPage::whereKey($spec['id'])->exists()));
+    }
+
+    public function test_the_picker_offers_this_projects_pages_and_marks_the_linked_ones(): void
+    {
+        [$owner, $ws] = $this->owner();
+        $project = $this->enabled($owner, $ws, 'MINE');
+        $other = $this->enabled($owner, $ws, 'THEIRS', 'Other');
+        $this->actingAs($owner)->get(route('projects.work-items', $project));
+
+        $mine = $this->publishedPage($owner, $project, 'Mine');
+        $this->publishedPage($owner, $other, 'Theirs');
+        $item = $this->workItem($owner, $project, 'Build the thing');
+
+        $url = ['project' => $project->id, 'workItem' => $item->id];
+
+        $items = $this->actingAs($owner)->getJson(route('projects.work-items.pages.search', $url))
+            ->assertOk()->json('items');
+
+        // Pages are project-scoped, so another project's documentation is not on offer.
+        $this->assertSame(['Mine'], array_column($items, 'title'));
+        $this->assertFalse($items[0]['linked']);
+
+        $this->actingAs($owner)->postJson(route('projects.work-items.pages.store', $url), [
+            'page_ids' => [$mine['id']],
+        ])->assertOk();
+
+        $items = $this->actingAs($owner)->getJson(route('projects.work-items.pages.search', $url))
+            ->assertOk()->json('items');
+        $this->assertTrue($items[0]['linked']);
+
+        // …and a crafted payload cannot reach across projects either.
+        $foreign = $this->publishedPage($owner, $other, 'Another of theirs');
+        $structure = $this->actingAs($owner)->postJson(route('projects.work-items.pages.store', $url), [
+            'page_ids' => [$foreign['id']],
+        ])->assertOk()->json('structure');
+        $this->assertSame(['Mine'], array_column($structure['pages'], 'title'));
+    }
+
+    public function test_only_published_pages_are_offered_for_linking(): void
+    {
+        [$owner, $ws] = $this->owner();
+        $project = $this->enabled($owner, $ws);
+        $this->actingAs($owner)->get(route('projects.work-items', $project));
+
+        $draft = $this->page($owner, $project, 'Still writing');
+        $published = $this->publishedPage($owner, $project, 'Ready to read');
+        $item = $this->workItem($owner, $project, 'Build the thing');
+        $url = ['project' => $project->id, 'workItem' => $item->id];
+
+        // A draft is still being written; pointing a work item at one links to something its
+        // author has not said is ready.
+        $items = $this->actingAs($owner)->getJson(route('projects.work-items.pages.search', $url))
+            ->assertOk()->json('items');
+        $this->assertSame(['Ready to read'], array_column($items, 'title'));
+
+        // A page already linked keeps showing on the work item even if it goes back to draft —
+        // that is history, and the filter is only about what may be chosen now.
+        $this->actingAs($owner)->postJson(route('projects.work-items.pages.store', $url), [
+            'page_ids' => [$published['id']],
+        ])->assertOk();
+
+        $this->actingAs($owner)->patchJson(route('projects.pages.update', [
+            'project' => $project->id, 'page' => $published['id'],
+        ]), ['status' => 'draft'])->assertOk();
+
+        $structure = $this->actingAs($owner)->getJson(route('projects.work-items.structure', $url))
+            ->assertOk()->json('structure');
+        $this->assertSame(['Ready to read'], array_column($structure['pages'], 'title'));
+
+        // …and the draft is gone from the picker.
+        $this->assertSame([], $this->actingAs($owner)->getJson(
+            route('projects.work-items.pages.search', $url))->assertOk()->json('items'));
+
+        $this->assertNotNull($draft);
+    }
+
+    public function test_linking_pages_needs_the_feature_and_edit_permission(): void
+    {
+        [$owner, $ws] = $this->owner();
+        $project = $this->enabled($owner, $ws);
+        $this->actingAs($owner)->get(route('projects.work-items', $project));
+        $page = $this->publishedPage($owner, $project, 'The spec');
+        $item = $this->workItem($owner, $project, 'Build the thing');
+        $url = ['project' => $project->id, 'workItem' => $item->id];
+
+        $sam = $this->member($ws, 'member', 'sam@example.com');
+        $ws->run(fn () => ProjectMember::create([
+            'tenant_id' => $ws->id, 'project_id' => $project->id,
+            'user_id' => $sam->id, 'role' => ProjectMember::ROLE_COMMENTER,
+        ]));
+
+        // Linking is an edit of the work item, and a Commenter does not have one.
+        $this->actingAs($sam)->postJson(route('projects.work-items.pages.store', $url), [
+            'page_ids' => [$page['id']],
+        ])->assertStatus(403);
+
+        // With Pages switched off there is nothing to offer and nothing to accept.
+        $this->togglePages($owner, $project, false);
+        $this->assertSame([], $this->actingAs($owner)->getJson(
+            route('projects.work-items.pages.search', $url))->assertOk()->json('items'));
+        $this->actingAs($owner)->postJson(route('projects.work-items.pages.store', $url), [
+            'page_ids' => [$page['id']],
+        ])->assertStatus(403);
+
+        // The work item screen is told, so the control says why instead of doing nothing.
+        $this->assertFalse($this->actingAs($owner)->get(route('projects.work-items', $project))
+            ->assertOk()->viewData('bootstrap')['pagesEnabled']);
+    }
+
     // ------------------------------------------------------------------ helpers
 
     private function enabled(User $owner, Workspace $ws, string $identifier = 'TESTI', string $name = 'Website Redesign'): Project
@@ -685,6 +830,30 @@ class ProjectPageTest extends ProjectTestCase
         return $this->actingAs($actor)->getJson(route('projects.pages.versions', [
             'project' => $project->id, 'page' => $pageId,
         ]))->assertOk()->json('versions');
+    }
+
+    private function workItem(User $actor, Project $project, string $title): WorkItem
+    {
+        $id = $this->actingAs($actor)
+            ->postJson(route('projects.work-items.store', $project), ['title' => $title])
+            ->assertStatus(201)->json('item.id');
+
+        return WorkItem::withoutTenancy()->find($id);
+    }
+
+    /**
+     * A page that may be linked. Pages start as drafts (§9) and the picker offers only
+     * published ones, so anything meant to be linkable has to be published first.
+     *
+     * @return array<string, mixed>
+     */
+    private function publishedPage(User $actor, Project $project, string $title): array
+    {
+        $page = $this->page($actor, $project, $title);
+
+        return $this->actingAs($actor)->patchJson(route('projects.pages.update', [
+            'project' => $project->id, 'page' => $page['id'],
+        ]), ['status' => 'published'])->assertOk()->json('page');
     }
 
     /** @return array<string, mixed> */

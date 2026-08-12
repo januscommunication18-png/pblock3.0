@@ -588,6 +588,7 @@ var WorkItemsScreen = {
       estimatesEnabled: !!b.estimatesEnabled,
       estimates: Array.isArray(b.estimates) ? b.estimates : [],
       // Epic §4/§9: the property appears only where the project has the feature on.
+      pagesEnabled: !!b.pagesEnabled,
       epicsEnabled: !!b.epicsEnabled,
       epics: Array.isArray(b.epics) ? b.epics : [],
       // Set when this screen is mounted inside an epic, cycle or module: new work items
@@ -637,7 +638,10 @@ var WorkItemsScreen = {
       // Sections collapse independently. Dependencies and Relations start CLOSED: they are
       // reference material about other work items, and expanded by default they push the
       // description and the conversation below the fold on every open.
-      secOpen: { subtasks: true, dependencies: false, relations: false, links: true },
+      secOpen: { subtasks: true, dependencies: false, relations: false, links: true, pages: true },
+      // The linked-pages picker. Its own dialog rather than the work item picker's: it
+      // searches documentation, not work items, and the rows read nothing alike.
+      pagePicker: { open: false, query: '', results: [], selected: [], busy: false, loaded: false },
       // Per-row ⋯ menu inside the structure sections.
       structMenu: { open: false, kind: '', row: null, style: {} },
       // The description editor is raised by ⋯ → Edit rather than sitting on the panel: an
@@ -1449,6 +1453,62 @@ var WorkItemsScreen = {
       return 'just now';
     },
 
+    // ---------- Linked pages ----------
+    openPagePicker: function () {
+      this.addMenu = '';
+      this.pagePicker = { open: true, query: '', results: [], selected: [], busy: false, loaded: false };
+      this.searchPages();
+    },
+    searchPages: async function () {
+      var it = this.drawerItem;
+      if (!it || !this.endpoints.pageSearch) return;
+      this.pagePicker.busy = true;
+      try {
+        var url = this.$pb.withId(this.endpoints.pageSearch, it.id) +
+          '?q=' + encodeURIComponent(this.pagePicker.query || '');
+        var resp = await this.$pb.api(url);
+        this.pagePicker.results = resp.items || [];
+        this.pagePicker.loaded = true;
+      } catch (e) { this.pagePicker.results = []; }
+      this.pagePicker.busy = false;
+    },
+    /** Debounced so typing does not fire a request per keystroke. */
+    onPageQuery: function () {
+      var self = this;
+      clearTimeout(this._pageTimer);
+      this._pageTimer = setTimeout(function () { self.searchPages(); }, 200);
+    },
+    togglePagePick: function (row) {
+      // Already linked: shown as such rather than offered again.
+      if (row.linked) return;
+      var ids = this.pagePicker.selected.map(String);
+      var at = ids.indexOf(String(row.id));
+      if (at > -1) this.pagePicker.selected.splice(at, 1); else this.pagePicker.selected.push(row.id);
+    },
+    isPagePicked: function (row) {
+      return row.linked || this.pagePicker.selected.map(String).indexOf(String(row.id)) > -1;
+    },
+    confirmPagePicker: async function () {
+      if (!this.pagePicker.selected.length || this.pagePicker.busy) return;
+      this.pagePicker.busy = true;
+      try {
+        this.applyStructure(await this.$pb.api(this.structureUrl('pages'), {
+          method: 'POST', body: { page_ids: this.pagePicker.selected }
+        }));
+        this.pagePicker.open = false;
+      } catch (e) { this.$pb.toast(this.$pb.firstError(e), 'error'); }
+      this.pagePicker.busy = false;
+    },
+    unlinkPage: async function (page) {
+      try {
+        // Only the link goes — the page is documentation in its own right.
+        this.applyStructure(await this.$pb.api(this.structureUrl('pages') + '/' + page.id, { method: 'DELETE' }));
+      } catch (e) { this.$pb.toast(this.$pb.firstError(e), 'error'); }
+    },
+    pageUrl: function (page) {
+      return this.endpoints.page ? this.$pb.withId(this.endpoints.page, page.id) : '#';
+    },
+
     // ---------- The shared work-item picker (§22 / §30 / §34) ----------
     /** §20: the sub-task button offers both routes; the choice decides which modal opens. */
     createSubtask: function () {
@@ -2145,11 +2205,17 @@ var WorkItemsScreen = {
     '<button type="button" @click="openLinkModal(null)" data-tip="Add link" aria-label="Add link" class="relative -ml-px inline-flex items-center justify-center h-9 w-9 text-sub ring-1 ring-inset ring-stroke hover:bg-hover focus:z-10">' +
     '' + wiIcon('link', 15) + '</button>' +
 
-    // Attachments and Pages are drawn but inert until they ship (§42/§43) — a dead control
-    // that silently does nothing is worse than one that says why.
+    // Attachments are drawn but inert until they ship (§42) — a dead control that silently
+    // does nothing is worse than one that says why.
     '<span data-tip="Attachments — coming soon" aria-label="Attachments — coming soon" class="relative -ml-px inline-flex items-center justify-center h-9 w-9 text-faint ring-1 ring-inset ring-stroke cursor-not-allowed">' +
     '' + wiIcon('paperclip', 15) + '</span>' +
-    '<span data-tip="Link pages — coming soon" aria-label="Link pages — coming soon" class="relative -ml-px inline-flex items-center justify-center rounded-r-md h-9 w-9 text-faint ring-1 ring-inset ring-stroke cursor-not-allowed">' +
+
+    // Link pages. Live where the project has Pages on, and saying why where it does not.
+    '<button v-if="pagesEnabled" type="button" @click="openPagePicker" data-tip="Link pages" aria-label="Link pages" ' +
+    'class="relative -ml-px inline-flex items-center justify-center rounded-r-md h-9 w-9 text-sub ring-1 ring-inset ring-stroke hover:bg-hover focus:z-10">' +
+    '' + wiIcon('file-lines', 15) + '</button>' +
+    '<span v-else data-tip="Pages are disabled for this project" aria-label="Pages are disabled for this project" ' +
+    'class="relative -ml-px inline-flex items-center justify-center rounded-r-md h-9 w-9 text-faint ring-1 ring-inset ring-stroke cursor-not-allowed">' +
     '' + wiIcon('file-lines', 15) + '</span>' +
 
     '</span></div>' +
@@ -2284,6 +2350,27 @@ var WorkItemsScreen = {
     '' + wiIcon('clone', 14) + '</button>' +
     '<button v-if="canEdit" type="button" @click="openStructMenu(\'link\', l, $event)" class="h-6 w-6 grid place-items-center rounded text-faint hover:bg-line shrink-0" data-tip="More" aria-label="More">' +
     '' + wiIcon('ellipsis-small', 15) + '</button>' +
+    '</li></ul></div>' +
+
+    // ---- Linked pages. The documentation this work item points at. ----
+    '<div v-if="pagesEnabled && structure.pages && structure.pages.length" class="p-3 sm:p-4">' +
+    '<div class="flex items-center gap-2">' +
+    '<button type="button" @click="toggleSection(\'pages\')" class="h-6 w-6 grid place-items-center rounded text-faint hover:bg-hover shrink-0">' +
+    '' + wiIcon('chevron-down', 15, 'transition-transform') + '</button>' +
+    '<span class="text-[13px] font-semibold text-head">Linked pages</span>' +
+    '<span class="text-[12px] text-sub">{{ structure.pages.length }}</span>' +
+    '<button v-if="canEdit" type="button" @click="openPagePicker" data-tip="Link pages" aria-label="Link pages" ' +
+    'class="ml-auto h-7 w-7 grid place-items-center rounded text-sub hover:bg-hover">' +
+    '' + wiIcon('plus', 16) + '</button>' +
+    '</div>' +
+    '<ul v-show="secOpen.pages" class="mt-1 space-y-1">' +
+    '<li v-for="p in structure.pages" :key="p.id" class="flex items-center gap-2.5 px-2.5 h-11 rounded-md border border-line">' +
+    '' + wiIcon('file-lines', 15, 'text-sub shrink-0') + '' +
+    '<a :href="pageUrl(p)" class="text-[13px] text-ink truncate hover:underline">{{ p.title }}</a>' +
+    '<span v-if="p.status === \'draft\'" class="text-[11px] text-faint shrink-0">Draft</span>' +
+    '<button v-if="canEdit" type="button" @click="unlinkPage(p)" data-tip="Unlink page" aria-label="Unlink page" ' +
+    'class="ml-auto h-6 w-6 grid place-items-center rounded text-faint hover:bg-line hover:text-danger shrink-0">' +
+    '' + wiIcon('xmark', 14) + '</button>' +
     '</li></ul></div>' +
 
     '</div>' +
@@ -2845,6 +2932,59 @@ var WorkItemsScreen = {
     '<button type="button" @click="confirmPicker" :disabled="!picker.selected.length || picker.busy" ' +
     'class="h-9 px-4 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold disabled:opacity-50">' +
     '{{ picker.busy ? (picker.mode === \'parent\' ? \'Saving…\' : \'Adding…\') : (picker.mode === \'parent\' ? \'Set parent\' : \'Add\') }}</button>' +
+    '</div></div></div>' +
+
+    // ===== Link pages (POC: LinkPagesModal) =====
+    '<div v-if="pagePicker.open" class="fixed inset-0 z-[95] flex items-start justify-center p-4 sm:pt-24">' +
+    '<div class="absolute inset-0 bg-black/40" @mousedown="backdropDown" @click="backdropClick($event, function(){ pagePicker.open = false; })"></div>' +
+    '<div class="relative w-full max-w-[680px] bg-white rounded-xl shadow-xl flex flex-col max-h-[72vh]">' +
+    '<div class="flex items-center justify-between px-5 py-4 border-b border-line shrink-0">' +
+    '<h2 class="text-[15px] font-semibold text-head">Link pages to ' +
+    '<span class="text-brand">{{ drawerItem ? drawerItem.identifier : \'\' }}</span></h2>' +
+    '<button type="button" @click="pagePicker.open = false" data-tip="Close" aria-label="Close" ' +
+    'class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover">' + wiIcon('xmark', 18) + '</button>' +
+    '</div>' +
+
+    '<div class="flex items-center gap-3 px-5 py-2.5 border-b border-line shrink-0">' +
+    '' + wiIcon('magnifying-glass', 16, 'text-faint shrink-0') + '' +
+    '<input v-model="pagePicker.query" @input="onPageQuery" type="text" placeholder="Search pages" ' +
+    'class="flex-1 h-8 text-[14px] text-ink placeholder:text-faint outline-none bg-transparent" />' +
+    // The POC pairs this with a "Show Wiki pages" switch. Wiki is a later phase (Pages §14),
+    // so it says so rather than offering a control that would do nothing.
+    '<span class="h-5 w-px bg-line"></span>' +
+    '<span class="text-[12px] text-faint shrink-0 whitespace-nowrap" ' +
+    'data-tip="Linking Wiki pages arrives with the Wiki">Wiki pages ' +
+    '<span class="text-[10px] font-semibold uppercase tracking-wide bg-hover rounded px-1 py-0.5">Soon</span></span>' +
+    '</div>' +
+
+    '<div class="p-2 overflow-y-auto flex-1">' +
+    '<button v-for="row in pagePicker.results" :key="row.id" type="button" @click="togglePagePick(row)" ' +
+    ':disabled="row.linked" class="w-full text-left flex items-center gap-3 px-3 h-11 rounded-md hover:bg-hover disabled:opacity-60" ' +
+    ':class="isPagePicked(row) ? \'bg-sel/40\' : \'\'">' +
+    // The tick is an inline SVG with a hard-coded stroke, not an icon-font glyph: at 11px a
+    // webfont glyph sits off-centre in a 16px box and inherits a colour the box has already
+    // painted over. This is the same checkbox the module and cycle pickers draw.
+    '<span class="h-[18px] w-[18px] rounded border grid place-items-center shrink-0 transition-colors" ' +
+    ':class="isPagePicked(row) ? \'bg-brand border-brand\' : \'border-stroke bg-white\'">' +
+    '<svg v-if="isPagePicked(row)" width="12" height="12" viewBox="0 0 24 24" fill="none">' +
+    '<path d="M5 12l4 4L19 7" stroke="#fff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+    '</span>' +
+    '' + wiIcon('file-lines', 15, 'text-sub shrink-0') + '' +
+    '<span class="text-[14px] text-ink truncate flex-1 min-w-0">{{ row.title }}</span>' +
+    '<span v-if="row.linked" class="text-[11px] text-faint shrink-0">Already linked</span>' +
+    '<span v-else class="text-[11px] text-faint shrink-0 hidden sm:inline">{{ relativeTime(row.updated_at) }}</span>' +
+    '</button>' +
+    '<div v-if="pagePicker.loaded && !pagePicker.results.length" class="px-3 py-8 text-[13px] text-sub text-center">' +
+    '{{ pagePicker.query ? \'No page matches\' : \'No pages in this project yet\' }}</div>' +
+    '</div>' +
+
+    '<div class="flex items-center gap-2 px-5 py-3 border-t border-line shrink-0">' +
+    '<span class="text-[12px] text-sub">{{ pagePicker.selected.length }} selected</span>' +
+    '<button type="button" @click="pagePicker.open = false" ' +
+    'class="ml-auto h-9 px-4 rounded-md border border-stroke text-[13px] font-semibold text-ink hover:bg-hover">Cancel</button>' +
+    '<button type="button" @click="confirmPagePicker" :disabled="!pagePicker.selected.length || pagePicker.busy" ' +
+    'class="h-9 px-4 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold disabled:opacity-50">' +
+    '{{ pagePicker.busy ? \'Linking…\' : \'Confirm\' }}</button>' +
     '</div></div></div>' +
 
     // ===== Add / edit link (§38) =====

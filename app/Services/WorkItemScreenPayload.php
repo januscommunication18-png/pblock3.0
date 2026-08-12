@@ -66,6 +66,8 @@ class WorkItemScreenPayload
             // Modules §9.1: the property only appears when the project has it on.
             'modulesEnabled' => $project->featureEnabled('modules'),
             'modules' => $this->modules($project),
+            // The Linked pages section only appears where the project has Pages on.
+            'pagesEnabled' => $project->featureEnabled('pages'),
             'epicsEnabled' => $project->featureEnabled('epics'),
             'epics' => $this->epics($project),
             // Estimation §4/§26: the chip only appears where the project has it on AND a
@@ -129,6 +131,10 @@ class WorkItemScreenPayload
             'subtasks' => $withId('projects.work-items.subtasks.store'),
             'relations' => $withId('projects.work-items.relations.store'),
             'links' => $withId('projects.work-items.links.store'),
+            // Opening a linked page. Project-scoped like the pages themselves.
+            'page' => route('projects.pages.show', ['project' => $project->id, 'page' => '__ID__']),
+            'pageSearch' => $withId('projects.work-items.pages.search'),
+            'pages' => $withId('projects.work-items.pages.store'),
             'createLabel' => $withId('projects.work-items.labels.store'),
             'mediaUpload' => route('projects.work-items.media.store', $project),
             'mediaGallery' => route('projects.work-items.media.index', $project),

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\ProjectPage;
 use App\Models\User;
 use App\Models\WorkItem;
 use App\Models\WorkItemActivity;
@@ -247,6 +248,17 @@ class WorkItemRelationManager
                 'duplicate_of' => $relations[WorkItemRelation::TYPE_DUPLICATE_OF],
                 'duplicated_by' => $relations[WorkItemRelation::TYPE_DUPLICATED_BY],
             ],
+            // The documentation this item points at. Pages are project-scoped, so a link can
+            // only ever reach a page in the same project — enforced when it is created.
+            'pages' => $item->pages()
+                ->orderBy('title')
+                ->get()
+                ->map(fn (ProjectPage $p) => [
+                    'id' => $p->id,
+                    'title' => $p->title,
+                    'status' => $p->status,
+                    'archived' => $p->isArchived(),
+                ])->values()->all(),
             'links' => WorkItemLink::query()
                 ->where('work_item_id', $item->id)
                 ->latest('id')

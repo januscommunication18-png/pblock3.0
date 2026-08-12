@@ -79,6 +79,14 @@ Route::middleware(['auth', 'workspace.tenancy'])
             ->whereNumber(['project', 'workItem', 'relation'])->name('work-items.relations.destroy');
         // Create a project label from the work item's label picker (applied by the normal
         // label PATCH straight after).
+        // Linked pages (§ Pages): the documentation a work item points at.
+        Route::get('/{project}/work-items/{workItem}/pages/search', [WorkItemStructureController::class, 'searchPages'])
+            ->whereNumber(['project', 'workItem'])->name('work-items.pages.search');
+        Route::post('/{project}/work-items/{workItem}/pages', [WorkItemStructureController::class, 'storePages'])
+            ->whereNumber(['project', 'workItem'])->name('work-items.pages.store');
+        Route::delete('/{project}/work-items/{workItem}/pages/{page}', [WorkItemStructureController::class, 'destroyPage'])
+            ->whereNumber(['project', 'workItem', 'page'])->name('work-items.pages.destroy');
+
         Route::post('/{project}/work-items/{workItem}/labels', [WorkItemStructureController::class, 'storeLabel'])
             ->whereNumber(['project', 'workItem'])->middleware('throttle:30,1')->name('work-items.labels.store');
         Route::post('/{project}/work-items/{workItem}/links', [WorkItemStructureController::class, 'storeLink'])

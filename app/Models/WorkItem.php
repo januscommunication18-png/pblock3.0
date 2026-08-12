@@ -86,6 +86,19 @@ class WorkItem extends Model
     }
 
     /**
+     * The project pages this work item points at.
+     *
+     * MANY, both ways: a work item can cite a spec, a decision record and the meeting it was
+     * agreed in, and each of those is cited by plenty of other work items.
+     */
+    public function pages(): BelongsToMany
+    {
+        return $this->belongsToMany(ProjectPage::class, 'work_item_pages', 'work_item_id', 'project_page_id')
+            ->withPivotValue('tenant_id', $this->pivotTenantId())
+            ->withTimestamps();
+    }
+
+    /**
      * This item's estimate, if it has one (Estimation §33).
      *
      * One value, never several: §36 refuses points AND a T-shirt size AND a duration on one

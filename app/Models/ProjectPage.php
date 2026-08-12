@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Stancl\Tenancy\Database\Concerns\BelongsToTenant;
@@ -60,6 +61,13 @@ class ProjectPage extends Model
     public function editor(): BelongsTo
     {
         return $this->belongsTo(User::class, 'updated_by');
+    }
+
+    /** The work items pointing at this page — the other side of the link. */
+    public function workItems(): BelongsToMany
+    {
+        return $this->belongsToMany(WorkItem::class, 'work_item_pages', 'project_page_id', 'work_item_id')
+            ->withTimestamps();
     }
 
     /** §9: the parent page, when applicable. */
