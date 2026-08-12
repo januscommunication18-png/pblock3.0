@@ -147,4 +147,41 @@ class IconSetTest extends TestCase
 
         return $files;
     }
+
+    /**
+     * The Pages toolbar is drawn with the app's icons, not Jodit's — a toolbar in someone
+     * else's line weight sits in the page looking borrowed. The mapping is by name, so a
+     * rename in the registry breaks it silently; this catches that.
+     */
+    public function test_every_editor_icon_the_pages_toolbar_maps_exists(): void
+    {
+        $registry = IconRegistry::all();
+        $source = file_get_contents(public_path('assets/js/projects/page-editor.js'));
+
+        $map = substr($source, strpos($source, 'var map = {'));
+        $map = substr($map, 0, strpos($map, '};'));
+
+        preg_match_all("/: '([a-z-]+)'/", $map, $matches);
+        $this->assertNotEmpty($matches[1], 'the icon map is empty or has moved');
+
+        foreach (array_unique($matches[1]) as $icon) {
+            $this->assertArrayHasKey($icon, $registry, "the toolbar maps to a missing icon [{$icon}]");
+        }
+    }
+
+    /** Icons lifted from Font Awesome keep their own viewBox rather than being re-drawn. */
+    public function test_font_awesome_sourced_icons_carry_their_viewbox(): void
+    {
+        $registry = IconRegistry::all();
+
+        foreach (['bold', 'italic', 'table', 'align-center'] as $icon) {
+            $this->assertArrayHasKey('viewBox', $registry[$icon], $icon);
+            $this->assertNotSame('0 0 24 24', $registry[$icon]['viewBox'], $icon);
+        }
+
+        // …and one drawn on the app's own grid still renders on the default 24 grid.
+        $this->assertArrayNotHasKey('viewBox', $registry['grid']);
+        config()->set('icons.set', 'legacy');
+        $this->assertStringContainsString('viewBox="0 0 24 24"', pb_icon('grid'));
+    }
 }

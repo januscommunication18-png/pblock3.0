@@ -18,6 +18,7 @@
     "dependencies": {
         "@vitejs/plugin-vue": "^6.0.8",
         "flyonui": "^2.4.1",
+        "jodit-pro": "^4.13.37",
         "laravel-echo": "^2.4.0",
         "pusher-js": "^8.6.0",
         "quill": "^2.0.3",

@@ -44,7 +44,7 @@ class ProjectNavigation
     public function tabs(Project $project): array
     {
         // tab key => the project feature that decides how it renders.
-        $gated = ['cycles' => 'cycles', 'modules' => 'modules', 'epics' => 'epics'];
+        $gated = ['cycles' => 'cycles', 'modules' => 'modules', 'epics' => 'epics', 'pages' => 'pages'];
 
         return collect(config('projects.workspace_tabs'))
             // Resolved once per tab rather than once per question, so a gated tab costs one
@@ -52,7 +52,13 @@ class ProjectNavigation
             ->map(fn (array $tab) => isset($gated[$tab['key']])
                 ? $tab + ['feature_state' => $this->featureState->state($project, $gated[$tab['key']])]
                 : $tab)
-            ->reject(fn (array $tab) => ($tab['feature_state'] ?? null) === ProjectFeatureState::DISABLED_UNUSED)
+            // Removed when the feature was never used, and also when the feature declares that
+            // being off makes it unreachable rather than read-only (Pages §5) — a tab that
+            // opens onto a 404 is worse than no tab.
+            ->reject(fn (array $tab) => isset($tab['feature_state'])
+                && $tab['feature_state'] !== ProjectFeatureState::ENABLED
+                && ($tab['feature_state'] === ProjectFeatureState::DISABLED_UNUSED
+                    || config("projects.features.{$gated[$tab['key']]}.hides_when_disabled", false)))
             ->map(function (array $tab) {
                 if (! isset($tab['feature_state'])) {
                     return $tab;

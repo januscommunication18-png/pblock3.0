@@ -66,10 +66,13 @@ if (! function_exists('pb_icon')) {
             );
         }
 
+        // Most entries are drawn on a 24 grid; ones lifted straight from Font Awesome keep
+        // their own viewBox rather than being re-drawn, so `viewBox` is optional per icon.
         return sprintf(
-            '<svg width="%d" height="%d" viewBox="0 0 24 24" fill="none" class="%s" aria-hidden="true">%s</svg>',
+            '<svg width="%d" height="%d" viewBox="%s" fill="none" class="%s" aria-hidden="true">%s</svg>',
             $size,
             $size,
+            e($icons[$name]['viewBox'] ?? '0 0 24 24'),
             e($classes),
             $icons[$name]['svg'],
         );

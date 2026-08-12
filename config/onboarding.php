@@ -10,8 +10,8 @@
 
 return [
     'roles' => [
-        'pm'  => 'Product Manager',
-        'em'  => 'Engineering Manager',
+        'pm' => 'Product Manager',
+        'em' => 'Engineering Manager',
         'des' => 'Designer',
         'dev' => 'Developer',
         'fnd' => 'Founder/Executive',
@@ -21,9 +21,9 @@ return [
 
     'goals' => [
         'roadmaps' => 'Plan and track product roadmaps',
-        'sprints'  => 'Manage engineering sprints',
-        'cross'    => 'Coordinate cross-functional projects',
-        'replace'  => 'Replace our current tool',
-        'explore'  => 'Just exploring',
+        'sprints' => 'Manage engineering sprints',
+        'cross' => 'Coordinate cross-functional projects',
+        'replace' => 'Replace our current tool',
+        'explore' => 'Just exploring',
     ],
 ];

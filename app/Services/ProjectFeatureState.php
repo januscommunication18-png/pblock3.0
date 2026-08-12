@@ -9,6 +9,7 @@ use App\Models\Module;
 use App\Models\Project;
 use App\Models\ProjectEstimation;
 use App\Models\ProjectItemLabel;
+use App\Models\ProjectPage;
 
 /**
  * What state is an optional project feature in (Feature Disable §10)?
@@ -48,6 +49,7 @@ class ProjectFeatureState
         'modules' => Module::class,
         'cycles' => Cycle::class,
         'labels' => ProjectItemLabel::class,
+        'pages' => ProjectPage::class,
     ];
 
     /**

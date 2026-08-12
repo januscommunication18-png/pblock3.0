@@ -118,6 +118,7 @@ return [
         ['key' => 'features', 'label' => 'Cycle', 'status' => 'active'],
         ['key' => 'modules', 'label' => 'Module', 'status' => 'active'],
         ['key' => 'epics', 'label' => 'Epic', 'status' => 'active'],
+        ['key' => 'pages', 'label' => 'Pages', 'status' => 'active'],
         ['key' => 'states', 'label' => 'States', 'status' => 'active'],
         ['key' => 'labels', 'label' => 'Labels', 'status' => 'active'],
         ['key' => 'estimates', 'label' => 'Estimation', 'status' => 'active'],
@@ -214,6 +215,18 @@ return [
             'default' => false,
             'section' => 'epics',
             'confirm_disable' => true,
+        ],
+        'pages' => [
+            'label' => 'Pages',
+            'singular' => 'Page',
+            'description' => 'Allow members of this project to create and manage project documentation using Pages.',
+            'default' => false,
+            'section' => 'pages',
+            'confirm_disable' => true,
+            // Pages §5 restricts direct access to a disabled project's pages, unlike Epics,
+            // Modules and Cycles whose records stay readable for historical reference. So the
+            // tab goes entirely when the feature is off — keeping it would point at a 404.
+            'hides_when_disabled' => true,
         ],
         'labels' => [
             'label' => 'Labels',
@@ -352,6 +365,51 @@ return [
             ],
         ],
     ],
+
+    /**
+     * Page statuses (§9). Draft is where a page starts — documentation is written before it
+     * is ready to be read, and publishing is the moment someone decides it is.
+     *
+     * Separate from archiving, which answers "is this still current?" rather than "is this
+     * ready?". A published page can be archived without becoming a draft again.
+     */
+    'page_statuses' => [
+        'draft' => ['label' => 'Draft', 'color' => '#9ca3af'],
+        'published' => ['label' => 'Published', 'color' => '#22c55e'],
+    ],
+
+    'page_default_status' => 'draft',
+
+    /**
+     * Jodit Pro licence key.
+     *
+     * The Pro plugins register but stay inert without it — which looks exactly like "the Pro
+     * features are missing". Kept in the environment rather than the repo because it is a
+     * purchased credential, not configuration.
+     */
+    'jodit_license' => env('JODIT_LICENSE', ''),
+
+    /**
+     * How long consecutive saves by one author fold into a single version.
+     *
+     * The editor autosaves after every pause in typing; without a window, an afternoon's work
+     * becomes hundreds of near-identical versions and the history stops being useful for the
+     * one thing it is for — finding the state to go back to.
+     *
+     * Short enough that separate sittings show up as separate versions, long enough that
+     * writing one section is one entry. Measured from the START of the version, so it closes
+     * on time however long the editing continues.
+     */
+    'page_version_window_minutes' => 5,
+
+    /** Versions kept per page. Each one carries a full copy of the document. */
+    'page_versions_max' => 50,
+
+    /** Pages (§8). A title is a heading, not a document. */
+    'page_title_max' => 200,
+
+    /** Rich-text body, the same ceiling a work item description gets. */
+    'page_content_max' => 200000,
 
     /** §7: a label name is short by design; the description carries any nuance. */
     'label_name_max' => 50,

@@ -1,0 +1,228 @@
+/* Project Pages — the document editor's chrome.
+   ------------------------------------------------------------------
+   Quill's Snow theme is built for a field inside a form: a bordered box with its toolbar
+   stuck to the top of it. A page is a document, so the box has to disappear — one persistent
+   toolbar across the screen, and a column of text with nothing drawn around it.
+
+   Scoped under .pb-page so the work item description editor, which wants Snow's boxed look,
+   is untouched. */
+
+/* ---- the persistent toolbar ----
+   Quill builds the toolbar and <wi-editor> moves it into #pb-page-toolbar, so the styled
+   element is a CHILD of the host rather than the host itself. */
+.pb-page-toolbar > .ql-toolbar.ql-snow {
+  border: 0;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 6px 24px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-wrap: wrap;
+}
+.pb-page-toolbar > .ql-toolbar.ql-snow .ql-formats {
+  margin-right: 10px;
+  display: inline-flex;
+  align-items: center;
+}
+/* A hairline between groups, the way the reference separates its clusters. */
+.pb-page-toolbar > .ql-toolbar.ql-snow .ql-formats + .ql-formats {
+  border-left: 1px solid #f1f2f4;
+  padding-left: 10px;
+}
+.pb-page-toolbar > .ql-toolbar.ql-snow button {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+}
+.pb-page-toolbar > .ql-toolbar.ql-snow button:hover,
+.pb-page-toolbar > .ql-toolbar.ql-snow .ql-picker-label:hover {
+  background: #f3f4f6;
+}
+.pb-page-toolbar > .ql-toolbar.ql-snow button.ql-active,
+.pb-page-toolbar > .ql-toolbar.ql-snow .ql-picker-label.ql-active {
+  background: #eef2ff;
+}
+
+/* ---- the document ---- */
+/*
+   ONE measure for the whole document. The title and the body are the same column of text, so
+   the width is stated once here and both read from it — set it on .pb-page-doc and nothing
+   can drift out of alignment with anything else.
+*/
+.pb-page { --pb-page-measure: 720px; }
+.pb-page-doc {
+  max-width: var(--pb-page-measure);
+  margin-left: auto;
+  margin-right: auto;
+  width: 100%;
+}
+
+/* No border and no field padding: the editor IS the page, not a control sitting on it.
+   Qualified with .wi-editor to outrank the boxed look work-items.css gives the same elements
+   — the grid skin taught this lesson once already, and equal specificity across two
+   stylesheets is decided by load order, which is too fragile to rely on. */
+.pb-page .wi-editor .ql-container.ql-snow {
+  border: 0;
+  font-size: 15px;
+}
+.pb-page .wi-editor .ql-editor {
+  padding: 0 0 25vh;          /* room to scroll past the last line, as a document should have */
+  font-size: 15px;
+  line-height: 1.75;
+  color: #1f2328;
+}
+.pb-page .wi-editor .ql-editor.ql-blank::before {
+  left: 0;
+  right: 0;
+  font-style: normal;
+  color: #9ca3af;
+}
+.pb-page .wi-editor .ql-editor h1 { font-size: 28px; margin: 28px 0 8px; font-weight: 700; }
+.pb-page .wi-editor .ql-editor h2 { font-size: 22px; margin: 24px 0 8px; font-weight: 700; }
+.pb-page .wi-editor .ql-editor h3 { font-size: 18px; margin: 20px 0 6px; font-weight: 600; }
+.pb-page .wi-editor .ql-editor p { margin: 0 0 10px; }
+.pb-page .wi-editor .ql-editor blockquote {
+  border-left: 3px solid #e5e7eb;
+  margin: 12px 0;
+  padding: 2px 0 2px 14px;
+  color: #6b7280;
+}
+/* What a paste actually brings.
+   Headings and paragraphs were styled; lists, links, images and rules were not — so content
+   pasted from a document or a web page arrived correctly formatted and then rendered flat,
+   which reads as "the paste lost its formatting". */
+.pb-page .wi-editor .ql-editor ul,
+.pb-page .wi-editor .ql-editor ol { padding-left: 1.5em; margin: 0 0 10px; }
+.pb-page .wi-editor .ql-editor li { margin: 4px 0; padding-left: 0.25em; }
+.pb-page .wi-editor .ql-editor li > ul,
+.pb-page .wi-editor .ql-editor li > ol { margin: 4px 0 0; }
+.pb-page .wi-editor .ql-editor a { color: #2563eb; text-decoration: underline; }
+.pb-page .wi-editor .ql-editor img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 12px 0;
+}
+.pb-page .wi-editor .ql-editor hr {
+  border: 0;
+  border-top: 1px solid #e5e7eb;
+  margin: 24px 0;
+}
+/* Inline code, as opposed to the block below it. */
+.pb-page .wi-editor .ql-editor code {
+  background: #f3f4f6;
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 0.9em;
+}
+.pb-page .wi-editor .ql-editor pre.ql-syntax {
+  background: #f6f7f8;
+  color: #1f2328;
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+
+/* The title sits in the same column as the body, so they read as one document. */
+.pb-page-title {
+  font-size: 34px;
+  line-height: 1.2;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+
+/* ---- Jodit (Pro) ----------------------------------------------------------
+   The editor spans the screen so its toolbar can pin to the top of the scroller; only the
+   text inside it is held to the document measure, which keeps the title and the body in one
+   column. Jodit's own `toolbarSticky` is deliberately off — it positions against the window,
+   so inside a scrolled container it detaches and floats.
+
+   Everything below is chrome removal: a page is a document, not a field with a frame. */
+.pb-page-jodit { display: block; }
+.pb-page-jodit .jodit-container:not(.jodit_inline) {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+/* ---- Jodit, in the app's palette ----
+   Jodit exposes its theme as CSS custom properties, so matching the app is a matter of
+   restating them rather than overriding rules one at a time — and an upgrade that adds new
+   internals inherits the palette instead of arriving in Jodit's grey.
+
+   Values are the Tailwind theme's (tailwind.config.js): those are the source of truth, and a
+   second set of near-identical hexes is how two palettes drift apart. */
+.pb-page-jodit,
+.pb-page-toolbar {
+  --jd-color-default: #23272f;        /* ink */
+  --jd-color-icon: #6b7280;           /* sub */
+  --jd-color-gray: #6b7280;
+  --jd-color-gray-dark: #4b5563;
+  --jd-color-border: #e5e7eb;         /* line */
+  --jd-color-border-dark: #d1d5db;    /* stroke */
+  --jd-color-border-active: #1b5f8a;  /* brand */
+  --jd-color-border-selected: #1b5f8a;
+  --jd-color-background-default: #ffffff;
+  --jd-color-background-gray: #f3f4f6;        /* hover */
+  --jd-color-background-gray-hover: #eef1f4;  /* sel */
+  --jd-color-background-light-gray: #f8f9fa;
+  --jd-color-background-button-hover: #f3f4f6;
+  --jd-color-button-background-hover: #f3f4f6;
+  --jd-color-background-active: #eef1f4;
+  --jd-color-background-selection: #eef1f4;
+  --jd-color-blue: #1b5f8a;
+  --jd-color-error: #ef4444;          /* danger */
+  --jd-border-radius-default: 6px;
+  --jd-button-size: 28px;
+  --jd-button-icon-size: 16px;
+}
+
+/* The toolbar lives in #pb-page-toolbar, above the scroller — <pg-editor> moves the finished
+   element there. Being a sibling of the scrolling area rather than inside it is what keeps it
+   at the top without `position: sticky` and without Jodit's window-relative sticky mode. */
+.pb-page-toolbar > .jodit-toolbar__box {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 2px 8px;
+}
+.pb-page-toolbar .jodit-toolbar-button__button:hover { border-radius: 6px; }
+/* Our icons come through as <i> webfont glyphs or inline SVG depending on the icon set, so
+   the button sizes them rather than assuming Jodit's own SVG dimensions. */
+.pb-page-toolbar .jodit-icon,
+.pb-page-toolbar .jodit-toolbar-button__icon .pb-icon {
+  width: 16px;
+  height: 16px;
+  font-size: 15px;
+  color: var(--jd-color-icon);
+  display: inline-grid;
+  place-items: center;
+}
+.pb-page-toolbar .jodit-toolbar-button_active .pb-icon,
+.pb-page-toolbar .jodit-toolbar-button__button:hover .pb-icon { color: #23272f; }
+/* Jodit leaves an empty box behind in its own container once the toolbar has moved out. */
+.pb-page-jodit .jodit-toolbar__box:empty { display: none; }
+
+/* The document itself.
+   In document view the text lives inside Jodit's iframe, so its typography and page styling
+   are injected there (see pageStyle() in page-editor.js) — nothing here can reach it, which
+   is the point of the mode. What is left out here is the desk the sheet sits on. */
+.pb-page-jodit .jodit-workplace { background: #f3f4f6; }
+.pb-page-jodit .jodit-wysiwyg_iframe { background: transparent; }
+
+/* Without document view the content is an ordinary element, and it is held to the same
+   measure the rest of the page uses. */
+.pb-page-jodit .jodit-wysiwyg:not(.jodit-wysiwyg_iframe) {
+  max-width: var(--pb-page-measure, 720px);
+  margin: 0 auto;
+  padding: 20px 24px 25vh;
+  font-size: 15px;
+  line-height: 1.75;
+  color: #1f2328;
+}
+.pb-page-jodit .jodit-placeholder {
+  max-width: var(--pb-page-measure, 720px);
+  margin: 0 auto;
+  padding: 20px 24px 0;
+  color: #9ca3af;
+}

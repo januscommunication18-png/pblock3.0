@@ -67,7 +67,7 @@ class BuildIconScript extends Command
                     '" style="font-size:' + size + 'px;line-height:1" aria-hidden="true"></i>';
             }
 
-            return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" fill="none" class="' +
+            return '<svg width="' + size + '" height="' + size + '" viewBox="' + (icon.viewBox || '0 0 24 24') + '" fill="none" class="' +
                 classes + '" aria-hidden="true">' + icon.svg + '</svg>';
         }
         JS;

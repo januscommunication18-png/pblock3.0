@@ -217,6 +217,13 @@ class ProjectSettingsController extends ManagesProjectController
             'modules' => $this->featureSection($project, 'modules',
                 'Module',
                 'Group related work items into focused initiatives or delivery areas. Turning modules off hides them from the project without deleting a module or its work item links.'),
+            // §3: one switch, so it reuses the shared feature-toggle screen — the same
+            // control Cycles, Modules and Epics use, which also gives Pages §5's confirmation
+            // and §6's restore-on-re-enable without a second implementation.
+            'pages' => $this->featureSection($project, 'pages',
+                'Pages',
+                'Allow members of this project to create and manage project documentation using Pages. Turning pages off hides them from the project without deleting a page or its content.'),
+
             'epics' => $this->featureSection($project, 'epics',
                 'Epic',
                 'Organize work items into larger initiatives and track progress across multiple areas and cycles. Turning epics off hides them from the project without deleting an epic or its work item assignments.'),

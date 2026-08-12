@@ -124,7 +124,29 @@ var WiEditor = {
     // component you can drop anywhere, and so it degrades to no-media when they are absent.
     mediaUpload: { type: String, default: '' },
     mediaGallery: { type: String, default: '' },
-    mediaMaxBytes: { type: Number, default: 5 * 1024 * 1024 }
+    mediaMaxBytes: { type: Number, default: 5 * 1024 * 1024 },
+    /**
+     * A CSS selector for an element to build the toolbar into.
+     *
+     * Snow puts its toolbar immediately above the editor, which is right for a description
+     * field inside a form. A document editor wants one persistent bar at the top of the
+     * screen instead, with the title and body scrolling under it — so the Pages screen names
+     * an element to move it into. Empty means the default, and every existing caller keeps it.
+     *
+     * Quill BUILDS the toolbar either way; this only relocates the finished element. Handing
+     * Quill a host full of hand-written markup instead looked equivalent and was not: Snow
+     * rewrites the toolbar's DOM (every <select> becomes a picker), so a Vue-rendered toolbar
+     * put the two in a fight over the same nodes. Every re-render patched Quill's DOM away,
+     * and the resulting mutation storm threw inside Quill's own observer —
+     *
+     *     TypeError: Cannot read properties of null (reading 'offset')
+     *       normalizedToRange → getRange → update → handleDOM
+     *
+     * — after which Quill stopped tracking changes entirely: no text-change, so nothing
+     * saved, and paste appeared to do nothing. The host must therefore be an EMPTY element
+     * that Vue renders once and never patches.
+     */
+    toolbarHost: { type: String, default: '' }
   },
   emits: ['update:modelValue', 'blur'],
   data: function () {
@@ -169,24 +191,15 @@ var WiEditor = {
       var text = data.getData('text/plain');
       if (!html && !text) return;
 
-      // No caret means the editor is not really the target — let the browser deal with it
-      // rather than cancel a paste we cannot place.
-      var range = self.quill.getSelection(true);
+      // Where to put it. safeRange() never throws and never returns null, so a paste is
+      // always placed somewhere — see its note for the crash this replaced.
+      var range = self.safeRange();
       if (!range) return;
 
       e.preventDefault();
 
-      try {
-        if (range.length) self.quill.deleteText(range.index, range.length, 'user');
-
-        if (html) {
-          self.quill.clipboard.dangerouslyPasteHTML(range.index, html, 'user');
-        } else {
-          self.quill.insertText(range.index, text, 'user');
-          self.quill.setSelection(range.index + text.length, 0, 'silent');
-        }
-      } catch (err) {
-        // A parser that objects to the source must not cost the user their paste.
+      if (!self.pasteHtml(html, range) && !self.pasteText(text, range)) {
+        // Both routes failed. Better an unformatted paste than a silent one.
         try { self.quill.insertText(range.index, text || '', 'user'); } catch (ignored) {}
       }
 
@@ -215,6 +228,14 @@ var WiEditor = {
         self.$emit('blur');
       }
     });
+
+    // Move the finished toolbar into its host, if one was named. Done here rather than by
+    // configuration so Quill owns every node inside it — see the toolbarHost note.
+    if (this.toolbarHost) {
+      var host = document.querySelector(this.toolbarHost);
+      var built = this.quill.getModule('toolbar');
+      if (host && built && built.container) host.appendChild(built.container);
+    }
 
     // Initial content LAST, after every listener is attached.
     //
@@ -269,6 +290,147 @@ var WiEditor = {
       } catch (e) {
         try { this.quill.setText(''); } catch (ignored) { /* nothing more to try */ }
       }
+
+      // And clear it again afterwards. Loading a document schedules Quill's own selection
+      // update, which runs after this method returns and maps whatever native range the
+      // browser still holds — if that points into the DOM we just replaced, it throws where
+      // no try/catch of ours can reach it. Those were the uncaught `update()` errors in the
+      // browser log on every page load.
+      try {
+        this.quill.setSelection(null, 'silent');
+      } catch (ignored) { /* nothing to clear */ }
+    },
+    /**
+     * Strip Word's scaffolding before Quill parses the paste.
+     *
+     * A copy from Word is not really HTML — it is HTML wrapped in conditional comments, an
+     * <xml> island, a <style> block of `Mso*` classes, and `mso-…` declarations inside every
+     * style attribute. Quill's matchers read that literally: the classes carry no meaning they
+     * recognise, the style attributes are mostly noise, and paragraphs come through flattened
+     * or wrongly promoted to headings. Handing them plain HTML first is the difference between
+     * a paste that keeps its bold, headings and lists and one that arrives as a wall of text.
+     *
+     * This removes the scaffolding ONLY. It does not invent formatting, and it deliberately
+     * leaves everything Quill can genuinely represent.
+     */
+    cleanPastedHtml: function (html) {
+      if (!html) return html;
+
+      return html
+        // <!--[if gte mso 9]> … <![endif]--> islands, and any other comment.
+        .replace(/<!--[\s\S]*?-->/g, '')
+        // Word's <xml> island and its <style> block of Mso class definitions.
+        .replace(/<xml[\s\S]*?<\/xml>/gi, '')
+        .replace(/<style[\s\S]*?<\/style>/gi, '')
+        // Namespaced tags: <o:p>, <w:sdt>, <v:shape>.
+        .replace(/<\/?[a-z]+:[^>]*>/gi, '')
+        // Mso class names, which mean nothing outside Word. Quoted, single-quoted and bare —
+        // Word emits `class=WordSection1` without quotes, which a quoted-only pattern misses.
+        .replace(/\s(?:class|lang)=(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, function (attr) {
+          return /Mso|WordSection|xl\d/i.test(attr) ? '' : attr;
+        })
+        // mso-* declarations inside style attributes, and the empty attributes left behind.
+        .replace(/style="([^"]*)"/gi, function (whole, css) {
+          var kept = css.split(';')
+            .filter(function (d) { return d.trim() && !/^\s*mso-/i.test(d); })
+            .join(';');
+
+          return kept.trim() ? 'style="' + kept + '"' : '';
+        });
+    },
+
+    /**
+     * Paste HTML, keeping its formatting.
+     *
+     * Through `clipboard.convert()` → `updateContents()`, which is Quill's own pipeline: the
+     * source runs through every registered matcher, so headings, lists, bold, links and the
+     * rest arrive as Quill formats. `dangerouslyPasteHTML` at an index takes a shorter route
+     * and drops formats the matchers would have kept — which is why a paste from a document
+     * or a web page landed as flat text.
+     *
+     * @return bool whether the paste was placed
+     */
+    pasteHtml: function (html, range) {
+      if (!html || !this.quill || !window.Quill) return false;
+
+      var pasted = null;
+
+      try {
+        var Delta = window.Quill.import('delta');
+        pasted = this.quill.clipboard.convert({ html: this.cleanPastedHtml(html) });
+
+        // Nothing Quill could represent — fall back to the plain-text branch rather than
+        // replacing the selection with an empty document.
+        if (!pasted || pasted.length() === 0) return false;
+
+        var change = new Delta().retain(range.index);
+        if (range.length) change = change.delete(range.length);
+
+        this.quill.updateContents(change.concat(pasted), 'user');
+      } catch (e) {
+        return false;
+      }
+
+      // Placed. Anything that fails from here is cosmetic and must NOT report failure: the
+      // caller falls back to a plain-text insert on false, which would append the same text a
+      // second time — the duplicated, run-together paragraphs a pasted document ended up with.
+      // Moving the caret is not worth a duplicate paste.
+      try {
+        this.quill.setSelection(range.index + pasted.length(), 0, 'silent');
+      } catch (e) { /* the text is in; the caret can stay where it is */ }
+
+      return true;
+    },
+
+    /** @return bool whether the paste was placed */
+    pasteText: function (text, range) {
+      if (!text || !this.quill) return false;
+
+      try {
+        if (range.length) this.quill.deleteText(range.index, range.length, 'user');
+        this.quill.insertText(range.index, text, 'user');
+        this.quill.setSelection(range.index + text.length, 0, 'silent');
+
+        return true;
+      } catch (e) {
+        return false;
+      }
+    },
+
+    /**
+     * Where the caret is, without letting Quill throw.
+     *
+     * `getSelection(true)` forces focus and then maps the native selection to a document
+     * position. When that selection sits in a node Quill does not own — the toolbar, the
+     * title field, anything outside the editor root — the mapping reads `.offset` off a null
+     * blot and throws:
+     *
+     *     TypeError: Cannot read properties of null (reading 'offset')
+     *       normalizedToRange → getRange → update → getSelection
+     *
+     * That killed paste outright: the handler threw before inserting anything, so the paste
+     * was cancelled AND dropped. Falling back to the end of the document means the worst case
+     * is text arriving in the wrong place rather than not arriving at all.
+     */
+    safeRange: function () {
+      if (!this.quill) return null;
+
+      // Unforced first — it answers without moving focus, so it cannot provoke the mapping
+      // in the case where focus is elsewhere entirely.
+      try {
+        var current = this.quill.getSelection();
+        if (current) return current;
+      } catch (e) { /* fall through to the forced read */ }
+
+      try {
+        var forced = this.quill.getSelection(true);
+        if (forced) return forced;
+      } catch (e) { /* fall through to the end of the document */ }
+
+      var length = 0;
+      try { length = Math.max(0, this.quill.getLength() - 1); } catch (e) { length = 0; }
+
+      return { index: length, length: 0 };
     },
     emitValue: function () {
       var html = this.html();
@@ -287,7 +449,7 @@ var WiEditor = {
       this.emitValue();
     },
     insert: function (embed, value) {
-      var range = this.quill.getSelection(true) || { index: this.quill.getLength() };
+      var range = this.safeRange() || { index: this.quill.getLength() };
       this.quill.insertEmbed(range.index, embed, value, 'user');
       this.quill.setSelection(range.index + 1, 'silent');
       this.emitValue();

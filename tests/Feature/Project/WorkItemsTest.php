@@ -43,15 +43,16 @@ class WorkItemsTest extends ProjectTestCase
 
         $response = $this->actingAs($owner)->get(route('projects.work-items', $project))->assertOk();
 
-        foreach (['Overview', 'Work items', 'Views', 'Pages'] as $label) {
+        foreach (['Overview', 'Work items', 'Views'] as $label) {
             $response->assertSee($label, false);
         }
 
-        // Cycles and Modules are feature-gated per project (Cycles §3.2.4, Modules §4.2) and
-        // are covered by CycleTest; both are absent here because this project has neither on.
+        // Cycles, Modules, Epics and Pages are feature-gated per project and are covered by
+        // their own tests; all four are absent here because this project has none of them on.
         $keys = collect($response->viewData('tabs'))->pluck('key');
-        $this->assertFalse($keys->contains('cycles'));
-        $this->assertFalse($keys->contains('modules'));
+        foreach (['cycles', 'modules', 'epics', 'pages'] as $gated) {
+            $this->assertFalse($keys->contains($gated), $gated);
+        }
     }
 
     public function test_non_mvp_tabs_show_coming_soon_and_work_items_is_not_one(): void
@@ -59,9 +60,10 @@ class WorkItemsTest extends ProjectTestCase
         [$owner, $ws] = $this->owner();
         $project = $this->makeProject($owner, $ws, ['identifier' => 'TESTI']);
 
-        // Cycles and Modules are deliberately not in this list: both are built features
-        // with their own controllers, routed ahead of the Coming Soon catch-all.
-        foreach (['overview', 'views', 'pages'] as $tab) {
+        // Cycles, Modules, Epics and Pages are deliberately not in this list: all four are
+        // built features with their own controllers, routed ahead of the Coming Soon
+        // catch-all. Only Overview and Views are still placeholders.
+        foreach (['overview', 'views'] as $tab) {
             $this->actingAs($owner)
                 ->get(route('projects.workspace.tab', ['project' => $project->id, 'tab' => $tab]))
                 ->assertOk()
@@ -1013,6 +1015,83 @@ class WorkItemsTest extends ProjectTestCase
         $this->assertStringContainsString('.tabulator-cell:last-child { padding-right: 20px; }', $css);
         // Tabulator's own 1px group border would put the two boxes 1px apart.
         $this->assertMatchesRegularExpression('/tabulator-group[^}]*border-right:\s*none/s', $css);
+    }
+
+    /**
+     * Quill's `getSelection(true)` maps the native selection to a document position, and
+     * throws when that selection is in a node it does not own — the toolbar, another field,
+     * anything outside the editor root:
+     *
+     *     TypeError: Cannot read properties of null (reading 'offset')
+     *
+     * The paste handler called it directly, so a paste threw before inserting anything: the
+     * event was cancelled AND the content dropped. Every selection read now goes through
+     * safeRange(), which falls back to the end of the document. Nothing renders JS here, so
+     * this pins the one thing a PHP test can see — that no call site uses the throwing form.
+     */
+    public function test_the_editor_never_reads_the_selection_unguarded(): void
+    {
+        $editor = file_get_contents(public_path('assets/js/projects/work-items.js'));
+
+        $this->assertStringContainsString('safeRange: function ()', $editor);
+
+        // The only place the forced read is allowed is inside safeRange itself, where it is
+        // wrapped in try/catch.
+        $guarded = substr_count($editor, 'this.quill.getSelection(true)');
+        $this->assertSame(1, $guarded, 'getSelection(true) must only be called inside safeRange()');
+        $this->assertStringNotContainsString('self.quill.getSelection(true)', $editor);
+    }
+
+    /**
+     * Quill rewrites its toolbar's DOM — Snow turns every <select> into a picker — so a
+     * Vue-rendered toolbar put the two in a fight over the same nodes. Each re-render patched
+     * Quill's markup away, and the mutation storm threw inside Quill's own observer:
+     *
+     *     TypeError: Cannot read properties of null (reading 'offset')
+     *       normalizedToRange → getRange → update → handleDOM
+     *
+     * After that Quill stopped tracking changes: no text-change, so nothing saved and paste
+     * did nothing. Quill now builds the toolbar and the editor MOVES it, so the host stays an
+     * element Vue renders once and never patches.
+     */
+    public function test_the_editor_builds_its_own_toolbar(): void
+    {
+        $editor = file_get_contents(public_path('assets/js/projects/work-items.js'));
+        $pages = file_get_contents(public_path('assets/js/projects/pages.js'));
+
+        // Quill always builds from its own layout; the host only receives the result.
+        $this->assertStringContainsString('container: WI_EDITOR_TOOLBAR,', $editor);
+        $this->assertStringContainsString('host.appendChild(built.container)', $editor);
+
+        // …and no screen hand-writes toolbar markup for Quill to collide with.
+        $this->assertStringNotContainsString('ql-formats', $pages);
+    }
+
+    /**
+     * A copy from Word is HTML wrapped in conditional comments, an <xml> island, a <style>
+     * block of Mso classes and `mso-…` declarations in every style attribute. Quill's matchers
+     * read that literally and the paste arrives flattened, so the editor strips the
+     * scaffolding first. Nothing renders JS here, so this pins that the cleaner exists and
+     * still removes each piece — the regexes are easy to break and the symptom is invisible
+     * until someone pastes a document.
+     */
+    public function test_the_editor_strips_word_scaffolding_before_pasting(): void
+    {
+        $editor = file_get_contents(public_path('assets/js/projects/work-items.js'));
+
+        $this->assertStringContainsString('cleanPastedHtml: function', $editor);
+        // …and it runs on the way into Quill's converter, not somewhere decorative.
+        $this->assertStringContainsString('convert({ html: this.cleanPastedHtml(html) })', $editor);
+
+        foreach ([
+            'conditional comments' => '<!--[',
+            'the xml island' => '<xml',
+            'the style block' => '<style',
+            'namespaced tags' => 'o:p',
+            'mso declarations' => 'mso-',
+        ] as $what => $marker) {
+            $this->assertStringContainsString($marker, $editor, "the cleaner no longer mentions {$what}");
+        }
     }
 
     public function test_a_private_project_404s_for_an_outsider(): void

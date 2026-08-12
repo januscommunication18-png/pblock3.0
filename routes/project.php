@@ -4,6 +4,7 @@ use App\Http\Controllers\Project\CycleController;
 use App\Http\Controllers\Project\EpicController;
 use App\Http\Controllers\Project\EstimationController;
 use App\Http\Controllers\Project\ModuleController;
+use App\Http\Controllers\Project\PageController;
 use App\Http\Controllers\Project\ProjectController;
 use App\Http\Controllers\Project\ProjectLabelController;
 use App\Http\Controllers\Project\ProjectMembersController;
@@ -199,9 +200,30 @@ Route::middleware(['auth', 'workspace.tenancy'])
         Route::delete('/{project}/epics/{epic}', [EpicController::class, 'destroy'])
             ->whereNumber(['project', 'epic'])->name('epics.destroy');
 
+        // ---- Pages (§4/§17). Registered BEFORE the {tab} catch-all, which would otherwise
+        //      swallow /pages and render Coming Soon over a built feature. Every action
+        //      re-checks ProjectPagePolicy, which refuses when the project has the feature
+        //      switched off — the routes existing is not permission to use them.
+        Route::get('/{project}/pages', [PageController::class, 'index'])
+            ->whereNumber('project')->name('pages');
+        Route::post('/{project}/pages', [PageController::class, 'store'])
+            ->whereNumber('project')->name('pages.store');
+        Route::post('/{project}/pages/{page}/archive', [PageController::class, 'archive'])
+            ->whereNumber(['project', 'page'])->name('pages.archive');
+        Route::get('/{project}/pages/{page}/versions', [PageController::class, 'versions'])
+            ->whereNumber(['project', 'page'])->name('pages.versions');
+        Route::post('/{project}/pages/{page}/versions/{version}/restore', [PageController::class, 'restoreVersion'])
+            ->whereNumber(['project', 'page', 'version'])->name('pages.versions.restore');
+        Route::get('/{project}/pages/{page}', [PageController::class, 'show'])
+            ->whereNumber(['project', 'page'])->name('pages.show');
+        Route::patch('/{project}/pages/{page}', [PageController::class, 'update'])
+            ->whereNumber(['project', 'page'])->name('pages.update');
+        Route::delete('/{project}/pages/{page}', [PageController::class, 'destroy'])
+            ->whereNumber(['project', 'page'])->name('pages.destroy');
+
         Route::get('/{project}/{tab}', [ProjectWorkspaceController::class, 'tab'])
             ->whereNumber('project')
-            ->whereIn('tab', ['overview', 'views', 'pages'])
+            ->whereIn('tab', ['overview', 'views'])
             ->name('workspace.tab');
 
         // ---- Estimation configuration (§10/§20-§23). Project Admin only; every action
