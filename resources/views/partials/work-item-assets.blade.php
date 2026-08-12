@@ -19,11 +19,12 @@
 
 <link rel="stylesheet" href="{{ pb_asset('assets/vendor/tabulator/tabulator.min.css') }}" />
 <link rel="stylesheet" href="{{ pb_asset('assets/css/tabulator-skin.css') }}" />
-<link rel="stylesheet" href="{{ pb_asset('assets/css/work-items.css') }}" />
 <script src="{{ pb_asset('assets/vendor/tabulator/tabulator.min.js') }}"></script>
 
-{{-- The row vocabulary (state/priority icons, chips, avatars), the shared <wi-calendar>
-     date picker, and the <wi-list> grid itself. --}}
-<script defer src="{{ pb_asset('assets/js/projects/work-item-ui.js') }}"></script>
-<script defer src="{{ pb_asset('assets/js/projects/date-picker.js') }}"></script>
+{{-- The row vocabulary (state/priority icons, chips, avatars) and the shared date picker.
+     Its own partial because the Views grid reuses exactly these and nothing else here — and
+     it loads work-items.css, which has to come after tabulator.min.css above. --}}
+@include('partials.work-item-chips')
+
+{{-- The <wi-list> grid itself. --}}
 <script defer src="{{ pb_asset('assets/js/projects/work-item-list.js') }}"></script>

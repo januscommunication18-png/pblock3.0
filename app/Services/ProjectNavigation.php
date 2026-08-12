@@ -44,7 +44,7 @@ class ProjectNavigation
     public function tabs(Project $project): array
     {
         // tab key => the project feature that decides how it renders.
-        $gated = ['cycles' => 'cycles', 'modules' => 'modules', 'epics' => 'epics', 'pages' => 'pages'];
+        $gated = ['cycles' => 'cycles', 'modules' => 'modules', 'epics' => 'epics', 'pages' => 'pages', 'views' => 'views'];
 
         return collect(config('projects.workspace_tabs'))
             // Resolved once per tab rather than once per question, so a gated tab costs one

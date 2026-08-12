@@ -773,3 +773,31 @@ Making it editable is what forced two server changes:
 The row payload also gained a `parent` object (id, identifier, title). Resolving the label from
 the loaded list only worked while the parent happened to be on screen — a parent in another
 project, or one filtered out, rendered as "None".
+
+---
+
+## Structure writes return the rows they changed
+
+**Symptom reported:** work item 10 was blocked by work item 8, but the list showed no
+**Blocked** chip until the page was reloaded.
+
+**Why.** `blocked_by_count` is a row property, and the relation endpoints answered with only
+`structure` — the drawer's own sections. So the drawer was right and the grid was stale. The
+asymmetry is what made it easy to miss: the chip belongs to the item being **blocked**, which
+is normally *not* the item the request was made against, so even re-fetching the open item's
+row would not have fixed it.
+
+**Change.** `WorkItemStructureController::payload()` now also returns `cards` — the rows the
+write affected, in the same shape `WorkItemScreenPayload` renders the list with, both ends of
+the relation included. Client-side, `applyStructure()` hands them to a new `mergeCards()`,
+which replaces matching rows in `items` and redraws just those rows. Rows not currently in the
+list are skipped, not appended: the list is filtered and paged, so an absent item was left out
+deliberately. The drawer needs no separate update — `drawerItem` is computed from `items`.
+
+Covered by `test_a_relation_write_returns_the_rows_it_changed`, which asserts on the *blocked*
+item's count rather than the requested item's, because that is the case that was broken.
+
+**Still not real-time.** This makes *your own* actions show immediately. A change made by
+someone else in another browser still needs a reload — nothing in the app broadcasts yet
+(`BROADCAST_CONNECTION=log`, no events, no `config/reverb.php`, Echo never booted on the
+page). See CLAUDE.md §8/§12; that pipeline is unbuilt.

@@ -10,6 +10,9 @@ use App\Http\Controllers\Project\ProjectLabelController;
 use App\Http\Controllers\Project\ProjectMembersController;
 use App\Http\Controllers\Project\ProjectSettingsController;
 use App\Http\Controllers\Project\ProjectStateController;
+use App\Http\Controllers\Project\ProjectViewColumnController;
+use App\Http\Controllers\Project\ProjectViewController;
+use App\Http\Controllers\Project\ProjectViewGridController;
 use App\Http\Controllers\Project\ProjectWorkspaceController;
 use App\Http\Controllers\Project\WorkItemCollaborationController;
 use App\Http\Controllers\Project\WorkItemController;
@@ -229,9 +232,54 @@ Route::middleware(['auth', 'workspace.tenancy'])
         Route::delete('/{project}/pages/{page}', [PageController::class, 'destroy'])
             ->whereNumber(['project', 'page'])->name('pages.destroy');
 
+        // ---- Views (§4/§23). Registered BEFORE the {tab} catch-all for the same reason Pages
+        //      is: the catch-all still lists 'views' and would render Coming Soon over the
+        //      built feature. Every action re-checks ProjectViewPolicy — the routes existing
+        //      is not permission to use them.
+        Route::get('/{project}/views', [ProjectViewController::class, 'index'])
+            ->whereNumber('project')->name('views');
+        Route::post('/{project}/views', [ProjectViewController::class, 'store'])
+            ->whereNumber('project')->name('views.store');
+
+        // Data. `rows` is hit once per page of scroll, so it is the one route here worth
+        // keeping cheap; the cell edit is throttled because it writes.
+        Route::get('/{project}/views/{view}/rows', [ProjectViewGridController::class, 'rows'])
+            ->whereNumber(['project', 'view'])->name('views.rows');
+        Route::patch('/{project}/views/{view}/rows/{workItem}', [ProjectViewGridController::class, 'updateCell'])
+            ->whereNumber(['project', 'view', 'workItem'])->name('views.rows.update');
+
+        // Configuration (§8/§9/§10). A separate permission from the data routes above (§14).
+        Route::get('/{project}/views/{view}/fields', [ProjectViewColumnController::class, 'fields'])
+            ->whereNumber(['project', 'view'])->name('views.fields');
+        Route::post('/{project}/views/{view}/columns', [ProjectViewColumnController::class, 'store'])
+            ->whereNumber(['project', 'view'])->name('views.columns.store');
+        // BEFORE the {column} routes: 'order' would otherwise be read as a column id.
+        Route::put('/{project}/views/{view}/columns/order', [ProjectViewColumnController::class, 'order'])
+            ->whereNumber(['project', 'view'])->name('views.columns.order');
+        Route::patch('/{project}/views/{view}/columns/{column}', [ProjectViewColumnController::class, 'update'])
+            ->whereNumber(['project', 'view', 'column'])->name('views.columns.update');
+        Route::delete('/{project}/views/{view}/columns/{column}', [ProjectViewColumnController::class, 'destroy'])
+            ->whereNumber(['project', 'view', 'column'])->name('views.columns.destroy');
+
+        // Lifecycle (§5.3).
+        Route::post('/{project}/views/{view}/duplicate', [ProjectViewController::class, 'duplicate'])
+            ->whereNumber(['project', 'view'])->name('views.duplicate');
+        Route::post('/{project}/views/{view}/favorite', [ProjectViewController::class, 'favorite'])
+            ->whereNumber(['project', 'view'])->name('views.favorite');
+        // The grid on its own — no sidebar, no project tabs (§18.3's shape, internally).
+        // BEFORE the /{view} route so 'external' is not read as part of it.
+        Route::get('/{project}/views/{view}/external', [ProjectViewController::class, 'external'])
+            ->whereNumber(['project', 'view'])->name('views.external');
+        Route::get('/{project}/views/{view}', [ProjectViewController::class, 'show'])
+            ->whereNumber(['project', 'view'])->name('views.show');
+        Route::patch('/{project}/views/{view}', [ProjectViewController::class, 'update'])
+            ->whereNumber(['project', 'view'])->name('views.update');
+        Route::delete('/{project}/views/{view}', [ProjectViewController::class, 'destroy'])
+            ->whereNumber(['project', 'view'])->name('views.destroy');
+
         Route::get('/{project}/{tab}', [ProjectWorkspaceController::class, 'tab'])
             ->whereNumber('project')
-            ->whereIn('tab', ['overview', 'views'])
+            ->whereIn('tab', ['overview'])
             ->name('workspace.tab');
 
         // ---- Estimation configuration (§10/§20-§23). Project Admin only; every action

@@ -524,6 +524,12 @@
     var bootstrap = {};
     try { bootstrap = JSON.parse(root.getAttribute('data-bootstrap') || '{}'); } catch (e) {}
     var app = Vue.createApp(component, { bootstrap: bootstrap });
+    // Web components are elements, not Vue components. Without this Vue tries to resolve
+    // <revo-grid> (the Views grid) as one, warns, and — more to the point — treats what it
+    // renders as its own, which fights the element's internal rendering.
+    app.config.compilerOptions.isCustomElement = function (tag) {
+      return tag.indexOf('revo-') === 0 || tag.indexOf('revogr-') === 0;
+    };
     app.config.globalProperties.$pb = { api: api, withId: withId, firstError: firstError, fieldErrors: fieldErrors, toast: toast };
     registerShared(app);
     tooltips();

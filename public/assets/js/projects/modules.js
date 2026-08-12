@@ -514,8 +514,9 @@ PB.boot('project-modules', {
     '<div class="mt-2 max-h-[320px] overflow-y-auto">' +
     '<button v-for="r in picker.results" :key="r.id" type="button" @click="togglePicked(r)" :disabled="r.linked" ' +
     'class="w-full text-left flex items-center gap-2.5 px-2 py-2 rounded-md hover:bg-hover disabled:opacity-60">' +
-    '<span class="h-4 w-4 rounded border grid place-items-center shrink-0" :class="isPicked(r) ? \'bg-brand border-brand\' : \'border-stroke\'">' +
-    '<svg v-if="isPicked(r)" width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M5 12l4 4L19 7" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>' +
+    '<span class="h-[18px] w-[18px] rounded border grid place-items-center shrink-0 transition-colors" ' +
+    ':class="isPicked(r) ? \'bg-brand border-brand\' : \'border-stroke bg-white\'">' +
+    '<svg v-if="isPicked(r)" width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M5 12l4 4L19 7" stroke="#fff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>' +
     '<span class="text-[11px] text-faint font-medium shrink-0">{{ r.identifier }}</span>' +
     '<span class="text-[13px] text-ink truncate flex-1">{{ r.title }}</span>' +
     '<span v-if="r.linked" class="text-[11px] text-faint shrink-0">Already added</span>' +

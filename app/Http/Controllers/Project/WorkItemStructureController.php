@@ -13,6 +13,7 @@ use App\Models\WorkItemRelation;
 use App\Policies\WorkItemPolicy;
 use App\Services\WorkItemLinkManager;
 use App\Services\WorkItemRelationManager;
+use App\Services\WorkItemScreenPayload;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -34,6 +35,7 @@ class WorkItemStructureController extends Controller
     public function __construct(
         private readonly WorkItemRelationManager $relations,
         private readonly WorkItemLinkManager $links,
+        private readonly WorkItemScreenPayload $screen,
     ) {}
 
     /** GET /projects/{project}/work-items/{workItem}/structure */
@@ -56,6 +58,9 @@ class WorkItemStructureController extends Controller
 
         $term = trim((string) $request->query('q', ''));
         $workspaceWide = $request->boolean('all_projects');
+        // What the picker is choosing FOR, so each candidate can say whether it is already
+        // taken. Absent for a plain search, which is why this defaults to no reasons at all.
+        $existing = $this->pickerConflicts($workItem, (string) $request->query('mode', ''), (string) $request->query('type', ''));
         // Picking a parent is the one search where the item's own descendants are illegal
         // choices — putting an item under its own child closes a loop (§25). They are dropped
         // from the results rather than offered and then refused: a row you are allowed to
@@ -104,6 +109,11 @@ class WorkItemStructureController extends Controller
                 'title' => $i->title,
                 'priority' => $i->priority,
                 'project' => $i->project?->name,
+                // Why this row cannot be picked, or null if it can. The picker showed every
+                // candidate as available and let the server refuse on submit — so choosing an
+                // item that already has the opposite dependency produced an error dialog
+                // instead of simply not being offered.
+                'blocked' => $existing[$i->id] ?? null,
                 'state' => $i->state ? [
                     'id' => $i->state->id, 'name' => $i->state->name,
                     'color' => $i->state->color, 'group' => $i->state->group,
@@ -111,6 +121,70 @@ class WorkItemStructureController extends Controller
             ])->values()->all();
 
         return response()->json(['ok' => true, 'items' => $items]);
+    }
+
+    /**
+     * Which candidates are already spoken for, and why.
+     *
+     * The picker used to offer everything and let the server refuse on submit. That turned an
+     * ordinary "already related" into an error dialog — and worse, an item related in the
+     * OPPOSITE direction looked available right up until it was rejected. Answering the
+     * question up front means the row arrives ticked and disabled with the reason on it.
+     *
+     * @return array<int, string> work item id => reason
+     */
+    private function pickerConflicts(WorkItem $item, string $mode, string $type): array
+    {
+        if ($mode === 'subtask') {
+            return WorkItem::query()
+                ->where('parent_id', $item->id)
+                ->pluck('id')
+                ->mapWithKeys(fn ($id) => [$id => 'Already a sub-work item'])
+                ->all();
+        }
+
+        if ($mode !== 'relation' || $type === '') {
+            return [];
+        }
+
+        // Relations are stored in ONE canonical direction (§52), so the same row means
+        // different things from each end: "B blocking A" read from A is "blocked by". Compare
+        // from THIS item's perspective or every canonically-flipped row looks like its own
+        // opposite — which marked an existing "blocked by" as a conflict with itself.
+        $opposites = [
+            WorkItemRelation::TYPE_BLOCKED_BY => WorkItemRelation::TYPE_BLOCKING,
+            WorkItemRelation::TYPE_BLOCKING => WorkItemRelation::TYPE_BLOCKED_BY,
+            WorkItemRelation::TYPE_DUPLICATE_OF => WorkItemRelation::TYPE_DUPLICATED_BY,
+            WorkItemRelation::TYPE_DUPLICATED_BY => WorkItemRelation::TYPE_DUPLICATE_OF,
+            // `related` is symmetric: it reads the same from both ends.
+            WorkItemRelation::TYPE_RELATED => WorkItemRelation::TYPE_RELATED,
+        ];
+
+        $conflicts = [];
+
+        $rows = WorkItemRelation::query()
+            ->where(fn ($q) => $q->where('work_item_id', $item->id)->orWhere('related_work_item_id', $item->id))
+            ->get();
+
+        foreach ($rows as $row) {
+            $isFrom = (int) $row->work_item_id === (int) $item->id;
+            $otherId = $isFrom ? (int) $row->related_work_item_id : (int) $row->work_item_id;
+
+            // What this row means when read from $item.
+            $asSeen = $isFrom ? $row->relation_type : ($opposites[$row->relation_type] ?? $row->relation_type);
+
+            if ($asSeen === $type) {
+                $conflicts[$otherId] = 'Already added';
+
+                continue;
+            }
+
+            if (($opposites[$type] ?? null) === $asSeen) {
+                $conflicts[$otherId] = 'Has the opposite dependency';
+            }
+        }
+
+        return $conflicts;
     }
 
     /**
@@ -144,8 +218,9 @@ class WorkItemStructureController extends Controller
         $ids = $this->itemIds($request);
 
         $added = $this->relations->addSubtasks($workItem, Auth::user(), $ids);
+        $touched = $ids;
 
-        return $this->payload($workItem, $added.' '.str('sub-task')->plural($added).' added.');
+        return $this->payload($workItem, $added.' '.str('sub-task')->plural($added).' added.', $touched);
     }
 
     /** DELETE /projects/{project}/work-items/{workItem}/subtasks/{child} (§26). */
@@ -156,7 +231,7 @@ class WorkItemStructureController extends Controller
 
         $this->relations->removeSubtask($workItem, $child, Auth::user());
 
-        return $this->payload($workItem, 'Sub-task removed.');
+        return $this->payload($workItem, 'Sub-task removed.', [$child->id]);
     }
 
     /** POST /projects/{project}/work-items/{workItem}/relations (§30/§34). */
@@ -169,7 +244,9 @@ class WorkItemStructureController extends Controller
             $workItem, Auth::user(), (string) $request->input('relation_type'), $ids,
         );
 
-        return $this->payload($workItem, $added.' '.str('relation')->plural($added).' added.');
+        // The counterpart's row is the one that changes: adding a blocker puts the "Blocked"
+        // chip on the BLOCKED item, which is not necessarily the drawer that is open.
+        return $this->payload($workItem, $added.' '.str('relation')->plural($added).' added.', $ids);
     }
 
     /** DELETE /projects/{project}/work-items/{workItem}/relations/{relation} (§32). */
@@ -187,7 +264,9 @@ class WorkItemStructureController extends Controller
 
         $this->relations->removeRelation($relation, Auth::user());
 
-        return $this->payload($workItem, 'Relation removed.');
+        return $this->payload($workItem, 'Relation removed.', [
+            (int) $relation->work_item_id, (int) $relation->related_work_item_id,
+        ]);
     }
 
     /**
@@ -293,13 +372,42 @@ class WorkItemStructureController extends Controller
         return $validated['work_item_ids'];
     }
 
-    private function payload(WorkItem $item, ?string $message = null): JsonResponse
+    /**
+     * @param  array<int, int>  $touched  other work items whose ROW changed as a result
+     */
+    private function payload(WorkItem $item, ?string $message = null, array $touched = []): JsonResponse
     {
         return response()->json(array_filter([
             'ok' => true,
             'structure' => $this->relations->structureFor($item->fresh()),
+            // The rows whose grid chips this change affects. Adding a blocker changes the
+            // BLOCKED item's row, which may not be the one whose drawer is open — without
+            // these the "Blocked" chip only appeared after a page reload.
+            'cards' => $this->cardsFor(array_merge([$item->id], $touched)),
             'message' => $message,
         ], fn ($v) => $v !== null));
+    }
+
+    /**
+     * Row payloads for a set of work items, in the list's own shape.
+     *
+     * @param  array<int, int>  $ids
+     * @return array<int, array<string, mixed>>
+     */
+    private function cardsFor(array $ids): array
+    {
+        $ids = array_values(array_unique(array_filter($ids)));
+
+        if ($ids === []) {
+            return [];
+        }
+
+        $items = WorkItem::query()
+            ->whereIn('id', $ids)
+            ->with(['state', 'assignees', 'labels', 'parent:id,identifier,title', 'cycle', 'epic', 'estimateValue', 'modules', 'creator'])
+            ->get();
+
+        return $this->screen->cards($items);
     }
 
     /**

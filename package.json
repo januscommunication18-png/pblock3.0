@@ -16,6 +16,7 @@
         "vite": "^8.0.0"
     },
     "dependencies": {
+        "@revolist/revogrid": "^4.25.2",
         "@vitejs/plugin-vue": "^6.0.8",
         "flyonui": "^2.4.1",
         "jodit-pro": "^4.13.37",

@@ -43,14 +43,15 @@ class WorkItemsTest extends ProjectTestCase
 
         $response = $this->actingAs($owner)->get(route('projects.work-items', $project))->assertOk();
 
-        foreach (['Overview', 'Work items', 'Views'] as $label) {
+        foreach (['Overview', 'Work items'] as $label) {
             $response->assertSee($label, false);
         }
 
-        // Cycles, Modules, Epics and Pages are feature-gated per project and are covered by
-        // their own tests; all four are absent here because this project has none of them on.
+        // Cycles, Modules, Epics, Pages and Views are feature-gated per project and are
+        // covered by their own tests; all five are absent here because this project has none
+        // of them on. Views joined that list when it stopped being a placeholder.
         $keys = collect($response->viewData('tabs'))->pluck('key');
-        foreach (['cycles', 'modules', 'epics', 'pages'] as $gated) {
+        foreach (['cycles', 'modules', 'epics', 'pages', 'views'] as $gated) {
             $this->assertFalse($keys->contains($gated), $gated);
         }
     }
@@ -60,10 +61,10 @@ class WorkItemsTest extends ProjectTestCase
         [$owner, $ws] = $this->owner();
         $project = $this->makeProject($owner, $ws, ['identifier' => 'TESTI']);
 
-        // Cycles, Modules, Epics and Pages are deliberately not in this list: all four are
-        // built features with their own controllers, routed ahead of the Coming Soon
-        // catch-all. Only Overview and Views are still placeholders.
-        foreach (['overview', 'views'] as $tab) {
+        // Cycles, Modules, Epics, Pages and Views are deliberately not in this list: all five
+        // are built features with their own controllers, routed ahead of the Coming Soon
+        // catch-all. Overview is the last placeholder.
+        foreach (['overview'] as $tab) {
             $this->actingAs($owner)
                 ->get(route('projects.workspace.tab', ['project' => $project->id, 'tab' => $tab]))
                 ->assertOk()
@@ -353,7 +354,7 @@ class WorkItemsTest extends ProjectTestCase
         // The ⋯ menu renders on every workspace tab, not just Work Items.
         foreach ([
             route('projects.work-items', $project),
-            route('projects.workspace.tab', ['project' => $project->id, 'tab' => 'views']),
+            route('projects.workspace.tab', ['project' => $project->id, 'tab' => 'overview']),
         ] as $url) {
             $response = $this->actingAs($owner)->get($url)->assertOk()->assertSee('Project actions', false);
 
@@ -1105,7 +1106,7 @@ class WorkItemsTest extends ProjectTestCase
         // 404, never 403: do not reveal that an inaccessible project exists (spec §12).
         $this->actingAs($outsider)->get(route('projects.work-items', $project))->assertNotFound();
         $this->actingAs($outsider)
-            ->get(route('projects.workspace.tab', ['project' => $project->id, 'tab' => 'views']))
+            ->get(route('projects.workspace.tab', ['project' => $project->id, 'tab' => 'overview']))
             ->assertNotFound();
     }
 }

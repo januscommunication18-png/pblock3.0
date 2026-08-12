@@ -1364,19 +1364,55 @@ var WorkItemsScreen = {
     /** Swap in the structure a write returned, and surface its message. */
     applyStructure: function (resp) {
       if (resp && resp.structure) this.structure = resp.structure;
+      this.mergeCards(resp && resp.cards);
       if (resp && resp.message) this.$pb.toast(resp.message);
+    },
+    /**
+     * Fold rows a write returned back into the grid.
+     *
+     * A relation change moves a chip on a row that is usually NOT the open drawer: adding a
+     * blocker puts the "Blocked" chip on the item being blocked. Without this the grid kept
+     * the row it was rendered with and the chip only appeared after a reload.
+     *
+     * Rows not currently in the list are skipped rather than appended — the list is filtered
+     * and paged, so an item that is not there was left out deliberately.
+     */
+    mergeCards: function (cards) {
+      if (!cards || !cards.length) return;
+      var self = this;
+
+      cards.forEach(function (card) {
+        for (var i = 0; i < self.items.length; i++) {
+          if (String(self.items[i].id) !== String(card.id)) continue;
+          self.items.splice(i, 1, card);
+          // The row keeps its group — a relation cannot change state — so one row redraw is
+          // enough and the grid keeps its scroll position and collapsed groups.
+          if (!self.$refs.list || !self.$refs.list.updateRow(card)) self.refreshTable();
+          break;
+        }
+      });
+
+      // The drawer needs no separate update: `drawerItem` is computed from `items`, so
+      // replacing the row IS the drawer refresh.
     },
     structureUrl: function (name, extra) {
       var it = this.drawerItem;
       if (!it || !this.endpoints[name]) return '';
       return this.$pb.withId(this.endpoints[name], it.id) + (extra || '');
     },
+    /**
+     * Does this item have anything to show in the structure card?
+     *
+     * Every kind has to be listed. A work item whose ONLY structure was a linked page still
+     * answered false here, so the card never rendered and the page it was linked to was
+     * invisible — the section inside it was correct and simply never reached.
+     */
     hasStructure: function () {
       var s = this.structure;
       if (!s) return false;
       return !!(s.subtasks.items.length || s.dependencies.blocking.length || s.dependencies.blocked_by.length ||
         s.relations.related.length || s.relations.duplicate_of.length || s.relations.duplicated_by.length ||
-        s.links.length);
+        s.links.length || (s.pages && s.pages.length));
     },
 
     /**
@@ -1420,19 +1456,23 @@ var WorkItemsScreen = {
       if (!m.row) return;
       if (m.kind === 'subtask') this.removeSubtask(m.row);
       else if (m.kind === 'link') this.deleteLink(m.row);
+      else if (m.kind === 'page') this.unlinkPage(m.row);
       else this.removeRelation(m.row);
     },
     structOpen: function () {
       var m = this.structMenu;
       this.closeStructMenu();
       if (!m.row) return;
-      window.location.href = m.kind === 'link' ? m.row.url : this.rowUrl(m.row);
+      if (m.kind === 'link') { window.location.href = m.row.url; return; }
+      window.location.href = m.kind === 'page' ? this.pageUrl(m.row) : this.rowUrl(m.row);
     },
     structCopy: function () {
       var m = this.structMenu;
       this.closeStructMenu();
       if (!m.row) return;
-      if (m.kind === 'link') this.copyText(m.row.url); else this.copyRowLink(m.row);
+      if (m.kind === 'link') this.copyText(m.row.url);
+      else if (m.kind === 'page') this.copyText(window.location.origin + this.pageUrl(m.row));
+      else this.copyRowLink(m.row);
     },
     copyText: async function (text) {
       try { await navigator.clipboard.writeText(text); this.$pb.toast('Link copied.'); }
@@ -1546,7 +1586,10 @@ var WorkItemsScreen = {
       if (!it || !this.endpoints.search) return;
       var q = encodeURIComponent(this.picker.query || '');
       var url = this.structureUrl('search', '?q=' + q + (this.picker.allProjects ? '&all_projects=1' : '') +
-        (this.picker.mode === 'parent' ? '&for=parent' : ''));
+        (this.picker.mode === 'parent' ? '&for=parent' : '') +
+        // What the picker is choosing FOR, so the server can mark what is already taken.
+        '&mode=' + encodeURIComponent(this.picker.mode || '') +
+        '&type=' + encodeURIComponent(this.picker.type || ''));
       try {
         var resp = await this.$pb.api(url);
         this.picker.results = resp.items || [];
@@ -1559,6 +1602,10 @@ var WorkItemsScreen = {
       this._pickerTimer = setTimeout(function () { self.searchItems(); }, 200);
     },
     togglePick: function (row) {
+      // Already related, or related the opposite way round. It arrives ticked to say so; the
+      // server would refuse it, and an error dialog is a worse way to learn that.
+      if (row.blocked) return;
+
       var ids = this.picker.selected.map(String);
       var at = ids.indexOf(String(row.id));
       // An item has exactly one parent (§5), so here the choice REPLACES — the same shape the
@@ -1569,7 +1616,9 @@ var WorkItemsScreen = {
       }
       if (at > -1) this.picker.selected.splice(at, 1); else this.picker.selected.push(row.id);
     },
-    isPicked: function (row) { return this.picker.selected.map(String).indexOf(String(row.id)) > -1; },
+    isPicked: function (row) {
+      return !!row.blocked || this.picker.selected.map(String).indexOf(String(row.id)) > -1;
+    },
     confirmPicker: async function () {
       if (!this.picker.selected.length || this.picker.busy) return;
 
@@ -2363,15 +2412,30 @@ var WorkItemsScreen = {
     'class="ml-auto h-7 w-7 grid place-items-center rounded text-sub hover:bg-hover">' +
     '' + wiIcon('plus', 16) + '</button>' +
     '</div>' +
-    '<ul v-show="secOpen.pages" class="mt-1 space-y-1">' +
-    '<li v-for="p in structure.pages" :key="p.id" class="flex items-center gap-2.5 px-2.5 h-11 rounded-md border border-line">' +
-    '' + wiIcon('file-lines', 15, 'text-sub shrink-0') + '' +
-    '<a :href="pageUrl(p)" class="text-[13px] text-ink truncate hover:underline">{{ p.title }}</a>' +
+    // Cards in a wrapping grid, per the POC's pageSection(): a page is a document with an
+    // author and a date, and a one-line row has nowhere to say so — unlike Links, which really
+    // are just a URL.
+    '<div v-show="secOpen.pages" class="flex flex-wrap gap-3 mt-1">' +
+    '<div v-for="p in structure.pages" :key="p.id" class="group relative w-full sm:w-[320px] rounded-lg border border-line p-3">' +
+    '<span v-if="p.project" class="inline-flex items-center gap-1 text-[12px] text-sub">' +
+    '<span>{{ p.project.emoji || \'📁\' }}</span>{{ p.project.name }}</span>' +
+
+    '<div class="flex items-center gap-2 mt-2">' +
+    '<span class="text-sub shrink-0">' + wiIcon('file-lines', 15) + '</span>' +
+    '<a :href="pageUrl(p)" class="text-[14px] font-medium text-ink truncate hover:underline">{{ p.title }}</a>' +
     '<span v-if="p.status === \'draft\'" class="text-[11px] text-faint shrink-0">Draft</span>' +
-    '<button v-if="canEdit" type="button" @click="unlinkPage(p)" data-tip="Unlink page" aria-label="Unlink page" ' +
-    'class="ml-auto h-6 w-6 grid place-items-center rounded text-faint hover:bg-line hover:text-danger shrink-0">' +
-    '' + wiIcon('xmark', 14) + '</button>' +
-    '</li></ul></div>' +
+    '</div>' +
+
+    '<div class="flex items-center gap-2 mt-6 pt-3 border-t border-line">' +
+    '<span v-if="p.updated_by" class="h-6 w-6 rounded-full overflow-hidden grid place-items-center bg-brand text-white text-[10px] font-bold shrink-0" ' +
+    ':data-tip="\'Last updated by \' + p.updated_by.name">' +
+    '<img v-if="p.updated_by.avatar_url" :src="p.updated_by.avatar_url" alt="" class="h-full w-full object-cover" />' +
+    '<span v-else>{{ p.updated_by.initial }}</span></span>' +
+    '<span class="text-[12px] text-faint truncate">Last updated {{ relativeTime(p.updated_at) }}</span>' +
+    '<button v-if="canEdit" type="button" @click="openStructMenu(\'page\', p, $event)" data-tip="More" aria-label="More" ' +
+    'class="ml-auto h-7 w-7 grid place-items-center rounded text-sub hover:bg-hover shrink-0">' +
+    '' + wiIcon('ellipsis-vertical', 15) + '</button>' +
+    '</div></div></div></div>' +
 
     '</div>' +
 
@@ -2383,7 +2447,7 @@ var WorkItemsScreen = {
     '<button v-if="structMenu.kind === \'link\'" type="button" @click="openLinkModal(structMenu.row); closeStructMenu();" class="w-full text-left px-3 h-9 text-[13px] text-ink hover:bg-hover">Edit</button>' +
     '<div class="my-1 border-t border-line"></div>' +
     '<button v-if="canEdit" type="button" @click="structRemove" class="w-full text-left px-3 h-9 text-[13px] text-danger hover:bg-hover">' +
-    '{{ structMenu.kind === \'subtask\' ? \'Remove from parent\' : (structMenu.kind === \'link\' ? \'Delete link\' : \'Remove relation\') }}</button>' +
+    '{{ structMenu.kind === \'subtask\' ? \'Remove from parent\' : (structMenu.kind === \'link\' ? \'Delete link\' : (structMenu.kind === \'page\' ? \'Unlink page\' : \'Remove relation\')) }}</button>' +
     '</div>' +
 
     // ---- Collaboration: All | Activity | Comments | Updates | Worklogs | Transition |
@@ -2913,14 +2977,19 @@ var WorkItemsScreen = {
     'Search all projects in this workspace</label>' +
 
     '<div class="p-2 overflow-y-auto">' +
-    '<button v-for="row in picker.results" :key="row.id" type="button" @click="togglePick(row)" ' +
-    'class="w-full text-left flex items-center gap-3 px-3 h-11 rounded-md hover:bg-hover" :class="isPicked(row) ? \'bg-sel/40\' : \'\'">' +
-    '<span class="h-4 w-4 rounded border grid place-items-center shrink-0" :class="isPicked(row) ? \'bg-brand border-brand text-white\' : \'border-stroke\'">' +
-    '<span v-if="isPicked(row)">' + wiIcon('check', 11) + '</span></span>' +
+    '<button v-for="row in picker.results" :key="row.id" type="button" @click="togglePick(row)" :disabled="!!row.blocked" ' +
+    'class="w-full text-left flex items-center gap-3 px-3 h-11 rounded-md hover:bg-hover disabled:opacity-60 disabled:cursor-not-allowed" ' +
+    ':class="isPicked(row) ? \'bg-sel/40\' : \'\'">' +
+    '<span class="h-[18px] w-[18px] rounded border grid place-items-center shrink-0 transition-colors" ' +
+    ':class="isPicked(row) ? \'bg-brand border-brand\' : \'border-stroke bg-white\'">' +
+    '<svg v-if="isPicked(row)" width="12" height="12" viewBox="0 0 24 24" fill="none">' +
+    '<path d="M5 12l4 4L19 7" stroke="#fff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+    '</span>' +
     '<span class="grid place-items-center shrink-0" v-html="stateIcon(row.state)"></span>' +
     '<span class="text-[12px] text-sub shrink-0">{{ row.identifier }}</span>' +
     '<span class="text-[14px] text-ink truncate">{{ row.title }}</span>' +
     '<span v-if="picker.allProjects" class="text-[11px] text-faint shrink-0">{{ row.project }}</span>' +
+    '<span v-if="row.blocked" class="text-[11px] text-faint shrink-0">{{ row.blocked }}</span>' +
     '<span class="ml-auto grid place-items-center shrink-0" v-html="priorityMeta(row.priority).icon"></span>' +
     '</button>' +
     '<div v-if="!picker.results.length" class="px-3 py-8 text-[13px] text-sub text-center">No work items found</div>' +

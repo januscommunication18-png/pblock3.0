@@ -89,6 +89,26 @@ class WorkItemScreenPayload
     }
 
     /**
+     * Just the option lists a picker needs — states, members, labels, cycles, epics, modules,
+     * estimates, priorities — without the rows.
+     *
+     * The Views grid edits the same properties through the same pickers (Views §11.1), so it
+     * needs the same choices. Taking them from `build()` rather than assembling a second set
+     * is what keeps the two screens offering identical options: a cycle that stops being
+     * assignable disappears from both, because there is one method deciding.
+     *
+     * @return array<string, mixed>
+     */
+    public function pickerOptions(Project $project): array
+    {
+        return collect($this->build($project))->only([
+            'states', 'labels', 'labelsEnabled', 'members', 'cycles', 'cyclesEnabled',
+            'modules', 'modulesEnabled', 'epics', 'epicsEnabled', 'estimates',
+            'estimatesEnabled', 'priorities', 'defaultStateId', 'currentUserId',
+        ])->all();
+    }
+
+    /**
      * Rows for a set the caller already resolved.
      *
      * @param  Collection<int, WorkItem>  $items

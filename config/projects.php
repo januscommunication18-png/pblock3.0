@@ -122,6 +122,7 @@ return [
         ['key' => 'states', 'label' => 'States', 'status' => 'active'],
         ['key' => 'labels', 'label' => 'Labels', 'status' => 'active'],
         ['key' => 'estimates', 'label' => 'Estimation', 'status' => 'active'],
+        ['key' => 'views', 'label' => 'View', 'status' => 'active'],
         ['key' => 'automations', 'label' => 'Automations', 'status' => 'soon'],
     ],
 
@@ -146,7 +147,8 @@ return [
         ['key' => 'epics', 'label' => 'Epics', 'status' => 'soon'],
         ['key' => 'cycles', 'label' => 'Cycles', 'status' => 'soon'],
         ['key' => 'modules', 'label' => 'Modules', 'status' => 'soon'],
-        ['key' => 'views', 'label' => 'Views', 'status' => 'soon'],
+        // Resolved per project, like Epics/Cycles/Modules/Pages — see ProjectNavigation::tabs().
+        ['key' => 'views', 'label' => 'Views', 'status' => 'active'],
         ['key' => 'pages', 'label' => 'Pages', 'status' => 'soon'],
     ],
 
@@ -181,6 +183,35 @@ return [
 
     /** Page size for the work item list. */
     'work_item_page_size' => 250,
+
+    /**
+     * Rows per request for a View's grid (Views §24).
+     *
+     * Smaller than the work item list's 250 on purpose: that screen loads one capped batch and
+     * is done, whereas a View fetches the next page as you scroll, so the number that matters
+     * is how fast the FIRST screenful arrives.
+     */
+    'view_page_size' => 100,
+
+    /** §6.1 — a View's name. */
+    'view_name_max' => 120,
+
+    /**
+     * §12.5's density, as the row height each one means. Stored on the View and persisted
+     * with everything else (§13), so a user's choice survives reopening it.
+     *
+     * Standard is 44px because that is what the work items list uses (`rowHeight` in
+     * work-item-list.js). The two grids render the same rows from the same chip helpers, so a
+     * work item that changed height depending on which screen you opened it from would give
+     * away that they are two grids — and the whole point of sharing the renderers is that it
+     * should not be visible. Compact and Comfortable are steps either side of that, not an
+     * independent scale.
+     */
+    'view_densities' => [
+        'compact' => ['label' => 'Compact', 'row_height' => 36],
+        'standard' => ['label' => 'Standard', 'row_height' => 44],
+        'comfortable' => ['label' => 'Comfortable', 'row_height' => 56],
+    ],
 
     /**
      * Project Settings → Features (PRJ-042). The catalog is config, the on/off state is a
@@ -239,6 +270,14 @@ return [
             'section' => 'labels',
             'confirm_disable' => true,
         ],
+        'views' => [
+            'label' => 'Views',
+            'singular' => 'View',
+            'description' => 'Build configurable spreadsheet-style views of this project\'s work items.',
+            'default' => false,
+            'section' => 'views',
+            'confirm_disable' => true,
+        ],
         'estimates' => [
             'label' => 'Estimation',
             'singular' => 'Estimate',
@@ -246,6 +285,23 @@ return [
             'default' => false,
             'section' => 'estimates',
             'confirm_disable' => true,
+        ],
+        // Views §4.2's sub-settings. Sub-features of `views`, the same shape as
+        // parallel_cycles: `requires` means the row only appears once Views is on, and
+        // switching Views off takes them with it without touching their stored value.
+        'view_project' => [
+            'label' => 'Allow project views',
+            'description' => 'Let members create views that everyone permitted on this project can open.',
+            'default' => true,
+            'requires' => 'views',
+            'section' => 'views',
+        ],
+        'view_private' => [
+            'label' => 'Allow private views',
+            'description' => 'Let members create views only they can open.',
+            'default' => true,
+            'requires' => 'views',
+            'section' => 'views',
         ],
         'parallel_cycles' => [
             'label' => 'Parallel cycles',

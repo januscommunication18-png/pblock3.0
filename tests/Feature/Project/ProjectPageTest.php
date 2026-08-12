@@ -695,6 +695,35 @@ class ProjectPageTest extends ProjectTestCase
         $this->assertTrue($ws->run(fn () => ProjectPage::whereKey($spec['id'])->exists()));
     }
 
+    public function test_a_linked_page_shows_even_when_it_is_the_only_structure(): void
+    {
+        [$owner, $ws] = $this->owner();
+        $project = $this->enabled($owner, $ws);
+        $this->actingAs($owner)->get(route('projects.work-items', $project));
+
+        $page = $this->publishedPage($owner, $project, 'The spec');
+        $item = $this->workItem($owner, $project, 'Build the thing');
+        $url = ['project' => $project->id, 'workItem' => $item->id];
+
+        $this->actingAs($owner)->postJson(route('projects.work-items.pages.store', $url), [
+            'page_ids' => [$page['id']],
+        ])->assertOk();
+
+        $structure = $this->actingAs($owner)->getJson(route('projects.work-items.structure', $url))
+            ->assertOk()->json('structure');
+
+        // The card that holds every structure section is rendered only when the item HAS
+        // structure, and that check has to count pages. It did not, so an item whose only
+        // structure was a linked page showed nothing at all — the section inside was correct
+        // and simply never reached.
+        $this->assertSame(['The spec'], array_column($structure['pages'], 'title'));
+        $this->assertEmpty($structure['subtasks']['items']);
+        $this->assertEmpty($structure['links']);
+
+        $screen = file_get_contents(public_path('assets/js/projects/work-items.js'));
+        $this->assertStringContainsString('(s.pages && s.pages.length)', $screen);
+    }
+
     public function test_the_picker_offers_this_projects_pages_and_marks_the_linked_ones(): void
     {
         [$owner, $ws] = $this->owner();

@@ -1,0 +1,100 @@
+/* Views — the RevoGrid spreadsheet.
+   ------------------------------------------------------------------
+   RevoGrid runs its own `default` theme, the one on rv-grid.com/demo — header band, row
+   dividers, hover, pinned-column edge, focus ring, scrollbars, all of it. This file
+   deliberately does NOT restyle any of that.
+
+   An earlier version did, matching the work item list's palette by hand. Every one of those
+   rules was `.vg-grid .rgCell`-shaped, which outranks the theme's own selectors, so the theme
+   was being paid for and then painted over. If the app's colours are wanted here again, the
+   way to do it is the theme's public tokens — `--revo-grid-header-bg`, `--revo-grid-row-hover`,
+   `--revo-grid-cell-border` and the rest, set once on `.vg-grid` — not a second set of rules
+   fighting the first.
+
+   What is left below is only what the theme cannot know about: the layout of OUR cell content,
+   and the chrome around the grid.
+   ------------------------------------------------------------------ */
+
+/* The element sizes itself to this box. The sizing is done with flex classes in the template
+   (`flex-1 min-h-0`), the same shape <wi-list> uses, not with a percentage height — a
+   percentage on a flex item is measured against a height the layout has not settled yet.
+
+   `display` is deliberately not set here: RevoGrid declares `display: flex !important` on the
+   element and would win anyway. */
+.vg-grid {
+  font-family: inherit;
+
+  /* ---- Rows stay white ---------------------------------------------------
+     Set through the theme's own TOKENS, not by overriding its selectors — which is the mistake
+     the previous version of this file made, and the reason the theme was being painted over.
+
+     RevoGrid never paints an ordinary row: rows are transparent over the grid surface, which is
+     `--revo-grid-background` and already white. What shaded them was the FOCUSED row —
+     `canFocus` is on for keyboard navigation (§7.1, §26), and clicking a cell to open its picker
+     left that row sitting at rgba(233, 234, 237, .5) afterwards.
+
+     So the focused-row fill goes transparent and the row stays white. Focus itself is not lost:
+     the focused CELL still gets its ring, which is the part that says where you are. */
+  --revo-grid-background: #fff;
+  --revo-grid-focused-bg: transparent;
+
+  /* ---- Header and cell text on the same left edge -------------------------
+     The theme pads both by `0 15px`. But our cell content is a custom span (`.vg-cell`) that
+     does its own padding, so a themed cell padding would be applied TWICE — and the header,
+     which has no such span, would be padded once. The two ended up on different left edges,
+     with the header text sitting further in than the values under it.
+
+     So the cell's own padding is zeroed and `.vg-cell` is the only thing that pads, and the
+     header is set to match it exactly. One number, in one place, for both. */
+  --revo-grid-cell-padding: 0;
+  --revo-grid-header-padding: 0 10px;
+}
+
+/* ---- Our cell content ----------------------------------------------------
+   Cells render chips from work-item-ui.js — the same helpers the Work Items list uses, so a
+   status or a priority means the same thing wherever you see it. This is the box that holds
+   them: the theme paints the cell, this lays out what is inside it. */
+.vg-cell {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 100%;
+  padding: 0 10px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.vg-head { display: flex; align-items: center; min-width: 0; }
+[data-sort] { cursor: pointer; user-select: none; }
+
+/* An editable cell reads as one. Cells that are read-only — a system field, or a column whose
+   feature is off — deliberately get none of this, so "can I change this?" is answerable by
+   pointing at it.
+
+   Drawn from the theme's OWN hover token rather than a colour of ours, so it stays correct if
+   the theme changes; and as an inset ring rather than a border, so hovering does not add a
+   pixel and nudge the row. */
+.vg-editable { cursor: pointer; }
+.vg-editable:hover {
+  background: var(--revo-grid-row-hover, rgba(0, 0, 0, .04));
+  box-shadow: inset 0 0 0 1px var(--revo-grid-border, rgba(0, 0, 0, .12));
+}
+
+/* ---- The column configuration panel --------------------------------------
+   Not part of the grid, so not the theme's business. It slides in beside the grid, and its
+   leading edge needs to read as an edge: a border alone is lost against the grid's own column
+   lines, and the shadow is what separates a panel sitting ON the screen from one more column
+   in the table. */
+.vg-config {
+  border-left: 1px solid var(--stroke, #d1d5db);
+  box-shadow: -8px 0 16px -8px rgba(15, 23, 42, .14);
+}
+
+/* The config panel's drag handle keeps the grab cursor while dragging, which is the only
+   feedback a list-to-list drag gives on its own. */
+[draggable="true"]:active { cursor: grabbing; }
+
+/* ---- External (full-screen) view -----------------------------------------
+   No sidebar, no project tabs — just a slim header and the grid, so the View is the whole page.
+   Only the chrome differs; the grid itself is identical. */
+.vg-external { height: 100vh; display: flex; flex-direction: column; }

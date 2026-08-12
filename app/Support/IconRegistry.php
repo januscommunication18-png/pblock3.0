@@ -83,6 +83,25 @@ class IconRegistry
                 'fa' => 'chevron-down',
                 'svg' => '<path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
             ],
+            // The sort indicator on a Views grid header, and the mirror of chevron-down.
+            'chevron-up' => [
+                'fa' => 'chevron-up',
+                'svg' => '<path d="M18 15l-6-6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+            ],
+            'arrow-right' => [
+                'fa' => 'arrow-right',
+                'svg' => '<path d="M4 12h15M13 6l6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
+            ],
+            // Views §12: the toolbar control that opens the column configuration panel.
+            'columns' => [
+                'fa' => 'table-columns',
+                'svg' => '<rect x="3.5" y="4.5" width="17" height="15" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M12 4.5v15" stroke="currentColor" stroke-width="1.7"/>',
+            ],
+            // Views §8: the drag handle on a column in the Fixed/Scroll cards.
+            'grip-vertical' => [
+                'fa' => 'grip-dots-vertical',
+                'svg' => '<circle cx="9" cy="6" r="1.4" fill="currentColor"/><circle cx="9" cy="12" r="1.4" fill="currentColor"/><circle cx="9" cy="18" r="1.4" fill="currentColor"/><circle cx="15" cy="6" r="1.4" fill="currentColor"/><circle cx="15" cy="12" r="1.4" fill="currentColor"/><circle cx="15" cy="18" r="1.4" fill="currentColor"/>',
+            ],
 
             'note' => [
                 'fa' => 'note',

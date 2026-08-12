@@ -135,9 +135,20 @@ class ProjectSettingsController extends ManagesProjectController
         // Switching a feature off switches off whatever depended on it, rather than leaving a
         // dependent flag stored as ON with nothing behind it — a state the UI would have no
         // honest way to render. Only the flags change; §3.2.4's data is untouched.
+        //
+        // …but only for dependents that default OFF, and the distinction matters. Those are
+        // EXTRAS the user opted into — parallel cycles — and clearing one is honest, because
+        // turning it back on is a deliberate act.
+        //
+        // A dependent that defaults ON is the opposite: a PERMISSION its parent grants, like
+        // the Views sub-settings that decide whether a view may be private or project-wide.
+        // Clearing those left Views switched on with neither visibility allowed, so no view
+        // could be created at all — the parent feature was on and unusable. Their stored value
+        // is unreachable while the parent is off anyway (every check reads both), so there is
+        // nothing dishonest to render and nothing to clear.
         if (! $enabling) {
             foreach ($catalog as $dependent => $meta) {
-                if (($meta['requires'] ?? null) === $key) {
+                if (($meta['requires'] ?? null) === $key && ! ($meta['default'] ?? false)) {
                     $features[$dependent] = false;
                 }
             }
@@ -223,6 +234,13 @@ class ProjectSettingsController extends ManagesProjectController
             'pages' => $this->featureSection($project, 'pages',
                 'Pages',
                 'Allow members of this project to create and manage project documentation using Pages. Turning pages off hides them from the project without deleting a page or its content.'),
+
+            // Views §4.2: one master switch plus its sub-settings, which is exactly the shape
+            // the shared feature-toggle screen already renders — `requires` keeps the
+            // sub-settings under the master, as parallel cycles sits under Cycles.
+            'views' => $this->featureSection($project, 'views',
+                'View',
+                'Build configurable spreadsheet-style views of this project\'s work items. Turning views off hides the tab without deleting a view or its column configuration.'),
 
             'epics' => $this->featureSection($project, 'epics',
                 'Epic',

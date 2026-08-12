@@ -176,6 +176,87 @@ class WorkItemStructureTest extends ProjectTestCase
         );
     }
 
+    /**
+     * The picker used to offer every candidate and let the server refuse on submit, so
+     * choosing an item that already had the opposite dependency produced
+     *
+     *     "8 and 9 already have the opposite dependency. Remove that one first."
+     *
+     * — an error dialog for something the picker could have said up front. Each row now
+     * carries why it cannot be chosen, and arrives ticked and disabled.
+     */
+    public function test_the_picker_marks_candidates_that_are_already_taken(): void
+    {
+        [$owner, $ws] = $this->owner();
+        $project = $this->makeProject($owner, $ws, ['identifier' => 'TESTI']);
+        $this->actingAs($owner)->get(route('projects.work-items', $project));
+
+        $a = $this->makeItem($owner, $project, 'A');
+        $b = $this->makeItem($owner, $project, 'B');
+        $c = $this->makeItem($owner, $project, 'C');
+
+        // A is blocked by B.
+        $this->actingAs($owner)->postJson(route('projects.work-items.relations.store', [
+            'project' => $project->id, 'workItem' => $a['id'],
+        ]), ['relation_type' => 'blocked_by', 'work_item_ids' => [$b['id']]])->assertOk();
+
+        $url = route('projects.work-items.search', ['project' => $project->id, 'workItem' => $a['id']]);
+        $rows = fn (string $type) => collect(
+            $this->actingAs($owner)->getJson($url.'?mode=relation&type='.$type)->assertOk()->json('items')
+        )->keyBy('id');
+
+        // Picking "Blocked by" again: B is already there.
+        $this->assertSame('Already added', $rows('blocked_by')[$b['id']]['blocked']);
+        $this->assertNull($rows('blocked_by')[$c['id']]['blocked']);
+
+        // Picking the OPPOSITE direction: B is the one the server would refuse, and it says so
+        // rather than waiting for the submit.
+        $this->assertSame('Has the opposite dependency', $rows('blocking')[$b['id']]['blocked']);
+        $this->assertNull($rows('blocking')[$c['id']]['blocked']);
+    }
+
+    public function test_the_picker_marks_existing_subtasks(): void
+    {
+        [$owner, $ws] = $this->owner();
+        $project = $this->makeProject($owner, $ws, ['identifier' => 'TESTI']);
+        $this->actingAs($owner)->get(route('projects.work-items', $project));
+
+        $parent = $this->makeItem($owner, $project, 'Parent');
+        $child = $this->makeItem($owner, $project, 'Child');
+        $other = $this->makeItem($owner, $project, 'Other');
+
+        $this->actingAs($owner)->postJson(route('projects.work-items.subtasks.store', [
+            'project' => $project->id, 'workItem' => $parent['id'],
+        ]), ['work_item_ids' => [$child['id']]])->assertOk();
+
+        $rows = collect($this->actingAs($owner)->getJson(route('projects.work-items.search', [
+            'project' => $project->id, 'workItem' => $parent['id'],
+        ]).'?mode=subtask')->assertOk()->json('items'))->keyBy('id');
+
+        $this->assertSame('Already a sub-work item', $rows[$child['id']]['blocked']);
+        $this->assertNull($rows[$other['id']]['blocked']);
+    }
+
+    public function test_a_plain_search_marks_nothing(): void
+    {
+        [$owner, $ws] = $this->owner();
+        $project = $this->makeProject($owner, $ws, ['identifier' => 'TESTI']);
+        $this->actingAs($owner)->get(route('projects.work-items', $project));
+
+        $one = $this->makeItem($owner, $project, 'One');
+        $this->makeItem($owner, $project, 'Two');
+
+        // No mode: the parent picker and a bare search ask nothing about relations, and must
+        // not pay for the question either.
+        $rows = $this->actingAs($owner)->getJson(route('projects.work-items.search', [
+            'project' => $project->id, 'workItem' => $one['id'],
+        ]))->assertOk()->json('items');
+
+        foreach ($rows as $row) {
+            $this->assertNull($row['blocked']);
+        }
+    }
+
     public function test_existing_work_items_can_be_attached_and_detached_as_subtasks(): void
     {
         [$owner, $ws] = $this->owner();
@@ -353,6 +434,46 @@ class WorkItemStructureTest extends ProjectTestCase
         )->assertOk();
 
         $this->assertSame(0, $counts()[$ui['id']]);
+    }
+
+    /**
+     * The grid cannot repaint a chip it was never told changed.
+     *
+     * Adding a blocker moves the "Blocked" chip onto the OTHER item's row — usually not the
+     * one whose drawer is open — so a response carrying only `structure` left the list showing
+     * a stale row until the page was reloaded. Every relation write now returns the rows it
+     * affected, both ends included, in the same shape the list was rendered with.
+     */
+    public function test_a_relation_write_returns_the_rows_it_changed(): void
+    {
+        [$owner, $ws] = $this->owner();
+        $project = $this->makeProject($owner, $ws, ['identifier' => 'TESTI']);
+        $this->actingAs($owner)->get(route('projects.work-items', $project));
+
+        $api = $this->makeItem($owner, $project, 'Build API');
+        $ui = $this->makeItem($owner, $project, 'Build checkout UI');
+
+        $cards = $this->actingAs($owner)->postJson(
+            route('projects.work-items.relations.store', ['project' => $project->id, 'workItem' => $api['id']]),
+            ['relation_type' => 'blocking', 'work_item_ids' => [$ui['id']]],
+        )->assertOk()->json('cards');
+
+        $counts = collect($cards)->pluck('blocked_by_count', 'id');
+
+        // The blocked item is the point: its row is the one that has to change, and it is not
+        // the item the request was made against.
+        $this->assertSame(1, $counts[$ui['id']] ?? null, 'the blocked row was not returned');
+        $this->assertSame(0, $counts[$api['id']] ?? null, 'the blocking row was not returned');
+
+        // Removing it puts both rows back, so the chip disappears without a reload too.
+        $relationId = $this->actingAs($owner)->getJson($this->structureUrl($project, $ui))
+            ->json('structure.dependencies.blocked_by.0.relation_id');
+
+        $cleared = $this->actingAs($owner)->deleteJson(route('projects.work-items.relations.destroy', [
+            'project' => $project->id, 'workItem' => $ui['id'], 'relation' => $relationId,
+        ]))->assertOk()->json('cards');
+
+        $this->assertSame(0, collect($cleared)->pluck('blocked_by_count', 'id')[$ui['id']] ?? null);
     }
 
     public function test_becoming_blocked_emails_the_project_lead_and_the_assignee(): void

@@ -575,7 +575,8 @@ PB.boot('project-cycles', {
     '<div class="mt-2 max-h-[320px] overflow-y-auto">' +
     '<button v-for="r in picker.results" :key="r.id" type="button" @click="togglePicked(r)" ' +
     'class="w-full text-left flex items-center gap-2.5 px-2 py-2 rounded-md hover:bg-hover">' +
-    '<span class="h-4 w-4 rounded border grid place-items-center shrink-0" :class="isPicked(r) ? \'bg-brand border-brand\' : \'border-stroke\'">' +
+    '<span class="h-[18px] w-[18px] rounded border grid place-items-center shrink-0 transition-colors" ' +
+    ':class="isPicked(r) ? \'bg-brand border-brand\' : \'border-stroke bg-white\'">' +
     '<span v-if="isPicked(r)">' + wiIcon('check-on-fill', 12) + '</span></span>' +
     '<span class="text-[11px] text-faint font-medium shrink-0">{{ r.identifier }}</span>' +
     '<span class="text-[13px] text-ink truncate flex-1">{{ r.title }}</span>' +
@@ -605,7 +606,8 @@ PB.boot('project-cycles', {
     '<div class="mt-4 max-h-[240px] overflow-y-auto">' +
     '<button v-for="i in incompleteItems" :key="i.id" type="button" @click="toggleTransfer(i)" ' +
     'class="w-full text-left flex items-center gap-2.5 px-2 py-2 rounded-md hover:bg-hover">' +
-    '<span class="h-4 w-4 rounded border grid place-items-center shrink-0" :class="isTransferring(i) ? \'bg-brand border-brand\' : \'border-stroke\'">' +
+    '<span class="h-[18px] w-[18px] rounded border grid place-items-center shrink-0 transition-colors" ' +
+    ':class="isTransferring(i) ? \'bg-brand border-brand\' : \'border-stroke bg-white\'">' +
     '<span v-if="isTransferring(i)">' + wiIcon('check-on-fill', 12) + '</span></span>' +
     '<span class="text-[11px] text-faint font-medium shrink-0">{{ i.identifier }}</span>' +
     '<span class="text-[13px] text-ink truncate flex-1">{{ i.title }}</span></button>' +

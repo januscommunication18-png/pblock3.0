@@ -10,6 +10,7 @@ use App\Models\Project;
 use App\Models\ProjectEstimation;
 use App\Models\ProjectItemLabel;
 use App\Models\ProjectPage;
+use App\Models\ProjectView;
 
 /**
  * What state is an optional project feature in (Feature Disable §10)?
@@ -50,6 +51,9 @@ class ProjectFeatureState
         'cycles' => Cycle::class,
         'labels' => ProjectItemLabel::class,
         'pages' => ProjectPage::class,
+        // Views §4.2: existing Views stay stored when the feature is switched off, so a
+        // project that ever built one keeps its tab and reopens it read-only.
+        'views' => ProjectView::class,
     ];
 
     /**

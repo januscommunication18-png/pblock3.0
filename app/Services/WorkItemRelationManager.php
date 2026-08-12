@@ -251,6 +251,10 @@ class WorkItemRelationManager
             // The documentation this item points at. Pages are project-scoped, so a link can
             // only ever reach a page in the same project — enforced when it is created.
             'pages' => $item->pages()
+                // `emoji` is NOT a column — it is read off the model as an attribute and is
+                // null today. Naming it in a column list made MySQL reject the whole query:
+                //   Unknown column 'emoji' in 'field list'
+                ->with(['editor', 'project:id,name'])
                 ->orderBy('title')
                 ->get()
                 ->map(fn (ProjectPage $p) => [
@@ -258,6 +262,21 @@ class WorkItemRelationManager
                     'title' => $p->title,
                     'status' => $p->status,
                     'archived' => $p->isArchived(),
+                    // The card names the project the page belongs to. Redundant today, since
+                    // pages are project-scoped and it is always this item's project — but the
+                    // card is the shape a Wiki page would arrive in, and that one will not be.
+                    'project' => $p->project ? [
+                        'name' => $p->project->name,
+                        // Null until projects carry an emoji; the card falls back to a glyph,
+                        // the same way the project tab bar does.
+                        'emoji' => $p->project->emoji,
+                    ] : null,
+                    'updated_by' => $p->editor ? [
+                        'name' => $p->editor->displayName(),
+                        'initial' => $p->editor->initial(),
+                        'avatar_url' => $p->editor->avatar_url,
+                    ] : null,
+                    'updated_at' => $p->updated_at?->toIso8601String(),
                 ])->values()->all(),
             'links' => WorkItemLink::query()
                 ->where('work_item_id', $item->id)
