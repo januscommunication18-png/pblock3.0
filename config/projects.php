@@ -116,9 +116,11 @@ return [
         // The key stays `features` — it is the URL, the route name and the toggle endpoint.
         // Only the label changes: everything this section configures is Cycles.
         ['key' => 'features', 'label' => 'Cycle', 'status' => 'active'],
+        ['key' => 'modules', 'label' => 'Module', 'status' => 'active'],
+        ['key' => 'epics', 'label' => 'Epic', 'status' => 'active'],
         ['key' => 'states', 'label' => 'States', 'status' => 'active'],
         ['key' => 'labels', 'label' => 'Labels', 'status' => 'active'],
-        ['key' => 'estimates', 'label' => 'Estimates', 'status' => 'soon'],
+        ['key' => 'estimates', 'label' => 'Estimation', 'status' => 'active'],
         ['key' => 'automations', 'label' => 'Automations', 'status' => 'soon'],
     ],
 
@@ -140,6 +142,7 @@ return [
         ['key' => 'overview', 'label' => 'Overview', 'status' => 'soon'],
         ['key' => 'work-items', 'label' => 'Work items', 'status' => 'active'],
         // Resolved per project — see ProjectNavigation::tabs().
+        ['key' => 'epics', 'label' => 'Epics', 'status' => 'soon'],
         ['key' => 'cycles', 'label' => 'Cycles', 'status' => 'soon'],
         ['key' => 'modules', 'label' => 'Modules', 'status' => 'soon'],
         ['key' => 'views', 'label' => 'Views', 'status' => 'soon'],
@@ -189,8 +192,47 @@ return [
     'features' => [
         'cycles' => [
             'label' => 'Cycles',
+            'singular' => 'Cycle',
             'description' => 'Let this project plan work in cycles.',
             'default' => false,
+            'section' => 'features',
+            // §7: disabling any of the three asks first, and says what stays.
+            'confirm_disable' => true,
+        ],
+        'modules' => [
+            'label' => 'Modules',
+            'singular' => 'Module',
+            'description' => 'Group related work items into focused initiatives or delivery areas within this project.',
+            'default' => false,
+            'section' => 'modules',
+            'confirm_disable' => true,
+        ],
+        'epics' => [
+            'label' => 'Epics',
+            'singular' => 'Epic',
+            'description' => 'Organize work items into larger initiatives and track progress across multiple areas and cycles.',
+            'default' => false,
+            'section' => 'epics',
+            'confirm_disable' => true,
+        ],
+        'labels' => [
+            'label' => 'Labels',
+            'singular' => 'Label',
+            'description' => 'Use labels to categorize and organize work items within this project.',
+            // §2: ON by default, unlike every other optional feature. Labels are a basic way
+            // to organise work rather than a planning layer a team opts into — and because
+            // featureFlags() merges catalog defaults, every existing project keeps them.
+            'default' => true,
+            'section' => 'labels',
+            'confirm_disable' => true,
+        ],
+        'estimates' => [
+            'label' => 'Estimation',
+            'singular' => 'Estimate',
+            'description' => 'Use estimates to measure the relative effort, complexity, or expected time required to complete work items in this project.',
+            'default' => false,
+            'section' => 'estimates',
+            'confirm_disable' => true,
         ],
         'parallel_cycles' => [
             'label' => 'Parallel cycles',
@@ -198,6 +240,7 @@ return [
             'default' => false,
             'requires' => 'cycles',
             'entitlement' => 'parallel_cycles',
+            'section' => 'features',
         ],
     ],
 
@@ -209,6 +252,116 @@ return [
     'entitlements' => [
         'parallel_cycles' => true,
     ],
+
+    /**
+     * Modules (Module Management §5.2/§6) — a container for related work items.
+     *
+     * The six statuses are lifecycle states, not work item states: they say where the module
+     * itself is, and changing one never touches the work items inside it (§6.4/§6.6).
+     */
+    'module_statuses' => [
+        'backlog' => ['label' => 'Backlog', 'color' => '#9ca3af'],
+        'planned' => ['label' => 'Planned', 'color' => '#6366f1'],
+        'in_progress' => ['label' => 'In Progress', 'color' => '#d97706'],
+        'paused' => ['label' => 'Paused', 'color' => '#0891b2'],
+        'completed' => ['label' => 'Completed', 'color' => '#22c55e'],
+        'cancelled' => ['label' => 'Cancelled', 'color' => '#dc2626'],
+    ],
+
+    /** §5.2: a new module starts in Backlog unless the user picks otherwise. */
+    'module_default_status' => 'backlog',
+
+    'module_title_max' => 255,
+
+    'module_description_max' => 2000,
+
+    /**
+     * The clip shown on the empty Modules screen. Drop a file in public/assets/video and
+     * point this at it; until then the empty state renders a labelled placeholder rather
+     * than a broken player.
+     */
+    'module_intro_video' => env('MODULE_INTRO_VIDEO'),
+
+    /**
+     * Epics (Epic §5/§6) — a larger initiative that work items contribute to.
+     *
+     * The same six lifecycle values as Modules, deliberately: §5 asks for the module naming
+     * convention, and two planning dimensions that read differently for the same idea would be
+     * a needless thing to learn. Stored, not derived — see docs/features/epics.md (E4).
+     */
+    'epic_statuses' => [
+        'backlog' => ['label' => 'Backlog', 'color' => '#9ca3af'],
+        'planned' => ['label' => 'Planned', 'color' => '#6366f1'],
+        'in_progress' => ['label' => 'In Progress', 'color' => '#d97706'],
+        'paused' => ['label' => 'Paused', 'color' => '#0891b2'],
+        'completed' => ['label' => 'Completed', 'color' => '#22c55e'],
+        'cancelled' => ['label' => 'Cancelled', 'color' => '#dc2626'],
+    ],
+
+    /** §5.2's equivalent for epics: a new epic starts in Backlog unless told otherwise. */
+    'epic_default_status' => 'backlog',
+
+    'epic_title_max' => 255,
+
+    'epic_description_max' => 2000,
+
+    /** The clip shown on the empty Epics screen — see `module_intro_video`. */
+    'epic_intro_video' => env('EPIC_INTRO_VIDEO'),
+
+    /**
+     * Estimation systems (Estimation §5-§8).
+     *
+     * Three types, each with ready-made templates plus Custom. The templates are seed values,
+     * not a constraint — §10 lets an admin add, rename, remove and reorder whatever they
+     * started from, so a "Fibonacci" system whose values have since been edited is still a
+     * valid Fibonacci system. `template` records where it came from, nothing more.
+     *
+     * `numeric` and `minutes` are what §32's future rollups will sum. A category has neither:
+     * XS is not a number and cannot be added up, which is exactly why it can only be counted.
+     */
+    'estimate_types' => [
+        'points' => [
+            'label' => 'Points',
+            'description' => 'Represent relative effort using numerical values.',
+            'templates' => [
+                'linear' => ['label' => 'Linear', 'values' => [1, 2, 3, 4, 5, 6]],
+                'fibonacci' => ['label' => 'Fibonacci', 'values' => [1, 2, 3, 5, 8, 13]],
+                'squares' => ['label' => 'Squares', 'values' => [1, 4, 9, 16, 25]],
+                'custom' => ['label' => 'Custom', 'values' => [1, 2, 4, 8, 12, 20]],
+            ],
+        ],
+        'category' => [
+            'label' => 'Category',
+            'description' => 'Estimate using descriptive values instead of numbers.',
+            'templates' => [
+                'tshirt' => ['label' => 'T-Shirt Size', 'values' => ['XS', 'S', 'M', 'L', 'XL']],
+                'easy_to_hard' => ['label' => 'Easy to Hard', 'values' => ['Easy', 'Medium', 'Hard']],
+                'custom' => ['label' => 'Custom', 'values' => ['Very Small', 'Small', 'Medium', 'Large', 'Very Large']],
+            ],
+        ],
+        'time' => [
+            'label' => 'Time',
+            'description' => 'Estimate the expected amount of time required.',
+            'templates' => [
+                // Minutes, so 1d is 8h of work rather than 24 — an estimate is effort, and
+                // nobody works a 24-hour day.
+                'standard' => ['label' => 'Standard', 'values' => [
+                    '30m' => 30, '1h' => 60, '2h' => 120, '4h' => 240, '8h' => 480, '1d' => 480, '2d' => 960,
+                ]],
+                'custom' => ['label' => 'Custom', 'values' => ['1h' => 60, '2h' => 120, '4h' => 240, '1d' => 480]],
+            ],
+        ],
+    ],
+
+    /** §7: a label name is short by design; the description carries any nuance. */
+    'label_name_max' => 50,
+
+    'label_description_max' => 255,
+
+    'estimate_label_max' => 40,
+
+    /** §10: enough values to be useful, few enough to stay a picker rather than a list. */
+    'estimate_values_max' => 20,
 
     /** Cycles (sprints) — Cycles §6.1. */
     'cycle_name_max' => 120,

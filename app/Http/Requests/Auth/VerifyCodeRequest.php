@@ -15,7 +15,7 @@ class VerifyCodeRequest extends FormRequest
     {
         return [
             'email' => ['required', 'string', 'email:rfc', 'max:255'],
-            'code'  => ['required', 'string', 'digits:6'],
+            'code' => ['required', 'string', 'digits:6'],
         ];
     }
 
@@ -23,7 +23,7 @@ class VerifyCodeRequest extends FormRequest
     {
         $this->merge([
             'email' => strtolower(trim((string) $this->input('email'))),
-            'code'  => preg_replace('/\s+/', '', (string) $this->input('code')),
+            'code' => preg_replace('/\s+/', '', (string) $this->input('code')),
         ]);
     }
 }

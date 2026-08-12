@@ -6,11 +6,12 @@
   <meta name="csrf-token" content="{{ csrf_token() }}" />
   <title>{{ $label }} — {{ $project->name }}</title>
 
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="{{ pb_asset('assets/js/tailwind.config.js') }}"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ pb_asset('assets/css/tailwind.css') }}" />
+  <link rel="stylesheet" href="{{ pb_asset('assets/css/inter.css') }}" />
   <link rel="stylesheet" href="{{ pb_asset('assets/css/styles.css') }}" />
+  {!! pb_icon_styles() !!}
+  {!! pb_icon_boot() !!}
+  <script defer src="{{ pb_asset('assets/js/icons.js') }}"></script>
   <script defer src="{{ pb_asset('assets/js/settings/app.js') }}"></script>
 </head>
 <body class="bg-white text-ink h-screen flex flex-col overflow-hidden text-[13px]">
@@ -27,7 +28,7 @@
            unfinished tab as production-ready, and never dead-end the navigation. --}}
       <div class="flex-1 flex flex-col items-center justify-center text-center px-6 py-16">
         <span class="h-12 w-12 rounded-xl bg-hover grid place-items-center text-sub">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.7"/><path d="M12 7v5l3 2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          {!! pb_icon('clock', 22) !!}
         </span>
         <h1 class="text-[18px] font-bold text-head mt-4">{{ $label }}</h1>
         <p class="text-[13px] text-sub mt-1.5 max-w-sm">

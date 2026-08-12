@@ -154,8 +154,6 @@ var WiEditor = {
       }
     });
 
-    if (this.modelValue) this.setHtml(this.modelValue);
-
     // Paste, handled explicitly.
     //
     // Quill's own clipboard drops content whose formats it does not recognise, so pasting
@@ -217,6 +215,20 @@ var WiEditor = {
         self.$emit('blur');
       }
     });
+
+    // Initial content LAST, after every listener is attached.
+    //
+    // It used to be loaded first, immediately after the Quill instance was built. Quill 2 can
+    // throw while parsing (`dangerouslyPasteHTML` → `setContents` → a stale native selection
+    // that no longer resolves), and a throw here aborted the rest of mounted() — so
+    // `text-change` was never wired, typing never reached the model, and the Save button read
+    // an empty document and returned without doing anything. The editor looked fine and the
+    // button looked dead.
+    //
+    // Loading last means a parse failure costs at most the pre-filled text; the editor still
+    // works. setHtml() no longer throws either — belt and braces, because this is the failure
+    // that is invisible from the outside.
+    if (this.modelValue) this.setHtml(this.modelValue);
   },
   beforeUnmount: function () {
     clearTimeout(this._syncTimer);
@@ -240,9 +252,23 @@ var WiEditor = {
       return this.quill.getText().trim() === '' && this.quill.getLength() <= 1 ? '' : html;
     },
     setHtml: function (html) {
-      // dangerouslyPasteHTML is Quill's own name for "parse this into a document"; the value
-      // is server-sanitized markup, and anything Quill cannot represent it simply drops.
-      this.quill.clipboard.dangerouslyPasteHTML(html || '', 'silent');
+      if (!this.quill) return;
+
+      // Replacing the document invalidates any native selection still pointing into the old
+      // DOM, and Quill crashes mapping that stale range back to a position. Dropping the
+      // selection first avoids it; the try/catch is there because "the editor lost its
+      // starting text" is recoverable and "the component died" is not.
+      try {
+        this.quill.setSelection(null, 'silent');
+      } catch (e) { /* no selection to clear */ }
+
+      try {
+        // dangerouslyPasteHTML is Quill's own name for "parse this into a document"; the
+        // value is server-sanitized markup, and anything Quill cannot represent it drops.
+        this.quill.clipboard.dangerouslyPasteHTML(html || '', 'silent');
+      } catch (e) {
+        try { this.quill.setText(''); } catch (ignored) { /* nothing more to try */ }
+      }
     },
     emitValue: function () {
       var html = this.html();
@@ -324,7 +350,7 @@ var WiEditor = {
     '<span class="text-[14px] font-semibold text-head">Insert image</span>' +
     '<button type="button" @click="$refs.file.click()" class="ml-auto h-8 px-3 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold">Upload</button>' +
     '<button type="button" @click="gallery.open = false" class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover" data-tip="Close" aria-label="Close">' +
-    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>' +
+    '' + wiIcon('xmark', 16) + '</button>' +
     '</div>' +
     '<div class="p-3 overflow-y-auto">' +
     '<div v-if="gallery.loading" class="py-8 text-center text-[13px] text-sub">Loading…</div>' +
@@ -339,15 +365,43 @@ var WiEditor = {
     '</div>'
 };
 
-function wiBlankForm(stateId) {
+/**
+ * A blank create form.
+ *
+ * `seed` pre-fills the properties belonging to whatever screen this is mounted inside — an
+ * epic's Work Items tab seeds `epic_id`, a cycle's seeds `cycle_id`, a module's seeds
+ * `module_ids`. One object rather than a parameter per host: the list only grows, and "Add
+ * work item" on a cycle page quietly creating an item outside that cycle is the bug this
+ * prevents.
+ */
+function wiBlankForm(stateId, seed) {
+  seed = seed || {};
   return {
     title: '', description: '', state_id: stateId || '', priority: 'none',
     start_date: '', due_date: '', parent_id: '',
+    // Epic §9: optional, zero or one. Independent of the module and cycle beside it (§11/§12)
+    // — picking one here neither sets nor limits either of the others.
+    epic_id: seed.epic_id || '',
+    cycle_id: seed.cycle_id || '',
+    module_ids: (seed.module_ids || []).slice(),
+    // Estimation §11: optional, one value, and "No Estimate" is a real choice (§13).
+    estimate_value_id: '',
     assignee_ids: [], label_ids: []
   };
 }
 
-PB.boot('work-items', {
+/**
+ * The Work Items screen — grid, chip pickers, create modal and the work item drawer.
+ *
+ * A named component rather than an inline PB.boot argument, because it is no longer only its
+ * own page: an Epic's Work Items tab mounts this SAME component, so a row there is editable,
+ * clicking it opens this drawer, and the two can never drift apart. That is the same reason
+ * <wi-list> was extracted, one level up.
+ *
+ * Everything it needs arrives in `bootstrap` (WorkItemScreenPayload), so a host only has to
+ * hand it a payload — there is no hidden dependency on being the page.
+ */
+var WorkItemsScreen = {
   props: { bootstrap: Object },
   data: function () {
     var b = this.bootstrap || {};
@@ -364,7 +418,24 @@ PB.boot('work-items', {
       labels: Array.isArray(b.labels) ? b.labels : [],
       // Cycles §8.1: the property is only offered when the project has the feature on.
       cyclesEnabled: !!b.cyclesEnabled,
+      // Labels §3/§15: the picker appears only where the project has labels on. Chips
+      // already on a work item stay readable either way (§28.5).
+      labelsEnabled: b.labelsEnabled !== false,
+      // Estimation §4/§26: the chip appears only where the project has it on and a system is
+      // configured — an estimate property with nothing to choose from is not a property.
+      estimatesEnabled: !!b.estimatesEnabled,
+      estimates: Array.isArray(b.estimates) ? b.estimates : [],
+      // Epic §4/§9: the property appears only where the project has the feature on.
+      epicsEnabled: !!b.epicsEnabled,
+      epics: Array.isArray(b.epics) ? b.epics : [],
+      // Set when this screen is mounted inside an epic, cycle or module: new work items
+      // created there belong to it, and that host owns the page-level Add button.
+      seed: b.seed || {},
+      embedded: !!b.embedded,
       cycles: Array.isArray(b.cycles) ? b.cycles : [],
+      // Modules §9.1: the property only appears when the project has the feature on.
+      modulesEnabled: !!b.modulesEnabled,
+      modules: Array.isArray(b.modules) ? b.modules : [],
       members: Array.isArray(b.members) ? b.members : [],
       priorities: Array.isArray(b.priorities) ? b.priorities : [],
       defaultStateId: b.defaultStateId || '',
@@ -438,12 +509,12 @@ PB.boot('work-items', {
       seedStateId: '',
       // Set when the create modal was opened as "new sub-task" of the open work item.
       seedParentId: '',
-      form: wiBlankForm(b.defaultStateId || ''),
+      form: wiBlankForm(b.defaultStateId || '', b.seed || {}),
       // Which chip popover is open in the modal ('state' | 'priority' | … | 'due_date').
       menu: '',
       // "Add parent" opens a full search panel rather than a popover (POC ParentSearchModal).
       parentOpen: false,
-      memberQuery: '', labelQuery: '', parentQuery: ''
+      memberQuery: '', labelQuery: '', parentQuery: '', epicQuery: ''
     };
   },
   computed: {
@@ -483,6 +554,21 @@ PB.boot('work-items', {
       var ids = this.form.assignee_ids.map(String);
       return this.members.filter(function (m) { return ids.indexOf(String(m.id)) > -1; });
     },
+    selectedEstimate: function () {
+      var id = String(this.form.estimate_value_id || '');
+      return this.estimates.filter(function (e) { return String(e.id) === id; })[0] || null;
+    },
+    /** §9: the picker searches epic names, and only this project's epics are in the list. */
+    filteredEpics: function () {
+      var q = (this.epicQuery || '').toLowerCase();
+      return this.epics.filter(function (e) {
+        return !q || (e.title || '').toLowerCase().indexOf(q) > -1 || String(e.identifier) === q;
+      });
+    },
+    selectedEpic: function () {
+      var id = String(this.form.epic_id || '');
+      return this.epics.filter(function (e) { return String(e.id) === id; })[0] || null;
+    },
     selectedLabels: function () {
       var ids = this.form.label_ids.map(String);
       return this.labels.filter(function (l) { return ids.indexOf(String(l.id)) > -1; });
@@ -513,18 +599,18 @@ PB.boot('work-items', {
       return [
         {
           key: 'blocked_by', label: 'Blocked by', cls: 'text-danger bg-danger/5',
-          icon: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.7"/><path d="M6 6l12 12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>'
+          icon: '' + wiIcon('circle-slash', 13) + ''
         },
         {
           key: 'blocking', label: 'Blocking', cls: 'text-amber-700 bg-amber-50',
-          icon: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 4l8 14H4z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M12 10v3M12 15.5v.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>'
+          icon: '' + wiIcon('triangle-exclamation', 13) + ''
         }
       ];
     },
     /** Same idea for relations, which are informational rather than blocking. */
     relGroups: function () {
-      var chain = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M9 15l6-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M10.5 6.5l1-1a3.5 3.5 0 015 5l-1 1M13.5 17.5l-1 1a3.5 3.5 0 01-5-5l1-1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-      var copy = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="9" y="9" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M15 9V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7a2 2 0 002 2h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+      var chain = '' + wiIcon('link', 13) + '';
+      var copy = '' + wiIcon('clone', 13) + '';
       return [
         { key: 'related', label: 'relates to', icon: chain },
         { key: 'duplicate_of', label: 'duplicate of', icon: copy },
@@ -569,12 +655,18 @@ PB.boot('work-items', {
         this.openCreate('');
       }
 
+      // The tab belongs to the detail view in both modes, so it is restored for both. It has
+      // to be applied BEFORE the drawer opens, or the freshly opened panel shows tab one.
+      var wantedTab = params.get('tab');
+      if (wantedTab && this.tabList().some(function (t) { return t.key === wantedTab; })) {
+        this.tab = wantedTab;
+      }
+
       if (this.pageMode) {
         // The per-item URL: the detail is the page, so open it straight away.
         this.syncDraft();
         this.loadStructure();
         this.loadFeed();
-        if (params.get('tab')) this.tab = params.get('tab');
       } else if (params.get('item')) {
         // ?item=<ID> deep link — the shape "Copy link" produced before the item page existed.
         var wanted = String(params.get('item'));
@@ -622,7 +714,7 @@ PB.boot('work-items', {
     /** Open a chip picker or the action menu, anchored to the clicked control. */
     openRowMenu: function (kind, item, btn) {
       if (!this.canEdit) return;
-      var widths = { state: 208, priority: 200, assignees: 256, labels: 256, cycle: 256, start_date: 300, due_date: 300, menu: 200 };
+      var widths = { state: 208, priority: 200, assignees: 256, labels: 256, cycle: 256, epic: 256, estimate: 220, modules: 256, start_date: 300, due_date: 300, menu: 200 };
       var w = widths[kind] || 208;
       var heights = { menu: 220, start_date: 340, due_date: 340 };
       var h = heights[kind] || 260;
@@ -748,6 +840,66 @@ PB.boot('work-items', {
       return this.cycles.filter(function (c) { return !q || (c.name || '').toLowerCase().indexOf(q) > -1; });
     },
     /**
+     * Set or clear a work item's estimate (§14/§15).
+     *
+     * One value, so picking replaces; picking the current one clears it, which is the same
+     * single control §15 describes as "No Estimate".
+     */
+    setRowEstimate: function (e) {
+      var it = this.rowMenu.item;
+      if (!it) return;
+      var same = e && String(it.estimate_value_id) === String(e.id);
+      this.patchItem(it, { estimate_value_id: same || !e ? '' : e.id }, true,
+        same || !e ? 'Estimate removed.' : 'Estimate set to ' + e.label + '.');
+    },
+    /** Epics offered by the picker, filtered by the same search box the others use. */
+    rowEpics: function () {
+      var q = (this.rowQuery || '').toLowerCase();
+      return this.epics.filter(function (e) {
+        return !q || (e.title || '').toLowerCase().indexOf(q) > -1 || String(e.identifier) === q;
+      });
+    },
+    /**
+     * Put the item in an epic, or take it out (§9).
+     *
+     * ONE epic per work item, so picking replaces — the same shape as the cycle picker above
+     * and deliberately not the module one. Picking the epic it is already in clears it, so a
+     * single control both assigns and removes.
+     *
+     * §11/§12: this sends `epic_id` and nothing else. The item's module and cycle are not read
+     * here and not written, which is the whole point of keeping the three independent.
+     */
+    setRowEpic: function (e) {
+      var it = this.rowMenu.item;
+      if (!it) return;
+      var same = e && String(it.epic_id) === String(e.id);
+      this.patchItem(it, { epic_id: same || !e ? '' : e.id }, true,
+        same || !e ? 'Removed from the epic.' : 'Moved to ' + e.title + '.');
+    },
+    /** Modules offered by the picker, filtered by the same search box the others use. */
+    rowModules: function () {
+      var q = (this.rowQuery || '').toLowerCase();
+      return this.modules.filter(function (m) { return !q || (m.title || '').toLowerCase().indexOf(q) > -1; });
+    },
+    rowHasModule: function (m) {
+      var it = this.rowMenu.item;
+      return !!(it && (it.modules || []).some(function (x) { return x.id === m.id; }));
+    },
+    /**
+     * Add or remove one module (§9.3).
+     *
+     * Multi-select, so the picker stays open and each click toggles one membership — the same
+     * behaviour as labels, and unlike the cycle picker where choosing one replaces the other.
+     */
+    toggleRowModule: function (m) {
+      var it = this.rowMenu.item;
+      if (!it) return;
+      var current = (it.modules || []).map(function (x) { return x.id; });
+      var has = current.indexOf(m.id) > -1;
+      var ids = has ? current.filter(function (id) { return id !== m.id; }) : current.concat([m.id]);
+      this.patchItem(it, { module_ids: ids }, false, has ? 'Removed from ' + m.title + '.' : 'Added to ' + m.title + '.');
+    },
+    /**
      * Put the item in a cycle, or take it out (§8.3).
      *
      * Picking the cycle it is already in clears it, so the same control both assigns and
@@ -795,6 +947,7 @@ PB.boot('work-items', {
       this.syncDraft();
       this.loadStructure();
       this.loadFeed();
+      this.syncUrl();
     },
     closeDrawer: function () {
       // On the per-item page there is nothing behind the panel — closing means going back to
@@ -803,6 +956,7 @@ PB.boot('work-items', {
       this.drawer.open = false;
       this.drawer.id = null;
       this.feed = null;
+      this.syncUrl();
     },
 
     // ---------- Collaboration tabs (§4-§11) ----------
@@ -818,13 +972,41 @@ PB.boot('work-items', {
     },
     setTab: function (key) {
       this.tab = key;
-      // §4.4: reflect the tab in the URL so it survives a refresh and can be linked to,
-      // without adding a history entry per click.
+      this.syncUrl();
+    },
+    /**
+     * Keep the URL describing what is on screen (§4.4: survives a refresh, can be linked to).
+     *
+     * BOTH parts have to be written, which is the bug this replaces. `setTab` used to add
+     * `?tab=` on its own while nothing recorded WHICH item was open, so switching to Updates
+     * in the drawer produced `/work-items?tab=updates` — a URL that reloads to the bare list,
+     * no item, and a tab nobody reads. It looked like a deep link and did nothing.
+     *
+     * `replaceState`, not `pushState`: a tab click is not a navigation, and Back should leave
+     * the screen rather than walk the tabs.
+     */
+    syncUrl: function () {
+      // The per-item page already IS the URL for the item; it only carries the tab.
+      if (this.pageMode) {
+        this.writeParams({ tab: this.tab });
+
+        return;
+      }
+
+      this.writeParams(this.drawer.open && this.drawer.id
+        ? { item: this.drawer.id, tab: this.tab }
+        : { item: null, tab: null });
+    },
+    /** Set or delete query params on the current URL. */
+    writeParams: function (params) {
       try {
         var url = new URL(window.location.href);
-        url.searchParams.set('tab', key);
+        Object.keys(params).forEach(function (key) {
+          if (params[key] === null || params[key] === undefined || params[key] === '') url.searchParams.delete(key);
+          else url.searchParams.set(key, params[key]);
+        });
         window.history.replaceState({}, '', url);
-      } catch (e) {}
+      } catch (e) { /* history is unavailable — the screen still works */ }
     },
     loadFeed: async function () {
       var it = this.drawerItem;
@@ -840,6 +1022,30 @@ PB.boot('work-items', {
     applyFeed: function (resp) {
       if (resp && resp.feed) this.feed = resp.feed;
       if (resp && resp.message) this.$pb.toast(resp.message);
+      this.syncStatusUpdate();
+    },
+    /**
+     * Mirror the item's current status update onto its row (§8).
+     *
+     * The row's At Risk / Off Track label arrives with the list, but posting, editing or
+     * deleting an update returns only the feed — so without this the row keeps the old label
+     * until a reload, which is exactly when someone is looking for it to change.
+     *
+     * Derived from the feed just received rather than re-fetching the row: it is the same
+     * data, and the newest update IS the current status (the feed is newest-first).
+     */
+    syncStatusUpdate: function () {
+      var item = this.drawerItem;
+      if (!item || !this.feed) return;
+
+      var newest = (this.feed.updates || [])[0];
+      var concerning = newest && (newest.status === 'at_risk' || newest.status === 'off_track');
+
+      item.status_update = concerning
+        ? { status: newest.status, label: newest.status_label, comment: wiPlainText(newest.content, 240) }
+        : null;
+
+      if (this.$refs.list) this.$refs.list.updateRow(item);
     },
     feedUrl: function (name, suffix) {
       var it = this.drawerItem;
@@ -932,8 +1138,8 @@ PB.boot('work-items', {
     updateMeta: function (status) {
       // §8.4: icon and label always travel together — never colour on its own.
       var map = {
-        on_track: { label: 'On Track', cls: 'text-success border-success/30 bg-success/5', icon: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M5 12l4 4L19 7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>' },
-        at_risk: { label: 'At Risk', cls: 'text-amber-700 border-amber-300 bg-amber-50', icon: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 4l8 14H4z" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><path d="M12 10v3M12 15.5v.5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>' },
+        on_track: { label: 'On Track', cls: 'text-success border-success/30 bg-success/5', icon: '' + wiIcon('check', 13) + '' },
+        at_risk: { label: 'At Risk', cls: 'text-amber-700 border-amber-300 bg-amber-50', icon: '' + wiIcon('triangle-exclamation', 13) + '' },
         off_track: { label: 'Off Track', cls: 'text-danger border-danger/30 bg-danger/5', icon: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.9"/><path d="M12 7.5v5M12 15.5v.5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>' }
       };
       return map[status] || map.on_track;
@@ -1091,6 +1297,20 @@ PB.boot('work-items', {
       // created through exactly the same path — and the same validation — as any work item.
       this.openCreate('', it.id);
     },
+    /**
+     * The parent search (§5). The same modal as sub-tasks and relations rather than a second
+     * one that looks almost like it — the question ("which work item?") is identical, only the
+     * arity differs, which `mode` carries.
+     */
+    openParentPicker: function () {
+      if (!this.canEdit) return;
+      this.openPicker('parent', '', 'Set parent');
+    },
+    clearParent: async function () {
+      var it = this.drawerItem;
+      if (!it || !this.canEdit) return;
+      await this.patchItem(it, { parent_id: null }, true, 'Parent removed.');
+    },
     openPicker: function (mode, type, title) {
       this.addMenu = '';
       this.picker = { open: true, mode: mode, type: type || '', title: title, query: '', allProjects: false, results: [], selected: [], busy: false };
@@ -1103,7 +1323,8 @@ PB.boot('work-items', {
       var it = this.drawerItem;
       if (!it || !this.endpoints.search) return;
       var q = encodeURIComponent(this.picker.query || '');
-      var url = this.structureUrl('search', '?q=' + q + (this.picker.allProjects ? '&all_projects=1' : ''));
+      var url = this.structureUrl('search', '?q=' + q + (this.picker.allProjects ? '&all_projects=1' : '') +
+        (this.picker.mode === 'parent' ? '&for=parent' : ''));
       try {
         var resp = await this.$pb.api(url);
         this.picker.results = resp.items || [];
@@ -1118,11 +1339,28 @@ PB.boot('work-items', {
     togglePick: function (row) {
       var ids = this.picker.selected.map(String);
       var at = ids.indexOf(String(row.id));
+      // An item has exactly one parent (§5), so here the choice REPLACES — the same shape the
+      // cycle picker uses, and the reason the modal's footer says "Set" rather than "Add".
+      if (this.picker.mode === 'parent') {
+        this.picker.selected = at > -1 ? [] : [row.id];
+        return;
+      }
       if (at > -1) this.picker.selected.splice(at, 1); else this.picker.selected.push(row.id);
     },
     isPicked: function (row) { return this.picker.selected.map(String).indexOf(String(row.id)) > -1; },
     confirmPicker: async function () {
       if (!this.picker.selected.length || this.picker.busy) return;
+
+      // Parent is a column on the item, not a relation table, so it goes through the ordinary
+      // PATCH — the same path, and the same validation, as changing state or a date.
+      if (this.picker.mode === 'parent') {
+        this.picker.busy = true;
+        var ok = await this.patchItem(this.drawerItem, { parent_id: this.picker.selected[0] }, true, 'Parent updated.');
+        this.picker.busy = false;
+        if (ok !== false) this.closePicker();
+        return;
+      }
+
       this.picker.busy = true;
       var body = { work_item_ids: this.picker.selected };
       var url = this.structureUrl(this.picker.mode === 'subtask' ? 'subtasks' : 'relations');
@@ -1182,12 +1420,17 @@ PB.boot('work-items', {
       catch (e) { window.prompt('Copy this link', url); }
     },
 
-    /** The parent's ID, resolved from the loaded list (relations land in a later slice). */
+    /**
+     * The parent's ID and title. The row now carries its own `parent` object, so a parent that
+     * is filtered out of the grid — or in another project — still names itself; the lookup in
+     * the loaded list is only a fallback for payloads written before that.
+     */
     parentLabel: function (item) {
       if (!item || !item.parent_id) return 'None';
+      if (item.parent) return item.parent.identifier + ' · ' + item.parent.title;
       var id = String(item.parent_id);
       var parent = this.items.find(function (i) { return String(i.id) === id; });
-      return parent ? parent.identifier + ' · ' + parent.title : 'None';
+      return parent ? parent.identifier + ' · ' + parent.title : '#' + id;
     },
     drawerCopyLink: async function () {
       var it = this.drawerItem;
@@ -1431,11 +1674,11 @@ PB.boot('work-items', {
     },
     /** Clear the form and every transient bit of modal state back to the opening seed. */
     resetForm: function () {
-      this.form = wiBlankForm(this.seedStateId);
+      this.form = wiBlankForm(this.seedStateId, this.seed);
       this.form.parent_id = this.seedParentId || '';
       this.errors = {};
       this.menu = ''; this.parentOpen = false;
-      this.memberQuery = ''; this.labelQuery = ''; this.parentQuery = '';
+      this.memberQuery = ''; this.labelQuery = ''; this.parentQuery = ''; this.epicQuery = '';
     },
     closeCreate: function () { this.open = false; this.menu = ''; this.parentOpen = false; },
     toggleMenu: function (name) { this.menu = this.menu === name ? '' : name; },
@@ -1572,16 +1815,20 @@ PB.boot('work-items', {
     // ===== Toolbar =====
     '<div class="flex items-center gap-2 px-5 sm:px-6 h-12 border-b border-line shrink-0">' +
     '<span class="flex items-center gap-2 text-[13px] font-medium text-ink shrink-0">' +
-    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-sub"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>' +
+    '' + wiIcon('bars-thin', 15, 'text-sub') + '' +
     'Work items <span class="text-[11px] font-semibold text-sub bg-hover rounded-full px-1.5 py-0.5">{{ totalCount }}</span></span>' +
     '<div class="ml-auto flex items-center gap-1.5">' +
-    '<button v-if="canCreate" type="button" @click="openCreate(\'\')" class="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold whitespace-nowrap">' +
-    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Add work item</button>' +
+    // Hidden when this screen is embedded in another (an epic's Work Items tab): that host
+    // has its own Add button in its header, and two side by side is one too many. Creating
+    // new work is still one click away — every group row keeps its "+".
+    '<button v-if="canCreate && !embedded" type="button" @click="openCreate(\'\')" class="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold whitespace-nowrap">' +
+    '' + wiIcon('plus', 14) + 'Add work item</button>' +
     '</div></div>' +
 
     // ===== Grid (desktop) =====
     '<wi-list v-show="items.length" ref="list" class="flex-1 min-h-0 hidden sm:block" ' +
     ':items="items" :states="states" :can-edit="canEdit" :can-add="canCreate" row-action="menu" ' +
+    ':labels-enabled="labelsEnabled" ' +
     '@open="openDrawer" @chip="onChip" @group-add="openCreate" />' +
 
     // ===== Cards (mobile) — same data, grouped by state =====
@@ -1591,7 +1838,7 @@ PB.boot('work-items', {
     '<span class="grid place-items-center" v-html="stateIcon(s)"></span>' +
     '<span class="text-[13px] font-semibold text-head">{{ s.name }}</span>' +
     '<span class="text-[11px] font-semibold rounded-full px-1.5 py-0.5 text-sub bg-hover">{{ items.filter(i => i.state_id === s.id).length }}</span>' +
-    '<button v-if="canCreate" type="button" @click="openCreate(String(s.id))" class="ml-auto h-6 w-6 grid place-items-center rounded text-sub hover:bg-line" data-tip="Add work item" aria-label="Add work item"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>' +
+    '<button v-if="canCreate" type="button" @click="openCreate(String(s.id))" class="ml-auto h-6 w-6 grid place-items-center rounded text-sub hover:bg-line" data-tip="Add work item" aria-label="Add work item">' + wiIcon('plus', 15) + '</button>' +
     '</div>' +
     '<div v-for="i in items.filter(i => i.state_id === s.id)" :key="i.id" @click="openDrawer(i)" class="border-b border-line px-4 py-3">' +
     '<div class="text-[12px] text-sub">{{ i.identifier }}</div>' +
@@ -1611,7 +1858,7 @@ PB.boot('work-items', {
     '<h2 class="text-[16px] font-bold text-head">No work items yet</h2>' +
     '<p class="text-[13px] text-sub mt-1.5 max-w-sm">Work items are the units of work in this project. Add the first one to get started.</p>' +
     '<button v-if="canCreate" type="button" @click="openCreate(\'\')" class="mt-5 inline-flex items-center gap-1.5 h-9 px-4 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold">' +
-    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Add work item</button>' +
+    '' + wiIcon('plus', 15) + 'Add work item</button>' +
     '</div>' +
 
     '</template>' +
@@ -1627,23 +1874,23 @@ PB.boot('work-items', {
     '<div class="flex items-center gap-1 px-4 h-14 border-b border-line shrink-0">' +
     '<template v-if="!pageMode">' +
     '<button type="button" @click="closeDrawer" data-tip="Close" aria-label="Close" class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover">' +
-    '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
+    '' + wiIcon('arrow-right-long', 18) + '</button>' +
     '<a :href="itemUrl(drawerItem)" data-tip="Open as full page" aria-label="Open as full page" class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover">' +
-    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 9V4h5M20 15v5h-5M15 4h5v5M9 20H4v-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></a>' +
+    '' + wiIcon('expand', 16) + '</a>' +
     '</template>' +
     // On the item page the toolbar carries a breadcrumb back to the list instead.
     '<div v-else class="flex items-center gap-1.5">' +
     '<a :href="endpoints.list" class="inline-flex items-center gap-1.5 text-[13px] text-sub hover:text-ink">' +
-    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Work items</a>' +
-    '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" class="text-faint"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+    '' + wiIcon('bars-thin', 15) + 'Work items</a>' +
+    '' + wiIcon('chevron-right', 13, 'text-faint') + '' +
     '<span class="text-[13px] text-ink font-medium">{{ drawerItem.identifier }}</span>' +
     '</div>' +
 
     '<div class="ml-auto flex items-center gap-1.5">' +
     '<button type="button" @click="drawerCopyLink" data-tip="Copy link" aria-label="Copy link" class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover">' +
-    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 15l6-6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M10.5 6.5l1-1a3.5 3.5 0 015 5l-1 1M13.5 17.5l-1 1a3.5 3.5 0 01-5-5l1-1" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
+    '' + wiIcon('link', 16) + '</button>' +
     '<button v-if="canEdit" type="button" @click="openRowMenu(\'menu\', drawerItem, $event.currentTarget)" data-tip="More" aria-label="More" class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover">' +
-    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="5" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="19" cy="12" r="1.6" fill="currentColor"/></svg></button>' +
+    '' + wiIcon('ellipsis', 16) + '</button>' +
     '</div></div>' +
 
     // ---- Content: main column + properties ----
@@ -1660,7 +1907,7 @@ PB.boot('work-items', {
     '{{ drawerItem.state ? drawerItem.state.name : \'No state\' }}</span>' +
     '<span class="text-[12px] text-sub tracking-wide">{{ drawerItem.identifier }}</span>' +
     '<span v-if="drawerItem.blocked_by_count" class="inline-flex items-center gap-1 h-5 px-1.5 rounded border border-danger/30 bg-danger/5 text-[11px] font-semibold text-danger">' +
-    '<svg width="11" height="11" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="2"/><path d="M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Blocked</span>' +
+    '' + wiIcon('circle-slash', 11) + 'Blocked</span>' +
     '</div>' +
     // A heading until it is double-clicked. Enter commits, Escape backs out, blur saves —
     // and it never looks like a form field while you are only reading.
@@ -1703,13 +1950,13 @@ PB.boot('work-items', {
     // Add sub-work item — §20's two routes.
     '<div class="relative" data-add-menu>' +
     '<button type="button" @click="addMenu = addMenu === \'sub\' ? \'\' : \'sub\'" class="inline-flex items-center gap-1.5 rounded-md shadow-sm h-9 px-3 text-[13px] text-ink ring-1 ring-inset ring-stroke hover:bg-hover">' +
-    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="7" height="7" rx="1.6" stroke="currentColor" stroke-width="1.6"/><rect x="13" y="13" width="8" height="7" rx="1.6" stroke="currentColor" stroke-width="1.6"/><path d="M6.5 11v4a2 2 0 002 2H13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>' +
+    '' + wiIcon('diagram-subtask', 15) + '' +
     'Add sub-work item</button>' +
     '<div v-if="addMenu === \'sub\'" class="absolute left-0 top-full mt-1 w-52 rounded-md bg-white py-1 shadow-lg outline outline-1 outline-black/5 z-[90]">' +
     '<button type="button" @click="createSubtask" class="w-full text-left flex items-center gap-2.5 px-3 h-9 text-[13px] text-ink hover:bg-hover">' +
-    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-sub"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Create new</button>' +
+    '' + wiIcon('plus', 15, 'text-sub') + 'Create new</button>' +
     '<button type="button" @click="openPicker(\'subtask\', \'\', \'Add existing work item\')" class="w-full text-left flex items-center gap-2.5 px-3 h-9 text-[13px] text-ink hover:bg-hover">' +
-    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-sub"><rect x="3" y="4" width="7" height="7" rx="1.6" stroke="currentColor" stroke-width="1.6"/><rect x="13" y="13" width="8" height="7" rx="1.6" stroke="currentColor" stroke-width="1.6"/><path d="M6.5 11v4a2 2 0 002 2H13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>Add existing</button>' +
+    '' + wiIcon('diagram-subtask', 15, 'text-sub') + 'Add existing</button>' +
     '</div></div>' +
 
     // Connected icon group: dependency ▾ · relation ▾ · link · attachment · pages
@@ -1717,8 +1964,8 @@ PB.boot('work-items', {
 
     '<span class="relative" data-add-menu>' +
     '<button type="button" @click="addMenu = addMenu === \'dep\' ? \'\' : \'dep\'" data-tip="Add dependency" aria-label="Add dependency" class="relative inline-flex items-center gap-1 rounded-l-md h-9 pl-2.5 pr-1.5 text-sub ring-1 ring-inset ring-stroke hover:bg-hover focus:z-10">' +
-    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M7 4v16M7 20l-3-3M7 20l3-3M17 20V4M17 4l-3 3M17 4l3 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
-    '<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
+    '' + wiIcon('arrows-up-down', 15) + '' +
+    '' + wiIcon('chevron-down', 12) + '</button>' +
     '<div v-if="addMenu === \'dep\'" class="absolute left-0 top-full mt-1 w-44 rounded-md bg-white py-1 shadow-lg outline outline-1 outline-black/5 z-[90]">' +
     '<button type="button" @click="openPicker(\'relation\', \'blocked_by\', \'Blocked by\')" class="w-full text-left px-3 h-9 text-[13px] text-ink hover:bg-hover">Blocked by</button>' +
     '<button type="button" @click="openPicker(\'relation\', \'blocking\', \'Blocking\')" class="w-full text-left px-3 h-9 text-[13px] text-ink hover:bg-hover">Blocking</button>' +
@@ -1726,22 +1973,22 @@ PB.boot('work-items', {
 
     '<span class="relative -ml-px" data-add-menu>' +
     '<button type="button" @click="addMenu = addMenu === \'rel\' ? \'\' : \'rel\'" data-tip="Add relation" aria-label="Add relation" class="relative inline-flex items-center gap-1 h-9 pl-2.5 pr-1.5 text-sub ring-1 ring-inset ring-stroke hover:bg-hover focus:z-10">' +
-    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><rect x="3" y="8.5" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.6"/><rect x="14" y="8.5" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M10 12h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>' +
-    '<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
+    '' + wiIcon('rectangles-pair', 15) + '' +
+    '' + wiIcon('chevron-down', 12) + '</button>' +
     '<div v-if="addMenu === \'rel\'" class="absolute left-0 top-full mt-1 w-44 rounded-md bg-white py-1 shadow-lg outline outline-1 outline-black/5 z-[90]">' +
     '<button type="button" @click="openPicker(\'relation\', \'related\', \'Related to\')" class="w-full text-left px-3 h-9 text-[13px] text-ink hover:bg-hover">Related to</button>' +
     '<button type="button" @click="openPicker(\'relation\', \'duplicate_of\', \'Duplicate of\')" class="w-full text-left px-3 h-9 text-[13px] text-ink hover:bg-hover">Duplicate of</button>' +
     '</div></span>' +
 
     '<button type="button" @click="openLinkModal(null)" data-tip="Add link" aria-label="Add link" class="relative -ml-px inline-flex items-center justify-center h-9 w-9 text-sub ring-1 ring-inset ring-stroke hover:bg-hover focus:z-10">' +
-    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M9 15l6-6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M10.5 6.5l1-1a3.5 3.5 0 015 5l-1 1M13.5 17.5l-1 1a3.5 3.5 0 01-5-5l1-1" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
+    '' + wiIcon('link', 15) + '</button>' +
 
     // Attachments and Pages are drawn but inert until they ship (§42/§43) — a dead control
     // that silently does nothing is worse than one that says why.
     '<span data-tip="Attachments — coming soon" aria-label="Attachments — coming soon" class="relative -ml-px inline-flex items-center justify-center h-9 w-9 text-faint ring-1 ring-inset ring-stroke cursor-not-allowed">' +
-    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M21 11l-9 9a5 5 0 01-7-7l9-9a3.5 3.5 0 015 5l-9 9a2 2 0 01-3-3l8-8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>' +
+    '' + wiIcon('paperclip', 15) + '</span>' +
     '<span data-tip="Link pages — coming soon" aria-label="Link pages — coming soon" class="relative -ml-px inline-flex items-center justify-center rounded-r-md h-9 w-9 text-faint ring-1 ring-inset ring-stroke cursor-not-allowed">' +
-    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M8 3h6l4 4v13a1 1 0 01-1 1H8a1 1 0 01-1-1V4a1 1 0 011-1z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M14 3v4h4M9.5 12h5M9.5 15.5h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>' +
+    '' + wiIcon('file-lines', 15) + '</span>' +
 
     '</span></div>' +
 
@@ -1756,7 +2003,7 @@ PB.boot('work-items', {
     '<div v-if="structure.subtasks.items.length" class="p-3 sm:p-4">' +
     '<div class="flex items-center gap-2">' +
     '<button type="button" @click="toggleSection(\'subtasks\')" class="h-6 w-6 grid place-items-center rounded text-faint hover:bg-hover shrink-0">' +
-    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="transition-transform" :class="secOpen.subtasks ? \'\' : \'-rotate-90\'"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
+    '' + wiIcon('chevron-down', 15, 'transition-transform') + '</button>' +
     '<span class="text-[13px] font-semibold text-head">Sub-work items</span>' +
     '<span class="text-[12px] text-sub">{{ structure.subtasks.items.length }}</span>' +
     '<span class="inline-flex items-center gap-1.5 h-5 pl-1 pr-2 rounded-full border border-line text-[11px] text-sub" :data-tip="structure.subtasks.progress.percent + \'% complete\'" :aria-label="structure.subtasks.progress.percent + \'% complete\'">' +
@@ -1764,7 +2011,7 @@ PB.boot('work-items', {
     '{{ structure.subtasks.progress.completed }}/{{ structure.subtasks.progress.total }}</span>' +
     '<div v-if="canEdit" class="ml-auto relative" data-add-menu>' +
     '<button type="button" @click="addMenu = addMenu === \'sec-sub\' ? \'\' : \'sec-sub\'" data-tip="Add sub-work item" aria-label="Add sub-work item" class="h-7 w-7 grid place-items-center rounded text-sub hover:bg-hover">' +
-    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>' +
+    '' + wiIcon('plus', 16) + '</button>' +
     '<div v-if="addMenu === \'sec-sub\'" class="absolute right-0 top-full mt-1 w-52 rounded-md bg-white py-1 shadow-lg outline outline-1 outline-black/5 z-[90]">' +
     '<button type="button" @click="createSubtask" class="w-full text-left px-3 h-9 text-[13px] text-ink hover:bg-hover">Create new</button>' +
     '<button type="button" @click="openPicker(\'subtask\', \'\', \'Add existing work item\')" class="w-full text-left px-3 h-9 text-[13px] text-ink hover:bg-hover">Add existing</button>' +
@@ -1781,21 +2028,21 @@ PB.boot('work-items', {
     '<span v-if="row.due_date" class="inline-flex items-center gap-1.5 h-6 px-2 rounded-md border border-line bg-white text-[12px] text-ink">{{ fmtDate(row.due_date) }}</span>' +
     '<wi-avatar v-if="row.assignees.length" :person="row.assignees[0]" :size="24" />' +
     '<span v-else class="h-6 w-6 rounded-full border border-dashed border-stroke grid place-items-center text-faint" data-tip="Unassigned" aria-label="Unassigned">' +
-    '<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.2" stroke="currentColor" stroke-width="1.7"/><path d="M5 20a7 7 0 0114 0" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></span>' +
+    '' + wiIcon('user', 12) + '</span>' +
     '<button type="button" @click="openStructMenu(\'subtask\', row, $event)" class="h-6 w-6 grid place-items-center rounded text-faint hover:bg-line" data-tip="More" aria-label="More">' +
-    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="5" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="19" cy="12" r="1.5" fill="currentColor"/></svg></button>' +
+    '' + wiIcon('ellipsis-small', 15) + '</button>' +
     '</span></li></ul></div>' +
 
     // ===== Dependencies =====
     '<div v-if="structure.dependencies.blocked_by.length || structure.dependencies.blocking.length" class="p-3 sm:p-4">' +
     '<div class="flex items-center gap-2">' +
     '<button type="button" @click="toggleSection(\'dependencies\')" class="h-6 w-6 grid place-items-center rounded text-faint hover:bg-hover shrink-0">' +
-    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="transition-transform" :class="secOpen.dependencies ? \'\' : \'-rotate-90\'"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
+    '' + wiIcon('chevron-down', 15, 'transition-transform') + '</button>' +
     '<span class="text-[13px] font-semibold text-head">Dependencies</span>' +
     '<span class="text-[12px] text-sub">{{ structure.dependencies.blocked_by.length + structure.dependencies.blocking.length }}</span>' +
     '<div v-if="canEdit" class="ml-auto relative" data-add-menu>' +
     '<button type="button" @click="addMenu = addMenu === \'sec-dep\' ? \'\' : \'sec-dep\'" data-tip="Add dependency" aria-label="Add dependency" class="h-7 w-7 grid place-items-center rounded text-sub hover:bg-hover">' +
-    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>' +
+    '' + wiIcon('plus', 16) + '</button>' +
     '<div v-if="addMenu === \'sec-dep\'" class="absolute right-0 top-full mt-1 w-44 rounded-md bg-white py-1 shadow-lg outline outline-1 outline-black/5 z-[90]">' +
     '<button type="button" @click="openPicker(\'relation\', \'blocked_by\', \'Blocked by\')" class="w-full text-left px-3 h-9 text-[13px] text-ink hover:bg-hover">Blocked by</button>' +
     '<button type="button" @click="openPicker(\'relation\', \'blocking\', \'Blocking\')" class="w-full text-left px-3 h-9 text-[13px] text-ink hover:bg-hover">Blocking</button>' +
@@ -1816,21 +2063,21 @@ PB.boot('work-items', {
     ':data-tip="\'Priority: \' + priorityMeta(row.priority).label"><span class="grid place-items-center" v-html="priorityMeta(row.priority).icon"></span>{{ priorityMeta(row.priority).label }}</span>' +
     '<wi-avatar v-if="row.assignees.length" :person="row.assignees[0]" :size="24" />' +
     '<span v-else class="h-6 w-6 rounded-full border border-dashed border-stroke grid place-items-center text-faint" data-tip="Unassigned" aria-label="Unassigned">' +
-    '<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.2" stroke="currentColor" stroke-width="1.7"/><path d="M5 20a7 7 0 0114 0" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></span>' +
+    '' + wiIcon('user', 12) + '</span>' +
     '<button type="button" @click="openStructMenu(\'relation\', row, $event)" class="h-6 w-6 grid place-items-center rounded text-faint hover:bg-line" data-tip="More" aria-label="More">' +
-    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="5" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="19" cy="12" r="1.5" fill="currentColor"/></svg></button>' +
+    '' + wiIcon('ellipsis-small', 15) + '</button>' +
     '</span></li></ul></div></template></div></div>' +
 
     // ===== Relations =====
     '<div v-if="structure.relations.related.length || structure.relations.duplicate_of.length || structure.relations.duplicated_by.length" class="p-3 sm:p-4">' +
     '<div class="flex items-center gap-2">' +
     '<button type="button" @click="toggleSection(\'relations\')" class="h-6 w-6 grid place-items-center rounded text-faint hover:bg-hover shrink-0">' +
-    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="transition-transform" :class="secOpen.relations ? \'\' : \'-rotate-90\'"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
+    '' + wiIcon('chevron-down', 15, 'transition-transform') + '</button>' +
     '<span class="text-[13px] font-semibold text-head">Relations</span>' +
     '<span class="text-[12px] text-sub">{{ structure.relations.related.length + structure.relations.duplicate_of.length + structure.relations.duplicated_by.length }}</span>' +
     '<div v-if="canEdit" class="ml-auto relative" data-add-menu>' +
     '<button type="button" @click="addMenu = addMenu === \'sec-rel\' ? \'\' : \'sec-rel\'" data-tip="Add relation" aria-label="Add relation" class="h-7 w-7 grid place-items-center rounded text-sub hover:bg-hover">' +
-    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>' +
+    '' + wiIcon('plus', 16) + '</button>' +
     '<div v-if="addMenu === \'sec-rel\'" class="absolute right-0 top-full mt-1 w-44 rounded-md bg-white py-1 shadow-lg outline outline-1 outline-black/5 z-[90]">' +
     '<button type="button" @click="openPicker(\'relation\', \'related\', \'Related to\')" class="w-full text-left px-3 h-9 text-[13px] text-ink hover:bg-hover">Related to</button>' +
     '<button type="button" @click="openPicker(\'relation\', \'duplicate_of\', \'Duplicate of\')" class="w-full text-left px-3 h-9 text-[13px] text-ink hover:bg-hover">Duplicate of</button>' +
@@ -1851,30 +2098,30 @@ PB.boot('work-items', {
     ':data-tip="\'Priority: \' + priorityMeta(row.priority).label"><span class="grid place-items-center" v-html="priorityMeta(row.priority).icon"></span>{{ priorityMeta(row.priority).label }}</span>' +
     '<wi-avatar v-if="row.assignees.length" :person="row.assignees[0]" :size="24" />' +
     '<span v-else class="h-6 w-6 rounded-full border border-dashed border-stroke grid place-items-center text-faint" data-tip="Unassigned" aria-label="Unassigned">' +
-    '<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.2" stroke="currentColor" stroke-width="1.7"/><path d="M5 20a7 7 0 0114 0" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></span>' +
+    '' + wiIcon('user', 12) + '</span>' +
     '<button type="button" @click="openStructMenu(\'relation\', row, $event)" class="h-6 w-6 grid place-items-center rounded text-faint hover:bg-line" data-tip="More" aria-label="More">' +
-    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="5" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="19" cy="12" r="1.5" fill="currentColor"/></svg></button>' +
+    '' + wiIcon('ellipsis-small', 15) + '</button>' +
     '</span></li></ul></div></template></div></div>' +
 
     // ===== Links =====
     '<div v-if="structure.links.length" class="p-3 sm:p-4">' +
     '<div class="flex items-center gap-2">' +
     '<button type="button" @click="toggleSection(\'links\')" class="h-6 w-6 grid place-items-center rounded text-faint hover:bg-hover shrink-0">' +
-    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="transition-transform" :class="secOpen.links ? \'\' : \'-rotate-90\'"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
+    '' + wiIcon('chevron-down', 15, 'transition-transform') + '</button>' +
     '<span class="text-[13px] font-semibold text-head">Links</span>' +
     '<span class="text-[12px] text-sub">{{ structure.links.length }}</span>' +
     '<button v-if="canEdit" type="button" @click="openLinkModal(null)" data-tip="Add link" aria-label="Add link" class="ml-auto h-7 w-7 grid place-items-center rounded text-sub hover:bg-hover">' +
-    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>' +
+    '' + wiIcon('plus', 16) + '</button>' +
     '</div>' +
     '<ul v-show="secOpen.links" class="mt-1 space-y-1">' +
     '<li v-for="l in structure.links" :key="l.id" class="flex items-center gap-2.5 px-2.5 h-11 rounded-md border border-line">' +
-    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-link shrink-0"><path d="M9 15l6-6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M10.5 6.5l1-1a3.5 3.5 0 015 5l-1 1M13.5 17.5l-1 1a3.5 3.5 0 01-5-5l1-1" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+    '' + wiIcon('link', 15, 'text-link shrink-0') + '' +
     '<a :href="l.url" target="_blank" rel="noopener noreferrer" class="text-[13px] text-ink truncate hover:underline">{{ l.label }}</a>' +
     '<span class="ml-auto text-[12px] text-faint shrink-0 hidden sm:inline">{{ relativeTime(l.created_at) }}</span>' +
     '<button type="button" @click="copyText(l.url)" data-tip="Copy link" aria-label="Copy link" class="h-6 w-6 grid place-items-center rounded text-faint hover:bg-line shrink-0">' +
-    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="9" y="9" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M15 9V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7a2 2 0 002 2h3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>' +
+    '' + wiIcon('clone', 14) + '</button>' +
     '<button v-if="canEdit" type="button" @click="openStructMenu(\'link\', l, $event)" class="h-6 w-6 grid place-items-center rounded text-faint hover:bg-line shrink-0" data-tip="More" aria-label="More">' +
-    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="5" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="19" cy="12" r="1.5" fill="currentColor"/></svg></button>' +
+    '' + wiIcon('ellipsis-small', 15) + '</button>' +
     '</li></ul></div>' +
 
     '</div>' +
@@ -1980,13 +2227,13 @@ PB.boot('work-items', {
     '<span class="ml-auto flex items-center gap-0.5 shrink-0">' +
     '<button v-if="canEdit" type="button" @click="startReply(c)" data-tip="Reply" aria-label="Reply" ' +
     'class="h-6 w-6 grid place-items-center rounded text-faint hover:text-ink hover:bg-hover">' +
-    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M9 14l-5-5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 9h9a7 7 0 010 14h-2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
+    '' + wiIcon('reply', 14) + '</button>' +
     '<button v-if="canEditComment(c)" type="button" @click="startEditComment(c)" data-tip="Edit" aria-label="Edit comment" ' +
     'class="h-6 w-6 grid place-items-center rounded text-faint hover:text-ink hover:bg-hover">' +
-    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M4 20h4l10-10-4-4L4 16v4z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg></button>' +
+    '' + wiIcon('pen-solid-tip', 14) + '</button>' +
     '<button v-if="canEdit" type="button" @click="deleteComment(c)" data-tip="Delete" aria-label="Delete comment" ' +
     'class="h-6 w-6 grid place-items-center rounded text-faint hover:text-danger hover:bg-hover">' +
-    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 7h14M10 4h4M9 7l.8 12a1 1 0 001 1h4.4a1 1 0 001-1L17 7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
+    '' + wiIcon('trash-can', 14) + '</button>' +
     '</span></div>' +
     '<div class="wi-rich text-[13px] text-ink mt-1.5" v-html="c.content"></div>' +
     '</div></div>' +
@@ -2002,10 +2249,10 @@ PB.boot('work-items', {
     '<span class="ml-auto flex items-center gap-0.5 shrink-0">' +
     '<button v-if="canEditComment(r)" type="button" @click="startEditComment(r)" data-tip="Edit" aria-label="Edit reply" ' +
     'class="h-6 w-6 grid place-items-center rounded text-faint hover:text-ink hover:bg-hover">' +
-    '<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M4 20h4l10-10-4-4L4 16v4z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg></button>' +
+    '' + wiIcon('pen-solid-tip', 13) + '</button>' +
     '<button v-if="canEdit" type="button" @click="deleteComment(r)" data-tip="Delete" aria-label="Delete reply" ' +
     'class="h-6 w-6 grid place-items-center rounded text-faint hover:text-danger hover:bg-hover">' +
-    '<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M5 7h14M10 4h4M9 7l.8 12a1 1 0 001 1h4.4a1 1 0 001-1L17 7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
+    '' + wiIcon('trash-can', 13) + '</button>' +
     '</span></div>' +
     '<div class="wi-rich text-[13px] text-ink mt-1.5" v-html="r.content"></div></div></li></ul>' +
 
@@ -2018,7 +2265,7 @@ PB.boot('work-items', {
     '<div v-else-if="tab === \'updates\'">' +
     '<div v-if="canEdit" class="flex justify-end mb-3">' +
     '<button type="button" @click="openUpdateForm(null)" class="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-stroke text-[13px] font-semibold text-ink hover:bg-hover">' +
-    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Add update</button></div>' +
+    '' + wiIcon('plus', 14) + 'Add update</button></div>' +
 
     '<div v-if="updateForm.open" class="mb-4 rounded-lg border border-line p-3">' +
     '<div class="flex items-center gap-2 mb-2">' +
@@ -2056,7 +2303,7 @@ PB.boot('work-items', {
     '<div v-else-if="tab === \'worklogs\'">' +
     '<div v-if="canEdit" class="flex justify-end mb-3">' +
     '<button type="button" @click="openWorklogForm(null)" class="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-stroke text-[13px] font-semibold text-ink hover:bg-hover">' +
-    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Log work</button></div>' +
+    '' + wiIcon('plus', 14) + 'Log work</button></div>' +
 
     '<div v-if="worklogForm.open" class="mb-4 rounded-lg border border-line p-3">' +
     '<div v-if="worklogForm.error" class="mb-2 rounded-md border border-danger/40 bg-danger/5 px-3 py-2 text-[12px] text-danger">{{ worklogForm.error }}</div>' +
@@ -2115,7 +2362,7 @@ PB.boot('work-items', {
     '<span class="inline-flex items-center gap-1.5 h-6 px-2 rounded border border-line text-sub">' +
     '<span v-if="valueIcon(h)" class="grid place-items-center text-faint" v-html="valueIcon(h)"></span>' +
     '{{ historyValue(h, \'old\') }}</span>' +
-    '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+    '' + wiIcon('arrow-right-long', 13, 'text-faint shrink-0') + '' +
     '<span class="inline-flex items-center gap-1.5 h-6 px-2 rounded border border-line text-ink">' +
     '<span v-if="valueIcon(h)" class="grid place-items-center text-faint" v-html="valueIcon(h)"></span>' +
     '{{ historyValue(h, \'new\') }}</span>' +
@@ -2180,24 +2427,174 @@ PB.boot('work-items', {
     '<div class="text-[13px] font-medium text-sub mt-6 mb-1">Details</div>' +
     '<div class="divide-y divide-line">' +
     '<div class="py-2.5"><div class="text-[12px] text-sub mb-1.5">Parent</div>' +
-    '<span class="block truncate text-[13px]" :class="drawerItem.parent_id ? \'text-ink\' : \'text-sub\'" ' +
-    ':data-tip="drawerItem.parent_id ? parentLabel(drawerItem) : null">{{ parentLabel(drawerItem) }}</span></div>' +
+    '<div class="flex flex-wrap items-center gap-1.5">' +
+    '<button v-if="drawerItem.parent_id" type="button" :disabled="!canEdit" @click="openParentPicker" ' +
+    ':data-tip="canEdit ? \'Change parent — \' + parentLabel(drawerItem) : parentLabel(drawerItem)" ' +
+    'class="inline-flex items-center gap-1.5 h-6 px-2 rounded-md border border-line text-[12px] text-ink min-w-0 hover:bg-hover">' +
+    '' + wiIcon('diagram-subtask', 12, 'text-brand shrink-0') + '' +
+    '<span class="truncate">{{ parentLabel(drawerItem) }}</span></button>' +
+    // One parent per item (§5), so once it is set the "+" would promise a second — the chip
+    // changes it, and the x next to it clears it.
+    '<button v-if="canEdit && drawerItem.parent_id" type="button" @click="clearParent" ' +
+    'data-tip="Remove parent" aria-label="Remove parent" ' +
+    'class="h-6 w-6 grid place-items-center rounded-md text-sub hover:bg-hover hover:text-ink shrink-0">' +
+    '' + wiIcon('xmark', 12) + '</button>' +
+    '<button v-if="canEdit && !drawerItem.parent_id" type="button" @click="openParentPicker" ' +
+    'data-tip="Add a parent" aria-label="Add a parent" ' +
+    'class="inline-flex items-center gap-1 h-6 px-1.5 rounded-md border border-dashed border-stroke text-[12px] text-sub hover:bg-hover hover:text-ink">' +
+    '' + wiIcon('plus', 12) + '<span>Add parent</span></button>' +
+    '<span v-if="!canEdit && !drawerItem.parent_id" class="text-[13px] text-sub">None</span>' +
+    '</div></div>' +
     // §8.1: "Add cycle" when there is none, the cycle's name as a chip when there is. The
     // whole row disappears with the feature, rather than sitting there refusing to work.
-    '<div v-if="cyclesEnabled" class="py-2.5"><div class="text-[12px] text-sub mb-1.5">Cycle</div>' +
-    '<button type="button" :disabled="!canEdit" @click="openRowMenu(\'cycle\', drawerItem, $event.currentTarget)" ' +
-    ':data-tip="drawerItem.cycle ? (canEdit ? \'Change cycle — \' + drawerItem.cycle.name : \'Cycle: \' + drawerItem.cycle.name) : (canEdit ? \'Add to a cycle\' : \'No cycle\')" ' +
-    'class="flex items-center gap-1.5 max-w-full text-[13px] text-left rounded px-1.5 py-0.5 -ml-1.5 hover:bg-hover">' +
-    '<span v-if="drawerItem.cycle" class="inline-flex items-center gap-1.5 h-6 px-2 rounded-md border border-line text-[12px] text-ink max-w-full">' +
-    '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" class="text-brand shrink-0"><path d="M21 12a9 9 0 11-3.6-7.2" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><path d="M21 4v4h-4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+    // §9.1: chips for each module the item belongs to, or "Add module" when it is in none.
+    // Estimation §12/§13: the estimate as a chip, or "Estimate +" when there is none. Shown
+    // while the feature is on, and also while it is off if this item already carries one —
+    // §27 keeps that value readable, just not editable.
+    '<div v-if="estimatesEnabled || drawerItem.estimate" class="py-2.5">' +
+    '<div class="text-[12px] text-sub mb-1.5">Estimate</div>' +
+    '<div class="flex flex-wrap items-center gap-1.5">' +
+    '<span v-if="drawerItem.estimate && !estimatesEnabled" ' +
+    ':data-tip="\'Estimate: \' + drawerItem.estimate.label + \' — estimation is disabled for this project\'" ' +
+    'class="inline-flex items-center gap-1.5 h-6 px-2 rounded-md border border-line bg-hover text-[12px] text-sub max-w-full">' +
+    '<span class="truncate">{{ drawerItem.estimate.label }}</span></span>' +
+    '<span v-if="drawerItem.estimate && !estimatesEnabled" class="text-[11px] text-faint">Estimation disabled</span>' +
+
+    '<button v-if="drawerItem.estimate && estimatesEnabled" type="button" :disabled="!canEdit" ' +
+    '@click="openRowMenu(\'estimate\', drawerItem, $event.currentTarget)" ' +
+    ':data-tip="canEdit ? \'Change estimate — \' + drawerItem.estimate.label : \'Estimate: \' + drawerItem.estimate.label" ' +
+    'class="inline-flex items-center gap-1.5 h-6 px-2 rounded-md border border-line text-[12px] text-ink max-w-full hover:bg-hover">' +
+    '<span class="truncate">{{ drawerItem.estimate.label }}</span></button>' +
+    // §13: one estimate, so once it is set the "+" would promise a second the picker will
+    // not give — the chip itself changes it, and "No Estimate" inside clears it.
+    '<button v-if="canEdit && estimatesEnabled && !drawerItem.estimate" type="button" ' +
+    '@click="openRowMenu(\'estimate\', drawerItem, $event.currentTarget)" ' +
+    'data-tip="Add an estimate" aria-label="Add an estimate" ' +
+    'class="inline-flex items-center gap-1 h-6 px-1.5 rounded-md border border-dashed border-stroke text-[12px] text-sub hover:bg-hover hover:text-ink">' +
+    '' + wiIcon('plus', 12) + '<span>Estimate</span></button>' +
+    '<span v-if="!canEdit && estimatesEnabled && !drawerItem.estimate" class="text-[13px] text-sub">No Estimate</span>' +
+    '</div></div>' +
+
+    // Epic §9: one epic, shown as a chip with the ID beside the title. The whole row is
+    // absent when the feature is off (§4) rather than sitting there refusing to work — and
+    // it is independent of the Module and Cycle rows below it (§11/§12).
+    // Visible while the feature is ON, and also while it is OFF if this item already has an
+    // epic — that assignment is historical context and must stay legible. Only when the
+    // feature is off AND there is nothing to show does the row disappear entirely.
+    '<div v-if="epicsEnabled || drawerItem.epic" class="py-2.5"><div class="text-[12px] text-sub mb-1.5">Epic</div>' +
+    '<div class="flex flex-wrap items-center gap-1.5">' +
+    // Frozen: the chip still reads, but it is not a button and it says why.
+    '<span v-if="drawerItem.epic && !epicsEnabled" ' +
+    ':data-tip="\'Epic: \' + drawerItem.epic.title + \' — epics are disabled for this project\'" ' +
+    'class="inline-flex items-center gap-1.5 h-6 px-2 rounded-md border border-line bg-hover text-[12px] text-sub max-w-full">' +
+    '' + wiIcon('rectangles-pair', 12, 'shrink-0') + '' +
+    '<span class="truncate">{{ drawerItem.epic.title }}</span></span>' +
+    '<span v-if="drawerItem.epic && !epicsEnabled" class="text-[11px] text-faint">Epic feature disabled</span>' +
+
+    '<button v-if="drawerItem.epic && epicsEnabled" type="button" :disabled="!canEdit" ' +
+    '@click="openRowMenu(\'epic\', drawerItem, $event.currentTarget)" ' +
+    ':data-tip="canEdit ? \'Change epic — \' + drawerItem.epic.title : \'Epic: \' + drawerItem.epic.title" ' +
+    'class="inline-flex items-center gap-1.5 h-6 px-2 rounded-md border border-line text-[12px] text-ink max-w-full hover:bg-hover">' +
+    '' + wiIcon('rectangles-pair', 12, 'text-brand shrink-0') + '' +
+    '<span class="truncate">{{ drawerItem.epic.title }}</span></button>' +
+    // §9 gives a work item ONE epic, so once it is set a "+" would promise a second the
+    // picker will not give — the chip itself is the way to change it.
+    '<button v-if="canEdit && epicsEnabled && !drawerItem.epic" type="button" ' +
+    '@click="openRowMenu(\'epic\', drawerItem, $event.currentTarget)" ' +
+    'data-tip="Add to an epic" aria-label="Add to an epic" ' +
+    'class="inline-flex items-center gap-1 h-6 px-1.5 rounded-md border border-dashed border-stroke text-[12px] text-sub hover:bg-hover hover:text-ink">' +
+    '' + wiIcon('plus', 12) + '<span>Add epic</span></button>' +
+    '<span v-if="!canEdit && !drawerItem.epic" class="text-[13px] text-sub">No epic</span>' +
+    '</div></div>' +
+
+    // Feature Disable §6: visible while Modules is ON, and also while it is OFF if this item
+    // already belongs to one — that assignment is historical context. When the feature is off
+    // and there is nothing to show, the row goes entirely rather than sitting there disabled.
+    '<div v-if="modulesEnabled || (drawerItem.modules && drawerItem.modules.length)" class="py-2.5">' +
+    '<div class="text-[12px] text-sub mb-1.5">Modules</div>' +
+    '<div class="flex flex-wrap items-center gap-1.5">' +
+    // Frozen: still reads, no longer a button, and says why.
+    '<template v-if="!modulesEnabled">' +
+    '<span v-for="m in drawerItem.modules" :key="m.id" :data-tip="m.title + \' — modules are disabled for this project\'" ' +
+    'class="inline-flex items-center gap-1.5 h-6 px-2 rounded-md border border-line bg-hover text-[12px] text-sub max-w-full">' +
+    '' + wiIcon('grid', 12, 'shrink-0') + '' +
+    '<span class="truncate">{{ m.title }}</span></span>' +
+    '<span class="text-[11px] text-faint">Module feature disabled</span></template>' +
+    // v-if on a <template> rather than beside the v-for: Vue 3 evaluates v-if FIRST, so the
+    // two on one element means the condition cannot see the loop variable.
+    '<template v-if="modulesEnabled">' +
+    '<button v-for="m in drawerItem.modules" :key="m.id" type="button" :disabled="!canEdit" ' +
+    '@click="openRowMenu(\'modules\', drawerItem, $event.currentTarget)" ' +
+    ':data-tip="canEdit ? \'Change modules — \' + m.title : m.title" ' +
+    'class="inline-flex items-center gap-1.5 h-6 px-2 rounded-md border border-line text-[12px] text-ink max-w-full hover:bg-hover">' +
+    '<span class="grid place-items-center shrink-0 text-brand">' + wiIcon('grid', 12) + '</span>' +
+    '<span class="truncate">{{ m.title }}</span></button></template>' +
+    // §9.3: an item can be in several modules at once, so the "+" stays put after the chips.
+    '<button v-if="canEdit && modulesEnabled" type="button" @click="openRowMenu(\'modules\', drawerItem, $event.currentTarget)" ' +
+    'data-tip="Add modules" aria-label="Add modules" ' +
+    'class="inline-flex items-center gap-1 h-6 px-1.5 rounded-md border border-dashed border-stroke text-[12px] text-sub hover:bg-hover hover:text-ink">' +
+    '' + wiIcon('plus', 12) + '' +
+    '<span v-if="!drawerItem.modules || !drawerItem.modules.length">Add modules</span></button>' +
+    '<span v-if="!canEdit && modulesEnabled && (!drawerItem.modules || !drawerItem.modules.length)" class="text-[13px] text-sub">No modules</span>' +
+    '</div></div>' +
+
+    // Feature Disable §6, as above: shown while Cycles is on, kept read-only while it is off
+    // if this item already has one, and hidden when there is neither.
+    '<div v-if="cyclesEnabled || drawerItem.cycle" class="py-2.5"><div class="text-[12px] text-sub mb-1.5">Cycle</div>' +
+    '<div class="flex flex-wrap items-center gap-1.5">' +
+    '<span v-if="drawerItem.cycle && !cyclesEnabled" ' +
+    ':data-tip="\'Cycle: \' + drawerItem.cycle.name + \' — cycles are disabled for this project\'" ' +
+    'class="inline-flex items-center gap-1.5 h-6 px-2 rounded-md border border-line bg-hover text-[12px] text-sub max-w-full">' +
+    '' + wiIcon('rotate', 12, 'shrink-0') + '' +
     '<span class="truncate">{{ drawerItem.cycle.name }}</span></span>' +
-    '<span v-else class="text-sub">{{ canEdit ? \'Add cycle\' : \'No cycle\' }}</span></button></div>' +
-    '<div class="py-2.5"><div class="text-[12px] text-sub mb-1.5">Labels</div>' +
-    '<button type="button" :disabled="!canEdit" @click="openRowMenu(\'labels\', drawerItem, $event.currentTarget)" ' +
-    ':data-tip="canEdit ? \'Change labels\' : \'Labels\'" class="flex flex-wrap items-center gap-1.5 text-left rounded px-1.5 py-0.5 -ml-1.5 hover:bg-hover">' +
-    '<span v-for="l in drawerItem.labels" :key="l.id" class="inline-flex items-center gap-1 h-5 px-1.5 rounded border border-line text-[11px] text-ink max-w-full" :data-tip="l.name">' +
-    '<span class="h-2 w-2 rounded-full shrink-0" :style="{background: l.color}"></span><span class="truncate">{{ l.name }}</span></span>' +
-    '<span v-if="!drawerItem.labels || !drawerItem.labels.length" class="text-[13px] text-sub">None</span></button></div>' +
+    '<span v-if="drawerItem.cycle && !cyclesEnabled" class="text-[11px] text-faint">Cycle feature disabled</span>' +
+    '<button v-if="drawerItem.cycle && cyclesEnabled" type="button" :disabled="!canEdit" ' +
+    '@click="openRowMenu(\'cycle\', drawerItem, $event.currentTarget)" ' +
+    ':data-tip="canEdit ? \'Change cycle — \' + drawerItem.cycle.name : \'Cycle: \' + drawerItem.cycle.name" ' +
+    'class="inline-flex items-center gap-1.5 h-6 px-2 rounded-md border border-line text-[12px] text-ink max-w-full hover:bg-hover">' +
+    '' + wiIcon('rotate', 12, 'text-brand shrink-0') + '' +
+    '<span class="truncate">{{ drawerItem.cycle.name }}</span></button>' +
+    // Cycles §8.3.1 is one cycle per item, so once one is set the "+" would promise a second
+    // that the picker will not give — the chip itself is the way to change it.
+    '<button v-if="canEdit && cyclesEnabled && !drawerItem.cycle" type="button" ' +
+    '@click="openRowMenu(\'cycle\', drawerItem, $event.currentTarget)" ' +
+    'data-tip="Add to a cycle" aria-label="Add to a cycle" ' +
+    'class="inline-flex items-center gap-1 h-6 px-1.5 rounded-md border border-dashed border-stroke text-[12px] text-sub hover:bg-hover hover:text-ink">' +
+    '' + wiIcon('plus', 12) + '<span>Add cycle</span></button>' +
+    '<span v-if="!canEdit && cyclesEnabled && !drawerItem.cycle" class="text-[13px] text-sub">No cycle</span>' +
+    '</div></div>' +
+    // §4.3: labels are a set, so the row carries its own "+" rather than making the chips the
+    // only way in — with several labels already applied there was no obvious spot left to
+    // click, and an empty row read "None", which says nothing about being able to add one.
+    // The chips stay clickable too, since that is where the eye goes first.
+    // Labels §3/§18: the editable field is hidden while the feature is off, but chips already
+    // on the item stay visible — §28.5 keeps those assignments, so hiding them would make a
+    // work item look uncategorized when it is not.
+    '<div v-if="labelsEnabled || (drawerItem.labels && drawerItem.labels.length)" class="py-2.5">' +
+    '<div class="text-[12px] text-sub mb-1.5">Labels</div>' +
+    '<div class="flex flex-wrap items-center gap-1.5">' +
+    '<template v-if="!labelsEnabled">' +
+    '<span v-for="l in drawerItem.labels" :key="l.id" ' +
+    ':data-tip="l.name + \' — labels are disabled for this project\'" ' +
+    'class="inline-flex items-center gap-1 h-6 px-1.5 rounded border border-line bg-hover text-[11px] text-sub max-w-full">' +
+    '<span class="h-2 w-2 rounded-full shrink-0 opacity-60" :style="{background: l.color}"></span>' +
+    '<span class="truncate">{{ l.name }}</span></span>' +
+    '<span class="text-[11px] text-faint">Label feature disabled</span></template>' +
+
+    '<template v-if="labelsEnabled">' +
+    '<button v-for="l in drawerItem.labels" :key="l.id" type="button" :disabled="!canEdit" ' +
+    '@click="openRowMenu(\'labels\', drawerItem, $event.currentTarget)" ' +
+    ':data-tip="canEdit ? \'Change labels — \' + l.name : l.name" ' +
+    'class="inline-flex items-center gap-1 h-6 px-1.5 rounded border border-line text-[11px] text-ink max-w-full hover:bg-hover">' +
+    '<span class="h-2 w-2 rounded-full shrink-0" :style="{background: l.color}"></span><span class="truncate">{{ l.name }}</span></button>' +
+    '</template>' +
+    '<button v-if="canEdit && labelsEnabled" type="button" @click="openRowMenu(\'labels\', drawerItem, $event.currentTarget)" ' +
+    'data-tip="Add labels" aria-label="Add labels" ' +
+    'class="inline-flex items-center gap-1 h-6 px-1.5 rounded-md border border-dashed border-stroke text-[12px] text-sub hover:bg-hover hover:text-ink">' +
+    '' + wiIcon('plus', 12) + '' +
+    '<span v-if="!drawerItem.labels || !drawerItem.labels.length">Add labels</span></button>' +
+    '<span v-if="!canEdit && labelsEnabled && (!drawerItem.labels || !drawerItem.labels.length)" class="text-[13px] text-sub">None</span>' +
+    '</div></div>' +
     '</div>' +
 
     '<div class="mt-6 pt-4 border-t border-line text-[12px] text-sub space-y-1.5">' +
@@ -2223,7 +2620,7 @@ PB.boot('work-items', {
     '<h2 class="text-[15px] font-semibold text-head">{{ commentModal.mode === \'edit\' ? \'Edit comment\' : \'Reply to comment\' }}</h2>' +
     '<button type="button" @click="closeCommentModal" data-tip="Close" aria-label="Close" ' +
     'class="ml-auto h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover">' +
-    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>' +
+    '' + wiIcon('xmark', 16) + '</button>' +
     '</div>' +
 
     '<div class="px-5 py-4 overflow-y-auto">' +
@@ -2258,7 +2655,7 @@ PB.boot('work-items', {
     '<input ref="pickerSearch" v-model="picker.query" @input="onPickerQuery" type="text" placeholder="Search by ID or title" ' +
     'class="flex-1 h-8 text-[14px] text-ink placeholder:text-faint outline-none bg-transparent" />' +
     '<button type="button" @click="closePicker" class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover" data-tip="Close" aria-label="Close">' +
-    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>' +
+    '' + wiIcon('xmark', 16) + '</button>' +
     '</div>' +
 
     // §57: this project by default, the whole workspace on request.
@@ -2270,7 +2667,7 @@ PB.boot('work-items', {
     '<button v-for="row in picker.results" :key="row.id" type="button" @click="togglePick(row)" ' +
     'class="w-full text-left flex items-center gap-3 px-3 h-11 rounded-md hover:bg-hover" :class="isPicked(row) ? \'bg-sel/40\' : \'\'">' +
     '<span class="h-4 w-4 rounded border grid place-items-center shrink-0" :class="isPicked(row) ? \'bg-brand border-brand text-white\' : \'border-stroke\'">' +
-    '<svg v-if="isPicked(row)" width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M5 12l4 4L19 7" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>' +
+    '<span v-if="isPicked(row)">' + wiIcon('check', 11) + '</span></span>' +
     '<span class="grid place-items-center shrink-0" v-html="stateIcon(row.state)"></span>' +
     '<span class="text-[12px] text-sub shrink-0">{{ row.identifier }}</span>' +
     '<span class="text-[14px] text-ink truncate">{{ row.title }}</span>' +
@@ -2284,7 +2681,8 @@ PB.boot('work-items', {
     '<span class="text-[12px] text-sub">{{ picker.selected.length }} selected</span>' +
     '<button type="button" @click="closePicker" class="ml-auto h-9 px-4 rounded-md border border-stroke text-[13px] font-semibold text-ink hover:bg-hover">Cancel</button>' +
     '<button type="button" @click="confirmPicker" :disabled="!picker.selected.length || picker.busy" ' +
-    'class="h-9 px-4 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold disabled:opacity-50">{{ picker.busy ? \'Adding…\' : \'Add\' }}</button>' +
+    'class="h-9 px-4 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold disabled:opacity-50">' +
+    '{{ picker.busy ? (picker.mode === \'parent\' ? \'Saving…\' : \'Adding…\') : (picker.mode === \'parent\' ? \'Set parent\' : \'Add\') }}</button>' +
     '</div></div></div>' +
 
     // ===== Add / edit link (§38) =====
@@ -2316,7 +2714,7 @@ PB.boot('work-items', {
     '<div class="py-1">' +
     '<button v-for="s in states" :key="s.id" type="button" @click="setRowState(s)" class="w-full text-left flex items-center gap-2 px-2.5 h-8 hover:bg-hover text-[13px] text-ink">' +
     '<span class="grid place-items-center" v-html="stateIcon(s)"></span><span class="flex-1 truncate">{{ s.name }}</span>' +
-    '<svg v-if="rowMenu.item && rowMenu.item.state_id===s.id" width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-brand shrink-0"><path d="M5 12l4 4L19 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+    '<span v-if="rowMenu.item && rowMenu.item.state_id===s.id" class="text-brand shrink-0">' + wiIcon('check', 15) + '</span>' +
     '</button></div></template>' +
 
     // -- Priority --
@@ -2324,7 +2722,7 @@ PB.boot('work-items', {
     '<div class="py-1">' +
     '<button v-for="p in priorities" :key="p.key" type="button" @click="setRowPriority(p)" class="w-full text-left flex items-center gap-2 px-2.5 h-8 hover:bg-hover text-[13px] text-ink">' +
     '<span class="grid place-items-center" v-html="priorityMeta(p.key).icon"></span><span class="flex-1">{{ p.label }}</span>' +
-    '<svg v-if="rowMenu.item && rowMenu.item.priority===p.key" width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-brand shrink-0"><path d="M5 12l4 4L19 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+    '<span v-if="rowMenu.item && rowMenu.item.priority===p.key" class="text-brand shrink-0">' + wiIcon('check', 15) + '</span>' +
     '</button></div></template>' +
 
     // -- Assignees (multi-select; stays open) --
@@ -2334,7 +2732,7 @@ PB.boot('work-items', {
     '<div class="max-h-52 overflow-y-auto">' +
     '<button v-for="m in rowMembers()" :key="m.id" type="button" @click="toggleRowAssignee(m)" class="w-full text-left flex items-center gap-2.5 px-2 h-9 rounded-md hover:bg-hover text-[13px] text-ink">' +
     '<wi-avatar :person="m" :size="24" /><span class="flex-1 truncate">{{ m.name }}</span>' +
-    '<svg v-if="rowHasAssignee(m)" width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-brand shrink-0"><path d="M5 12l4 4L19 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+    '<span v-if="rowHasAssignee(m)" class="text-brand shrink-0">' + wiIcon('check', 15) + '</span>' +
     '</button>' +
     '<div v-if="!rowMembers().length" class="px-2 py-3 text-[13px] text-sub text-center">No members found</div>' +
     '</div></div></template>' +
@@ -2346,7 +2744,7 @@ PB.boot('work-items', {
     '<div class="max-h-52 overflow-y-auto">' +
     '<button v-for="l in rowLabels()" :key="l.id" type="button" @click="toggleRowLabel(l)" class="w-full text-left flex items-center gap-2.5 px-2 h-9 rounded-md hover:bg-hover text-[13px] text-ink">' +
     '<span class="h-2.5 w-2.5 rounded-full shrink-0" :style="{background: l.color}"></span><span class="flex-1 truncate">{{ l.name }}</span>' +
-    '<svg v-if="rowHasLabel(l)" width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-brand shrink-0"><path d="M5 12l4 4L19 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+    '<span v-if="rowHasLabel(l)" class="text-brand shrink-0">' + wiIcon('check', 15) + '</span>' +
     '</button>' +
     '<div v-if="!rowLabels().length && !newLabel.open" class="px-2 py-3 text-[13px] text-sub text-center">' +
     '{{ rowQuery ? \'No label matches\' : \'No labels yet\' }}</div>' +
@@ -2357,7 +2755,7 @@ PB.boot('work-items', {
     '<div v-if="!newLabel.open" class="border-t border-line mt-1 pt-1">' +
     '<button type="button" @click="startNewLabel" :disabled="labelExists(rowQuery)" ' +
     'class="w-full text-left flex items-center gap-2.5 px-2 h-9 rounded-md hover:bg-hover text-[13px] text-ink disabled:opacity-40">' +
-    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-sub shrink-0"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>' +
+    '' + wiIcon('plus', 15, 'text-sub shrink-0') + '' +
     '<span class="truncate">{{ rowQuery.trim() ? \'Create “\' + rowQuery.trim() + \'”\' : \'Create new label\' }}</span></button>' +
     '</div>' +
 
@@ -2384,17 +2782,68 @@ PB.boot('work-items', {
     '<input v-model="rowQuery" placeholder="Search cycles..." class="w-full h-9 px-3 mb-1 rounded-md bg-hover text-[13px] text-ink placeholder:text-faint outline outline-1 -outline-offset-1 outline-transparent focus:bg-white focus:outline-stroke" />' +
     '<div class="max-h-52 overflow-y-auto">' +
     '<button v-for="c in rowCycles()" :key="c.id" type="button" @click="setRowCycle(c)" class="w-full text-left flex items-center gap-2.5 px-2 h-9 rounded-md hover:bg-hover text-[13px] text-ink">' +
-    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="text-sub shrink-0"><path d="M21 12a9 9 0 11-3.6-7.2" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><path d="M21 4v4h-4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+    '' + wiIcon('rotate', 14, 'text-sub shrink-0') + '' +
     '<span class="flex-1 truncate">{{ c.name }}</span>' +
     '<span class="text-[11px] text-faint capitalize shrink-0">{{ c.status }}</span>' +
-    '<svg v-if="rowMenu.item && rowMenu.item.cycle_id===c.id" width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-brand shrink-0"><path d="M5 12l4 4L19 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+    '<span v-if="rowMenu.item && rowMenu.item.cycle_id===c.id" class="text-brand shrink-0">' + wiIcon('check', 15) + '</span>' +
     '</button>' +
     '<div v-if="!rowCycles().length" class="px-2 py-3 text-[13px] text-sub text-center">' +
     '{{ rowQuery ? \'No cycle matches\' : \'No active or upcoming cycles\' }}</div>' +
     '</div>' +
     '<div v-if="rowMenu.item && rowMenu.item.cycle_id" class="border-t border-line mt-1 pt-1">' +
     '<button type="button" @click="setRowCycle(null)" class="w-full text-left flex items-center gap-2.5 px-2 h-9 rounded-md hover:bg-hover text-[13px] text-ink">' +
-    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-sub shrink-0"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Remove from cycle</button>' +
+    '' + wiIcon('xmark', 15, 'text-sub shrink-0') + 'Remove from cycle</button>' +
+    '</div></div></template>' +
+
+    // -- Estimate (§11/§13): the configured values, "No Estimate" first. No search box — a
+    //    system has at most twenty values and they are meant to be scanned, not hunted. --
+    '<template v-else-if="rowMenu.kind===\'estimate\'">' +
+    '<div class="p-2"><div class="max-h-60 overflow-y-auto">' +
+    '<button type="button" @click="setRowEstimate(null)" class="w-full text-left flex items-center gap-2.5 px-2 h-9 rounded-md hover:bg-hover text-[13px] text-sub">' +
+    '<span class="flex-1">No Estimate</span>' +
+    '<span v-if="rowMenu.item && !rowMenu.item.estimate_value_id" class="text-brand shrink-0">' + wiIcon('check', 15) + '</span></button>' +
+    '<button v-for="e in estimates" :key="e.id" type="button" @click="setRowEstimate(e)" class="w-full text-left flex items-center gap-2.5 px-2 h-9 rounded-md hover:bg-hover text-[13px] text-ink">' +
+    '<span class="flex-1 truncate">{{ e.label }}</span>' +
+    '<span v-if="rowMenu.item && String(rowMenu.item.estimate_value_id)===String(e.id)" class="text-brand shrink-0">' + wiIcon('check', 15) + '</span>' +
+    '</button>' +
+    '<div v-if="!estimates.length" class="px-2 py-3 text-[13px] text-sub text-center">No estimate values configured</div>' +
+    '</div></div></template>' +
+
+    // -- Epic (§9): search, current selection ticked, and picking the current one clears it.
+    //    Archived epics are absent by construction — the server only sends active ones (§16),
+    //    because offering an option it would refuse is worse than not offering it. --
+    '<template v-else-if="rowMenu.kind===\'epic\'">' +
+    '<div class="p-2">' +
+    '<input v-model="rowQuery" placeholder="Search epics..." class="w-full h-9 px-3 mb-1 rounded-md bg-hover text-[13px] text-ink placeholder:text-faint outline outline-1 -outline-offset-1 outline-transparent focus:bg-white focus:outline-stroke" />' +
+    '<div class="max-h-52 overflow-y-auto">' +
+    '<button v-for="e in rowEpics()" :key="e.id" type="button" @click="setRowEpic(e)" class="w-full text-left flex items-center gap-2.5 px-2 h-9 rounded-md hover:bg-hover text-[13px] text-ink">' +
+    '' + wiIcon('rectangles-pair', 14, 'text-sub shrink-0') + '' +
+    '<span class="text-[11px] text-faint shrink-0">{{ e.identifier }}</span>' +
+    '<span class="flex-1 truncate">{{ e.title }}</span>' +
+    '<span v-if="rowMenu.item && String(rowMenu.item.epic_id)===String(e.id)" class="text-brand shrink-0">' + wiIcon('check', 15) + '</span>' +
+    '</button>' +
+    '<div v-if="!rowEpics().length" class="px-2 py-3 text-[13px] text-sub text-center">' +
+    '{{ rowQuery ? \'No epic matches\' : \'No epics in this project yet\' }}</div>' +
+    '</div>' +
+    '<div v-if="rowMenu.item && rowMenu.item.epic_id" class="border-t border-line mt-1 pt-1">' +
+    '<button type="button" @click="setRowEpic(null)" class="w-full text-left flex items-center gap-2.5 px-2 h-9 rounded-md hover:bg-hover text-[13px] text-ink">' +
+    '' + wiIcon('xmark', 15, 'text-sub shrink-0') + 'Remove from epic</button>' +
+    '</div></div></template>' +
+
+    // -- Modules (§9.2): multi-select, so it stays open. Archived modules are absent by
+    //    construction — the server only sends active ones (§12.2). --
+    '<template v-else-if="rowMenu.kind===\'modules\'">' +
+    '<div class="p-2">' +
+    '<input v-model="rowQuery" placeholder="Search modules..." class="w-full h-9 px-3 mb-1 rounded-md bg-hover text-[13px] text-ink placeholder:text-faint outline outline-1 -outline-offset-1 outline-transparent focus:bg-white focus:outline-stroke" />' +
+    '<div class="max-h-52 overflow-y-auto">' +
+    '<button v-for="m in rowModules()" :key="m.id" type="button" @click="toggleRowModule(m)" class="w-full text-left flex items-center gap-2.5 px-2 h-9 rounded-md hover:bg-hover text-[13px] text-ink">' +
+    '<span class="grid place-items-center shrink-0 text-sub">' + wiIcon('grid', 14) + '</span>' +
+    '<span class="flex-1 truncate">{{ m.title }}</span>' +
+    '<span class="text-[11px] text-faint shrink-0">{{ m.status_label }}</span>' +
+    '<span v-if="rowHasModule(m)" class="text-brand shrink-0">' + wiIcon('check', 15) + '</span>' +
+    '</button>' +
+    '<div v-if="!rowModules().length" class="px-2 py-3 text-[13px] text-sub text-center">' +
+    '{{ rowQuery ? \'No module matches\' : \'No modules yet\' }}</div>' +
     '</div></div></template>' +
 
     // -- Dates: the same calendar the create modal uses, with the same ordering bounds --
@@ -2409,13 +2858,13 @@ PB.boot('work-items', {
     // -- Action menu (§4.4) --
     '<template v-else-if="rowMenu.kind===\'menu\'">' +
     '<div class="py-1 text-[13px]">' +
-    '<button type="button" @click="rowEdit" class="w-full text-left flex items-center gap-2.5 px-3 h-9 hover:bg-hover text-ink"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4 12.5-12.5z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>Edit</button>' +
-    '<button type="button" @click="rowCopy" class="w-full text-left flex items-center gap-2.5 px-3 h-9 hover:bg-hover text-ink"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0"><rect x="9" y="9" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M5 15V5a2 2 0 012-2h10" stroke="currentColor" stroke-width="1.7"/></svg>Make a copy</button>' +
-    '<button type="button" @click="rowOpenTab" class="w-full text-left flex items-center gap-2.5 px-3 h-9 hover:bg-hover text-ink"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0"><path d="M14 4h6v6M20 4l-8 8M10 6H5a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1v-5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>Open in new tab</button>' +
-    '<button type="button" @click="rowCopyLink" class="w-full text-left flex items-center gap-2.5 px-3 h-9 hover:bg-hover text-ink"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0"><path d="M9 15l6-6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M10.5 6.5l1-1a3.5 3.5 0 015 5l-1 1M13.5 17.5l-1 1a3.5 3.5 0 01-5-5l1-1" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>Copy link</button>' +
-    '<button type="button" @click="rowArchive" class="w-full text-left flex items-center gap-2.5 px-3 h-9 hover:bg-hover text-ink"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0"><rect x="3" y="4" width="18" height="5" rx="1.5" stroke="currentColor" stroke-width="1.7"/><path d="M5 9v9a1 1 0 001 1h12a1 1 0 001-1V9M10 13h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>Archive</button>' +
+    '<button type="button" @click="rowEdit" class="w-full text-left flex items-center gap-2.5 px-3 h-9 hover:bg-hover text-ink">' + wiIcon('pen', 15, 'text-faint shrink-0') + 'Edit</button>' +
+    '<button type="button" @click="rowCopy" class="w-full text-left flex items-center gap-2.5 px-3 h-9 hover:bg-hover text-ink">' + wiIcon('copy', 15, 'text-faint shrink-0') + 'Make a copy</button>' +
+    '<button type="button" @click="rowOpenTab" class="w-full text-left flex items-center gap-2.5 px-3 h-9 hover:bg-hover text-ink">' + wiIcon('arrow-up-right-from-square', 15, 'text-faint shrink-0') + 'Open in new tab</button>' +
+    '<button type="button" @click="rowCopyLink" class="w-full text-left flex items-center gap-2.5 px-3 h-9 hover:bg-hover text-ink">' + wiIcon('link', 15, 'text-faint shrink-0') + 'Copy link</button>' +
+    '<button type="button" @click="rowArchive" class="w-full text-left flex items-center gap-2.5 px-3 h-9 hover:bg-hover text-ink">' + wiIcon('box-archive', 15, 'text-faint shrink-0') + 'Archive</button>' +
     '<div class="my-1 border-t border-line"></div>' +
-    '<button type="button" @click="rowAskDelete" class="w-full text-left flex items-center gap-2.5 px-3 h-9 hover:bg-hover text-danger"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="shrink-0"><path d="M4 7h16M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2M6 7l1 13a1 1 0 001 1h8a1 1 0 001-1l1-13" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>Delete</button>' +
+    '<button type="button" @click="rowAskDelete" class="w-full text-left flex items-center gap-2.5 px-3 h-9 hover:bg-hover text-danger">' + wiIcon('trash', 15, 'shrink-0') + 'Delete</button>' +
     '</div></template>' +
 
     '</div>' +
@@ -2440,9 +2889,9 @@ PB.boot('work-items', {
     '<div class="flex items-center gap-2 px-6 pt-5 shrink-0">' +
     // Project context chip — the POC's bordered chip, not a filled one.
     '<span class="inline-flex items-center gap-1.5 h-7 px-2 rounded-md border border-stroke text-[13px] text-ink"><span>{{ project.emoji || \'📁\' }}</span>{{ project.name }}</span>' +
-    '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" class="text-faint"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+    '' + wiIcon('chevron-right', 13, 'text-faint') + '' +
     '<span class="text-[13px] text-sub">New work item</span>' +
-    '<button @click="closeCreate" class="ml-auto h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover" data-tip="Close" aria-label="Close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>' +
+    '<button @click="closeCreate" class="ml-auto h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover" data-tip="Close" aria-label="Close">' + wiIcon('xmark', 16) + '</button>' +
     '</div>' +
 
     // Body. `overflow-visible` (as in the POC) is load-bearing: every chip popover opens
@@ -2468,7 +2917,7 @@ PB.boot('work-items', {
     '<div v-if="menu===\'state\'" class="absolute left-0 bottom-full mb-1 w-48 rounded-md bg-white py-1 shadow-lg outline outline-1 outline-black/5 z-50">' +
     '<button v-for="s in states" :key="s.id" type="button" @click="form.state_id=s.id; menu=\'\'" class="w-full text-left flex items-center gap-2 px-2.5 h-8 hover:bg-hover text-[13px] text-ink">' +
     '<span class="grid place-items-center" v-html="stateIcon(s)"></span><span class="flex-1 truncate">{{ s.name }}</span>' +
-    '<svg v-if="String(form.state_id)===String(s.id)" width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-brand shrink-0"><path d="M5 12l4 4L19 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+    '<span v-if="String(form.state_id)===String(s.id)" class="text-brand shrink-0">' + wiIcon('check', 15) + '</span>' +
     '</button></div></div>' +
 
     // Priority
@@ -2479,13 +2928,13 @@ PB.boot('work-items', {
     '<div v-if="menu===\'priority\'" class="absolute left-0 bottom-full mb-1 w-44 rounded-md bg-white py-1 shadow-lg outline outline-1 outline-black/5 z-50">' +
     '<button v-for="p in priorities" :key="p.key" type="button" @click="form.priority=p.key; menu=\'\'" class="w-full text-left flex items-center gap-2 px-2.5 h-8 hover:bg-hover text-[13px] text-ink">' +
     '<span class="grid place-items-center" v-html="priorityMeta(p.key).icon"></span><span class="flex-1">{{ p.label }}</span>' +
-    '<svg v-if="form.priority===p.key" width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-brand shrink-0"><path d="M5 12l4 4L19 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+    '<span v-if="form.priority===p.key" class="text-brand shrink-0">' + wiIcon('check', 15) + '</span>' +
     '</button></div></div>' +
 
     // Assignees
     '<div class="relative">' +
     '<button type="button" @click.stop="toggleMenu(\'assignees\')" class="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border border-stroke text-[13px] text-ink hover:bg-hover">' +
-    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3" stroke="currentColor" stroke-width="1.7"/><path d="M3 19a6 6 0 0112 0M16 6a3 3 0 010 6M18 19a6 6 0 00-3-5.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>' +
+    '' + wiIcon('users-thin', 14) + '' +
     '{{ selectedAssignees.length ? (selectedAssignees.length === 1 ? selectedAssignees[0].name : selectedAssignees.length + \' assignees\') : \'Assignees\' }}</button>' +
     '<div v-if="menu===\'assignees\'" class="fixed inset-0 z-40" @click="menu=\'\'"></div>' +
     '<div v-if="menu===\'assignees\'" class="absolute left-0 bottom-full mb-1 w-64 rounded-md bg-white p-2 shadow-lg outline outline-1 outline-black/5 z-50">' +
@@ -2493,15 +2942,55 @@ PB.boot('work-items', {
     '<div class="max-h-48 overflow-y-auto">' +
     '<button v-for="m in filteredMembers" :key="m.id" type="button" @click="toggleAssignee(m)" class="w-full text-left flex items-center gap-2.5 px-2 h-9 rounded-md hover:bg-hover text-[13px] text-ink">' +
     '<wi-avatar :person="m" :size="24" /><span class="flex-1 truncate">{{ m.name }}</span>' +
-    '<svg v-if="isAssigned(m)" width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-brand shrink-0"><path d="M5 12l4 4L19 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+    '<span v-if="isAssigned(m)" class="text-brand shrink-0">' + wiIcon('check', 15) + '</span>' +
     '</button>' +
     '<div v-if="!filteredMembers.length" class="px-2 py-3 text-[13px] text-sub text-center">No members found</div>' +
     '</div></div></div>' +
 
-    // Labels
-    '<div class="relative">' +
+    // Estimate (§11). Absent entirely when the feature is off or no system is configured —
+    // §4 is explicit that the property must not appear.
+    '<div v-if="estimatesEnabled" class="relative">' +
+    '<button type="button" @click.stop="toggleMenu(\'estimate\')" class="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border border-stroke text-[13px] text-ink hover:bg-hover">' +
+    '<span class="max-w-[120px] truncate">{{ selectedEstimate ? selectedEstimate.label : \'Estimate\' }}</span></button>' +
+    '<div v-if="menu===\'estimate\'" class="fixed inset-0 z-40" @click="menu=\'\'"></div>' +
+    '<div v-if="menu===\'estimate\'" class="absolute left-0 bottom-full mb-1 w-52 rounded-md bg-white p-2 shadow-lg outline outline-1 outline-black/5 z-50">' +
+    '<div class="max-h-52 overflow-y-auto">' +
+    '<button type="button" @click="form.estimate_value_id=\'\'; menu=\'\'" class="w-full text-left flex items-center gap-2.5 px-2 h-9 rounded-md hover:bg-hover text-[13px] text-sub">' +
+    '<span class="flex-1">No Estimate</span>' +
+    '<span v-if="!form.estimate_value_id" class="text-brand shrink-0">' + wiIcon('check', 15) + '</span></button>' +
+    '<button v-for="e in estimates" :key="e.id" type="button" @click="form.estimate_value_id=e.id; menu=\'\'" class="w-full text-left flex items-center gap-2.5 px-2 h-9 rounded-md hover:bg-hover text-[13px] text-ink">' +
+    '<span class="flex-1 truncate">{{ e.label }}</span>' +
+    '<span v-if="String(form.estimate_value_id)===String(e.id)" class="text-brand shrink-0">' + wiIcon('check', 15) + '</span>' +
+    '</button></div></div></div>' +
+
+    // Epic (§9). Sits between Assignee and Labels, which is the property order §9 asks for.
+    // Absent entirely when the feature is off — a control that refuses to work is worse than
+    // one that is not there (§4).
+    '<div v-if="epicsEnabled" class="relative">' +
+    '<button type="button" @click.stop="toggleMenu(\'epic\')" class="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border border-stroke text-[13px] text-ink hover:bg-hover">' +
+    '' + wiIcon('rectangles-pair', 14, 'text-sub') + '' +
+    '<span class="max-w-[160px] truncate">{{ selectedEpic ? selectedEpic.title : \'Epic\' }}</span></button>' +
+    '<div v-if="menu===\'epic\'" class="fixed inset-0 z-40" @click="menu=\'\'"></div>' +
+    '<div v-if="menu===\'epic\'" class="absolute left-0 bottom-full mb-1 w-64 rounded-md bg-white p-2 shadow-lg outline outline-1 outline-black/5 z-50">' +
+    '<input v-model="epicQuery" placeholder="Search epics..." class="w-full h-9 px-3 mb-1 rounded-md bg-hover text-[13px] text-ink placeholder:text-faint outline outline-1 -outline-offset-1 outline-transparent focus:bg-white focus:outline-stroke" />' +
+    '<div class="max-h-48 overflow-y-auto">' +
+    // §9: clearing the field is a first-class choice, not something you reach by deselecting.
+    '<button type="button" @click="form.epic_id=\'\'; menu=\'\'" class="w-full text-left flex items-center gap-2.5 px-2 h-9 rounded-md hover:bg-hover text-[13px] text-sub">' +
+    '<span class="flex-1">No epic</span>' +
+    '<span v-if="!form.epic_id" class="text-brand shrink-0">' + wiIcon('check', 15) + '</span></button>' +
+    '<button v-for="e in filteredEpics" :key="e.id" type="button" @click="form.epic_id=e.id; menu=\'\'" class="w-full text-left flex items-center gap-2.5 px-2 h-9 rounded-md hover:bg-hover text-[13px] text-ink">' +
+    '<span class="text-[11px] text-faint shrink-0">{{ e.identifier }}</span>' +
+    '<span class="flex-1 truncate">{{ e.title }}</span>' +
+    '<span v-if="String(form.epic_id)===String(e.id)" class="text-brand shrink-0">' + wiIcon('check', 15) + '</span>' +
+    '</button>' +
+    '<div v-if="!filteredEpics.length" class="px-2 py-3 text-[13px] text-sub text-center">' +
+    '{{ epicQuery ? \'No epic matches\' : \'No epics in this project yet\' }}</div>' +
+    '</div></div></div>' +
+
+    // Labels (§15). Absent when the feature is off — §3 hides the field from Create.
+    '<div v-if="labelsEnabled" class="relative">' +
     '<button type="button" @click.stop="toggleMenu(\'labels\')" class="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border border-stroke text-[13px] text-ink hover:bg-hover">' +
-    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M3 12l7-7h7a2 2 0 012 2v7l-7 7-9-9z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="14.5" cy="9.5" r="1.3" fill="currentColor"/></svg>' +
+    '' + wiIcon('tag-label', 14) + '' +
     '{{ selectedLabels.length ? (selectedLabels.length === 1 ? selectedLabels[0].name : selectedLabels.length + \' labels\') : \'Labels\' }}</button>' +
     '<div v-if="menu===\'labels\'" class="fixed inset-0 z-40" @click="menu=\'\'"></div>' +
     '<div v-if="menu===\'labels\'" class="absolute left-0 bottom-full mb-1 w-64 rounded-md bg-white p-2 shadow-lg outline outline-1 outline-black/5 z-50">' +
@@ -2509,7 +2998,7 @@ PB.boot('work-items', {
     '<div class="max-h-48 overflow-y-auto">' +
     '<button v-for="l in filteredLabels" :key="l.id" type="button" @click="toggleLabel(l)" class="w-full text-left flex items-center gap-2.5 px-2 h-9 rounded-md hover:bg-hover text-[13px] text-ink">' +
     '<span class="h-2.5 w-2.5 rounded-full shrink-0" :style="{background: l.color}"></span><span class="flex-1 truncate">{{ l.name }}</span>' +
-    '<svg v-if="isLabelled(l)" width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-brand shrink-0"><path d="M5 12l4 4L19 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+    '<span v-if="isLabelled(l)" class="text-brand shrink-0">' + wiIcon('check', 15) + '</span>' +
     '</button>' +
     '<div v-if="!filteredLabels.length" class="px-2 py-3 text-[13px] text-sub text-center">No labels configured for this project</div>' +
     '</div></div></div>' +
@@ -2517,7 +3006,7 @@ PB.boot('work-items', {
     // Start date — anchored calendar popover (quick options → Custom Date), per the POC
     '<div class="relative">' +
     '<button type="button" @click.stop="toggleMenu(\'start_date\')" class="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border border-stroke text-[13px] text-ink hover:bg-hover">' +
-    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="text-faint"><rect x="4" y="5" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>' +
+    '' + wiIcon('calendar', 14, 'text-faint') + '' +
     '{{ form.start_date ? fmtDate(form.start_date) : \'Start date\' }}</button>' +
     '<div v-if="menu===\'start_date\'" class="fixed inset-0 z-40" @click="menu=\'\'"></div>' +
     '<wi-calendar v-if="menu===\'start_date\'" :value="form.start_date" :before="form.due_date" ' +
@@ -2527,7 +3016,7 @@ PB.boot('work-items', {
     // Due date
     '<div class="relative">' +
     '<button type="button" @click.stop="toggleMenu(\'due_date\')" class="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border border-stroke text-[13px] text-ink hover:bg-hover">' +
-    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="text-faint"><rect x="4" y="5" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>' +
+    '' + wiIcon('calendar', 14, 'text-faint') + '' +
     '{{ form.due_date ? fmtDate(form.due_date) : \'Due date\' }}</button>' +
     '<div v-if="menu===\'due_date\'" class="fixed inset-0 z-40" @click="menu=\'\'"></div>' +
     '<wi-calendar v-if="menu===\'due_date\'" :value="form.due_date" :after="form.start_date" ' +
@@ -2536,7 +3025,7 @@ PB.boot('work-items', {
 
     // Add parent — opens the search panel below (POC: ParentSearchModal)
     '<button type="button" @click.stop="openParent" class="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border border-stroke text-[13px] text-ink hover:bg-hover">' +
-    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>' +
+    '' + wiIcon('plus', 14) + '' +
     '{{ parentSelected ? parentSelected.identifier : \'Add parent\' }}</button>' +
 
     '</div>' +
@@ -2563,7 +3052,7 @@ PB.boot('work-items', {
 
     // Search header
     '<div class="flex items-center gap-3 px-5 py-3 border-b border-line shrink-0">' +
-    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>' +
+    '' + wiIcon('magnifying-glass', 16, 'text-faint shrink-0') + '' +
     '<input ref="parentSearch" v-model="parentQuery" type="text" placeholder="Type to search" class="flex-1 h-8 text-[14px] text-ink placeholder:text-faint outline-none bg-transparent" />' +
     '<span class="h-5 w-px bg-line"></span>' +
     '<span class="text-[13px] text-sub shrink-0">{{ project.identifier }}</span>' +
@@ -2572,13 +3061,13 @@ PB.boot('work-items', {
     // Results
     '<div class="p-2 overflow-y-auto">' +
     '<button v-if="parentSelected" type="button" @click="pickParent(null)" class="w-full text-left flex items-center gap-3 px-3 h-11 rounded-md hover:bg-hover">' +
-    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>' +
+    '' + wiIcon('xmark', 15, 'text-faint shrink-0') + '' +
     '<span class="text-[14px] text-sub">Remove parent</span></button>' +
     '<button v-for="i in parentCandidates" :key="i.id" type="button" @click="pickParent(i)" class="w-full text-left flex items-center gap-3 px-3 h-11 rounded-md hover:bg-hover">' +
     '<span class="h-2.5 w-2.5 rounded-full shrink-0" :style="{background: i.state ? i.state.color : \'#9ca3af\'}"></span>' +
     '<span class="text-[13px] text-sub shrink-0">{{ i.identifier }}</span>' +
     '<span class="text-[14px] text-ink truncate">{{ i.title }}</span>' +
-    '<svg v-if="parentSelected && parentSelected.id===i.id" width="15" height="15" viewBox="0 0 24 24" fill="none" class="ml-auto text-brand shrink-0"><path d="M5 12l4 4L19 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+    '<span v-if="parentSelected && parentSelected.id===i.id" class="ml-auto text-brand shrink-0">' + wiIcon('check', 15) + '</span>' +
     '</button>' +
     '<div v-if="!parentCandidates.length" class="px-3 py-6 text-[13px] text-sub text-center">No work items found</div>' +
     '</div>' +
@@ -2586,4 +3075,14 @@ PB.boot('work-items', {
     '</div></div>' +
 
     '</div>'
-});
+};
+
+// Mount as the page only where the page IS the work items screen. Other screens (an Epic's
+// Work Items tab) load this file for the component and mount their own root, so an unguarded
+// boot here would render the work item list over them.
+(function () {
+  var root = document.getElementById('settings-root');
+  if (root && root.getAttribute('data-screen') === 'work-items') {
+    PB.boot('work-items', WorkItemsScreen);
+  }
+})();

@@ -7,13 +7,12 @@
   <title>@yield('title', 'Project Block')</title>
 
   {{-- Project Block app shell — ported from the HTML POC. Plain Tailwind (CDN) + POC tokens. --}}
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="{{ pb_asset('assets/js/tailwind.config.js') }}"></script>
-
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ pb_asset('assets/css/tailwind.css') }}" />
+  <link rel="stylesheet" href="{{ pb_asset('assets/css/inter.css') }}" />
   <link rel="stylesheet" href="{{ pb_asset('assets/css/styles.css') }}" />
+  {!! pb_icon_styles() !!}
+  {!! pb_icon_boot() !!}
+  <script defer src="{{ pb_asset('assets/js/icons.js') }}"></script>
 </head>
 <body class="bg-white text-ink h-screen flex flex-col overflow-hidden text-[13px]">
   @yield('body')

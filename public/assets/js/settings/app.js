@@ -67,7 +67,7 @@
       '<div class="shrink-0">' + icon + '</div>' +
       '<div class="ml-3 w-0 flex-1 pt-0.5"><p class="text-[13px] font-semibold text-head" data-t></p><p class="mt-1 text-[13px] text-sub" data-m></p></div>' +
       '<div class="ml-4 flex shrink-0"><button type="button" class="inline-flex rounded-md text-faint hover:text-sub" data-x>' +
-      '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></div>' +
+      '' + wiIcon('xmark', 18) + '</button></div>' +
       '</div></div>';
     card.querySelector('[data-t]').textContent = isError ? 'Error' : 'Success';
     card.querySelector('[data-m]').textContent = message;
@@ -156,7 +156,10 @@
                 label: String(o.label != null ? o.label : o.value),
                 desc: o.desc ? String(o.desc) : '',
                 avatar: o.avatar || '',
-                initial: o.initial || ''
+                initial: o.initial || '',
+                // Raw markup for options that are a THING rather than a person — a module
+                // status, a work item state. Dropped here would silently lose the glyph.
+                icon: o.icon || ''
               }
               : { value: String(o), label: String(o), desc: '', avatar: '', initial: '' };
           });
@@ -205,10 +208,32 @@
           else { style.top = (r.bottom + 4) + 'px'; }
           this.menuStyle = style;
         },
+        /**
+         * Keep the menu under its trigger while the page or a dialog body scrolls.
+         *
+         * The menu is teleported to <body> and positioned ONCE on open, so scrolling the
+         * modal it lives in used to move the field and leave the menu behind — which reads
+         * as the list being cut off or detached. `true` for capture, because the scroll
+         * happens on the dialog's own overflow container, not on window.
+         */
+        watchScroll: function () {
+          if (this._follow) return;
+          var self = this;
+          this._follow = function () { if (self.open) self.position(); };
+          window.addEventListener('scroll', this._follow, true);
+          window.addEventListener('resize', this._follow);
+        },
+        unwatchScroll: function () {
+          if (!this._follow) return;
+          window.removeEventListener('scroll', this._follow, true);
+          window.removeEventListener('resize', this._follow);
+          this._follow = null;
+        },
         toggle: function () {
           this.open = !this.open;
+          if (!this.open) this.unwatchScroll();
           if (this.open) {
-            this.query = ''; this.position();
+            this.query = ''; this.position(); this.watchScroll();
             var self = this;
             this.$nextTick(function () { if (self.searchable && self.$refs.search) self.$refs.search.focus(); });
           }
@@ -250,12 +275,13 @@
       },
       template:
         '<div class="relative" ref="root">' +
-        '<button type="button" class="pb-input pb-combo-btn flex items-center justify-between text-left" :class="[{\'is-error\': invalid}, dense ? \'!h-9\' : \'\']" @click.stop="toggle">' +
+        '<button type="button" class="pb-input pb-combo-btn" :class="[{\'is-error\': invalid}, dense ? \'!h-9\' : \'\']" @click.stop="toggle">' +
         '<span class="flex items-center gap-2 min-w-0">' +
         '<img v-if="chosenOption && chosenOption.avatar" :src="chosenOption.avatar" alt="" class="h-5 w-5 rounded-full object-cover shrink-0" />' +
         '<span v-else-if="chosenOption && chosenOption.initial" class="h-5 w-5 rounded-full bg-brand text-white grid place-items-center text-[10px] font-bold shrink-0">{{ chosenOption.initial }}</span>' +
+        '<span v-else-if="chosenOption && chosenOption.icon" class="grid place-items-center shrink-0" v-html="chosenOption.icon"></span>' +
         '<span class="truncate" :class="selected.length ? \'text-ink\' : \'text-faint\'">{{ display }}</span></span>' +
-        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0 ml-1.5"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+        '' + wiIcon('chevron-down', 16, 'text-faint shrink-0 ml-1.5') + '' +
         '</button>' +
         '<teleport to="body">' +
         '<div v-if="open" ref="menu" :style="menuStyle" class="min-w-[9rem] bg-white border border-line rounded-md shadow-lg overflow-hidden">' +
@@ -266,11 +292,15 @@
         '<li v-for="o in filtered" :key="o.value" @click.stop="choose(o)" :class="[\'px-3 flex gap-2 text-[13px] cursor-pointer hover:bg-hover\', o.desc ? \'py-2 items-start\' : \'h-9 items-center\', isChosen(o) ? \'text-brand\' : \'text-ink\']">' +
         '<img v-if="o.avatar" :src="o.avatar" alt="" class="h-6 w-6 rounded-full object-cover shrink-0" :class="o.desc ? \'mt-0.5\' : \'\'" />' +
         '<span v-else-if="o.initial" class="h-6 w-6 rounded-full bg-brand text-white grid place-items-center text-[10px] font-bold shrink-0" :class="o.desc ? \'mt-0.5\' : \'\'">{{ o.initial }}</span>' +
+        // `icon` is raw markup, in the same slot as the avatar: the option's own glyph, the
+        // way the work item pickers show a state or priority. Author-supplied, never user
+        // input — the option list is always built by the screen, not typed.
+        '<span v-else-if="o.icon" class="grid place-items-center shrink-0" :class="o.desc ? \'mt-0.5\' : \'\'" v-html="o.icon"></span>' +
         '<span class="min-w-0 flex-1">' +
         '<span class="block truncate">{{ o.label }}</span>' +
         '<span v-if="o.desc" class="block text-[12px] text-sub whitespace-normal">{{ o.desc }}</span>' +
         '</span>' +
-        '<svg v-if="isChosen(o)" width="15" height="15" viewBox="0 0 24 24" fill="none" :class="[\'shrink-0\', o.desc ? \'mt-0.5\' : \'\']"><path d="M5 12l4 4L19 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+        '<span v-if="isChosen(o)" :class="[\'shrink-0\', o.desc ? \'mt-0.5\' : \'\']">' + wiIcon('check', 15) + '</span>' +
         '</li>' +
         '<li v-if="!filtered.length" class="px-3 h-9 flex items-center text-[13px] text-faint">No matches</li>' +
         '</ul></div></teleport></div>'
@@ -278,18 +308,22 @@
 
     // Centered modal dialog.
     app.component('pb-modal', {
-      props: { open: Boolean, title: String },
+      // `width` is the dialog's max width as a Tailwind class. A default rather than a fixed
+      // value: most dialogs are a single column of fields, but a form with side-by-side rows
+      // (the module form) needs the room, and cramming it into 520px is what makes those
+      // pairs unreadable.
+      props: { open: Boolean, title: String, width: { type: String, default: 'max-w-[520px]' } },
       emits: ['close'],
       template:
         // role/aria-modal are load-bearing beyond a11y: the settings shell reads them to know
         // a dialog is open, so Escape closes the dialog instead of leaving the page.
         '<teleport to="body"><div v-if="open" role="dialog" aria-modal="true" class="fixed inset-0 z-[70] flex items-start justify-center p-4 sm:pt-24">' +
         '<div class="absolute inset-0 bg-black/40" @click="$emit(\'close\')"></div>' +
-        '<div class="relative w-full max-w-[520px] bg-white rounded-xl shadow-xl flex flex-col max-h-[85vh]">' +
+        '<div :class="[\'relative w-full bg-white rounded-xl shadow-xl flex flex-col max-h-[85vh]\', width]">' +
         '<div class="flex items-center justify-between px-6 py-4 border-b border-line shrink-0">' +
         '<h2 class="text-[16px] font-semibold text-head">{{ title }}</h2>' +
         '<button @click="$emit(\'close\')" class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover">' +
-        '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></div>' +
+        '' + wiIcon('xmark', 18) + '</button></div>' +
         '<div class="px-6 py-5 overflow-y-auto"><slot/></div>' +
         '<div class="px-6 py-4 border-t border-line flex justify-end gap-2 shrink-0"><slot name="footer"/></div>' +
         '</div></div></teleport>'

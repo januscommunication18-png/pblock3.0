@@ -136,7 +136,7 @@ PB.boot('project-members', {
       // §33: members without manage rights never see row actions.
       if (!this.canManage) return '';
       return '<button type="button" class="pb-quickaction inline-flex items-center gap-1 h-7 pl-2.5 pr-2 rounded-md border border-stroke text-[12px] text-ink hover:bg-hover" data-id="' + d.id + '">Actions' +
-        '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" class="text-faint"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>';
+        '' + wiIcon('chevron-down', 12, 'text-faint') + '</button>';
     },
     openActionMenu: function (row, btn) {
       var r = btn.getBoundingClientRect(), w = 200, h = 2 * 32 + 8;
@@ -246,7 +246,7 @@ PB.boot('project-members', {
     '<span v-if="memberCount" class="ml-1.5 text-[11px] bg-hover text-sub rounded px-1.5 py-0.5">{{ memberCount }}</span></span>' +
     '</div>' +
     '<div class="ml-auto flex items-center gap-2 pb-2">' +
-    '<div class="relative"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-faint"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>' +
+    '<div class="relative">' + wiIcon('magnifying-glass', 14, 'absolute left-2.5 top-1/2 -translate-y-1/2 text-faint') + '' +
     '<input class="pb-input !h-9 !w-56 !pl-8" placeholder="Search members…" v-model="search" @input="applyFilters"/></div>' +
     '<div class="w-36"><pb-combo dense :searchable="false" v-model="roleFilter" :options="filterOptions" @update:modelValue="applyFilters"/></div>' +
     '<button v-if="canManage" class="h-9 px-3.5 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold whitespace-nowrap" @click="openAdd">Add Member</button>' +
@@ -265,9 +265,9 @@ PB.boot('project-members', {
     // ===== Row action menu (§33) =====
     '<div v-if="actionMenu.open" ref="actionMenuEl" :style="actionMenu.style" role="menu" class="rounded-md bg-white py-1 shadow-lg ring-1 ring-black/5">' +
     '<button type="button" role="menuitem" @click="runAction(\'role\')" class="w-full text-left flex items-center gap-2.5 px-3 h-8 hover:bg-hover text-[13px] text-ink">' +
-    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0"><path d="M4 20h4l10-10a2.5 2.5 0 10-3.5-3.5L4.5 16.5 4 20z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>Change Role</button>' +
+    '' + wiIcon('pen-line', 15, 'text-faint shrink-0') + 'Change Role</button>' +
     '<button type="button" role="menuitem" @click="runAction(\'remove\')" class="w-full text-left flex items-center gap-2.5 px-3 h-8 hover:bg-hover text-[13px] text-danger">' +
-    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="shrink-0"><path d="M10 17l-5-5 5-5M5 12h11M14 4h4a2 2 0 012 2v12a2 2 0 01-2 2h-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Remove from Project</button>' +
+    '' + wiIcon('arrow-right-from-bracket', 15, 'shrink-0') + 'Remove from Project</button>' +
     '</div>' +
 
     // ===== Add Member modal (§7, §32) =====

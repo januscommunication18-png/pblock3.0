@@ -64,6 +64,11 @@ class StoreProjectRequest extends FormRequest
                     ->where('workspace_id', $workspaceId)
                     ->where('status', WorkspaceMembership::STATUS_ACTIVE),
             ],
+            // PRJ-027: the gradient picked instead of an upload. Restricted to the palette,
+            // not free text — it is rendered into a `background:` style on every card.
+            'cover_gradient' => ['nullable', 'string', Rule::in(
+                config('projects.cover_presets') ?? config('projects.cover_gradients') ?? []
+            )],
             // PRJ-027: optional cover; validated type/size, recoverable error otherwise.
             'cover' => [
                 'nullable', 'image',
@@ -94,6 +99,7 @@ class StoreProjectRequest extends FormRequest
             'description' => $this->validated('description'),
             'visibility' => $this->validated('visibility'),
             'lead_user_id' => $this->validated('lead_user_id'),
+            'cover_gradient' => $this->validated('cover_gradient'),
         ];
     }
 

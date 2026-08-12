@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\StampsPivotTenant;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -23,7 +24,7 @@ use Stancl\Tenancy\Database\Concerns\BelongsToTenant;
  */
 class WorkItem extends Model
 {
-    use BelongsToTenant;
+    use BelongsToTenant, StampsPivotTenant;
 
     public const PRIORITY_NONE = 'none';
 
@@ -42,6 +43,8 @@ class WorkItem extends Model
         'cycle_id',
         'cycle_assigned_by',
         'cycle_assigned_at',
+        'epic_id',
+        'estimate_value_id',
         'created_by',
         'archived_at',
     ];
@@ -55,6 +58,42 @@ class WorkItem extends Model
             'cycle_assigned_at' => 'datetime',
             'archived_at' => 'datetime',
         ];
+    }
+
+    /**
+     * The modules this item belongs to (Module Management §9.3).
+     *
+     * MANY, unlike `cycle` — a work item can sit in a functional module and a release module
+     * at once, which is the case the spec adopts Plane's model for.
+     */
+    public function modules(): BelongsToMany
+    {
+        return $this->belongsToMany(Module::class, 'module_work_items')
+            ->withPivotValue('tenant_id', $this->pivotTenantId())
+            ->withTimestamps();
+    }
+
+    /**
+     * The one epic this item contributes to, if any (Epic §9).
+     *
+     * ONE, like `cycle` and unlike `modules` — §9 gives a work item zero or one epic in
+     * Phase 1. Independent of both the others (§11/§12): setting this never reads or writes
+     * `cycle_id` or the module pivot, and nothing here should ever make it.
+     */
+    public function epic(): BelongsTo
+    {
+        return $this->belongsTo(Epic::class);
+    }
+
+    /**
+     * This item's estimate, if it has one (Estimation §33).
+     *
+     * One value, never several: §36 refuses points AND a T-shirt size AND a duration on one
+     * item, because nothing downstream could then aggregate it honestly.
+     */
+    public function estimateValue(): BelongsTo
+    {
+        return $this->belongsTo(EstimateValue::class, 'estimate_value_id');
     }
 
     /** The one cycle this item is planned into, if any (Cycles §8.3.1). */

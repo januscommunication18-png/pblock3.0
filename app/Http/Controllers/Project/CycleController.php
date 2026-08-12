@@ -11,9 +11,12 @@ use App\Models\ProjectItemState;
 use App\Models\User;
 use App\Models\WorkItem;
 use App\Services\CycleMetrics;
+use App\Services\ProjectFeatureState;
 use App\Services\ProjectItemStateProvisioner;
 use App\Services\ProjectNavigation;
 use App\Services\WorkItemBlockers;
+use App\Services\WorkItemScreenPayload;
+use App\Services\WorkItemStatusUpdates;
 use App\Services\WorkItemUpdater;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
@@ -35,11 +38,14 @@ use Illuminate\Support\Facades\DB;
 class CycleController extends Controller
 {
     public function __construct(
+        private readonly ProjectFeatureState $featureState,
         private readonly CycleMetrics $metrics,
         private readonly ProjectNavigation $navigation,
         private readonly WorkItemUpdater $updater,
         private readonly WorkItemBlockers $blockers,
+        private readonly WorkItemStatusUpdates $statusUpdates,
         private readonly ProjectItemStateProvisioner $states,
+        private readonly WorkItemScreenPayload $payload,
     ) {}
 
     /** GET /projects/{project}/cycles */
@@ -261,6 +267,29 @@ class CycleController extends Controller
     }
 
     /**
+     * The work items screen's payload, narrowed to one cycle.
+     *
+     * `seed` is what makes "Add work item" inside a cycle create work IN that cycle. A
+     * completed cycle seeds nothing: §8.3.5 refuses new work there, and pre-filling a value
+     * the server would reject is worse than pre-filling nothing.
+     *
+     * @return array<string, mixed>
+     */
+    private function cycleScreenPayload(Project $project, Cycle $cycle): array
+    {
+        $items = $cycle->workItems()
+            ->active()
+            ->with(['state', 'assignees', 'labels', 'parent:id,identifier,title', 'cycle', 'epic', 'estimateValue', 'modules', 'creator'])
+            ->orderBy('sequence_no')
+            ->get();
+
+        return $this->payload->build($project, null, $items) + [
+            'seed' => $cycle->status() === 'completed' ? [] : ['cycle_id' => $cycle->id],
+            'embedded' => true,
+        ];
+    }
+
+    /**
      * The Cycles screen, as a list or focused on one cycle.
      */
     private function screen(Project $project, ?Cycle $pageCycle = null): View
@@ -293,6 +322,19 @@ class CycleController extends Controller
                 'states' => $this->states->for($project)->map(fn (ProjectItemState $s) => [
                     'id' => $s->id, 'name' => $s->name, 'color' => $s->color, 'group' => $s->group,
                 ])->values()->all(),
+                // Feature Disable §3/§4: the page still loads when the feature is off so
+                // existing records stay readable, and these tell the screen to render itself
+                // read-only and say why. Every write ability is already false by then.
+                'featureEnabled' => $project->featureEnabled('cycles'),
+                'disabledNotice' => $this->featureState->disabledNotice('cycles'),
+                'settingsUrl' => route('projects.settings', ['project' => $project->id, 'section' => 'features']),
+                // Project-Level Labels §3: the row's label chip follows the project's
+                // setting, so a work item row reads the same here as on the work items list.
+                // The detail's grid IS the work items screen, narrowed to this cycle — so a
+                // row's chips are editable and clicking one opens the same drawer. Null on
+                // the landing page, which shows no grid at all.
+                'workItems' => $pageCycle ? $this->cycleScreenPayload($project, $pageCycle) : null,
+                'labelsEnabled' => $project->featureEnabled('labels'),
                 'canCreate' => Auth::user()->can('create', [Cycle::class, $project]),
                 'canDelete' => Auth::user()->can('manage', $project),
                 'parallel' => $project->featureEnabled('parallel_cycles'),
@@ -370,8 +412,10 @@ class CycleController extends Controller
             ->filter(fn (WorkItem $i) => $user->can('view', $i))
             ->values();
 
-        // The same Blocked marker the project's work item list shows, from the same service.
+        // The same Blocked marker and the same At Risk / Off Track label the project's work
+        // item list shows, from the same services.
         $blocked = $this->blockers->counts($items->pluck('id')->all());
+        $concerns = $this->statusUpdates->currentConcerns($items->pluck('id')->all());
 
         // Shaped exactly like WorkItemController's row payload, because the grid that renders
         // it is the same grid (Cycles §7.2).
@@ -388,6 +432,7 @@ class CycleController extends Controller
             ] : null,
             'group' => $i->state?->group ?? 'backlog',
             'blocked_by_count' => $blocked[$i->id] ?? 0,
+            'status_update' => $concerns[$i->id] ?? null,
             'assignees' => $i->assignees->map(fn (User $u) => [
                 'id' => $u->id, 'name' => $u->displayName(),
                 'initial' => $u->initial(), 'avatar_url' => $u->avatar_url,

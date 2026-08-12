@@ -8,7 +8,7 @@
   <!-- ============ AppTopbar ============ -->
   <header class="h-14 shrink-0 border-b border-line flex items-center gap-2 px-3 sm:px-4">
     <button id="open-sidebar" class="lg:hidden h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      {!! pb_icon('bars', 18) !!}
     </button>
 
     <!-- WorkspaceSwitcher -->
@@ -23,7 +23,7 @@
     <!-- Search -->
     <div class="flex-1 flex justify-center px-2">
       <div class="relative w-full max-w-md">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="absolute left-3 top-1/2 -translate-y-1/2 text-faint"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        {!! pb_icon('magnifying-glass', 15, 'absolute left-3 top-1/2 -translate-y-1/2 text-faint') !!}
         <input type="text" placeholder="Search" class="w-full h-9 rounded-md bg-hover pl-9 pr-3 text-[13px] text-ink placeholder:text-faint outline outline-1 -outline-offset-1 outline-transparent focus:bg-white focus:outline-stroke" />
       </div>
     </div>
@@ -32,11 +32,11 @@
     <div class="flex items-center gap-1.5 shrink-0">
       <button class="hidden sm:inline-flex items-center h-8 px-3 rounded-md border border-line text-[13px] text-ink hover:bg-hover">Get started</button>
       <button type="button" data-ws-open class="hidden sm:inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-line text-[13px] text-ink hover:bg-hover">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/><rect x="13" y="4" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/><rect x="4" y="13" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/><rect x="13" y="13" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/></svg>
+        {!! pb_icon('grid', 15) !!}
         Workspace
       </button>
-      <button class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover" title="Inbox"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M3 13h4l2 3h6l2-3h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 6h14l2 7v4a1 1 0 01-1 1H4a1 1 0 01-1-1v-4l2-7z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></button>
-      <button class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover" title="Help"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M9.5 9.5a2.5 2.5 0 114 2c-1 .7-1.5 1.2-1.5 2.5M12 17.5v.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+      <button class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover" title="Inbox">{!! pb_icon('inbox', 17) !!}</button>
+      <button class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover" title="Help">{!! pb_icon('circle-question', 17) !!}</button>
       <!-- UserMenu -->
       <div class="relative ml-1">
         <button id="user-btn" class="h-7 w-7 rounded-full bg-emerald-500 grid place-items-center text-white text-[11px] font-bold ring-2 ring-transparent focus:outline-none">{{ $user->initial() }}</button>
@@ -49,19 +49,19 @@
           </div>
           <div class="pt-1.5">
             <a href="{{ route('projects.index') }}?create=1" class="w-full text-left flex items-center gap-2.5 px-2.5 h-9 rounded-lg text-[13px] text-ink hover:bg-hover">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" class="text-sub"><rect x="4" y="4" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/><rect x="13" y="4" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/><rect x="4" y="13" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/><rect x="13" y="13" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/></svg>
+              {!! pb_icon('grid', 16, 'text-sub') !!}
               New project
             </a>
             <a href="{{ route('workspaces.create') }}" class="w-full text-left flex items-center gap-2.5 px-2.5 h-9 rounded-lg text-[13px] text-ink hover:bg-hover">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" class="text-sub"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+              {!! pb_icon('plus', 16, 'text-sub') !!}
               Create workspace
             </a>
             <a href="{{ route('settings.general') }}" class="w-full text-left flex items-center gap-2.5 px-2.5 h-9 rounded-lg text-[13px] text-ink hover:bg-hover">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" class="text-sub"><path d="M10.3 4.3a1 1 0 011.4 0l.6.6a1 1 0 001 .24l.9-.3a1 1 0 011.3.9v.9a1 1 0 00.6.9l.8.4a1 1 0 01.4 1.4l-.5.7a1 1 0 000 1l.5.7a1 1 0 01-.4 1.4l-.8.4a1 1 0 00-.6.9v.9a1 1 0 01-1.3.9l-.9-.3a1 1 0 00-1 .24l-.6.6a1 1 0 01-1.4 0" stroke="currentColor" stroke-width="1.5"/><circle cx="12" cy="12" r="2.4" stroke="currentColor" stroke-width="1.5"/></svg>
+              {!! pb_icon('gear-simple', 16, 'text-sub') !!}
               Workspace settings
             </a>
             <button type="submit" form="logout-form" class="w-full text-left flex items-center gap-2.5 px-2.5 h-9 rounded-lg text-[13px] text-ink hover:bg-hover">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" class="text-sub"><path d="M9 21H6a2 2 0 01-2-2V5a2 2 0 012-2h3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 17l5-5-5-5M21 12H9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              {!! pb_icon('right-from-bracket', 16, 'text-sub') !!}
               Sign out
             </button>
           </div>
@@ -76,7 +76,8 @@
     <!-- MAIN -->
     <main class="flex-1 min-w-0 overflow-y-auto">
       <div class="flex items-center gap-2 text-[13px] text-sub px-5 sm:px-8 h-11 border-b border-line">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-amber-500"><path d="M9 18h6M10 21h4M12 3a6 6 0 00-4 10.5c.6.6 1 1.3 1 2.5h6c0-1.2.4-1.9 1-2.5A6 6 0 0012 3z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+        @include('partials.sidebar-expand')
+        {!! pb_icon('lightbulb', 15, 'text-amber-500') !!}
         Get started
       </div>
 
@@ -85,7 +86,7 @@
         <p class="text-[15px] text-sub mt-1">Here's everything you need to kickstart your journey with Project Block.</p>
 
         <div class="mt-6 border border-line rounded-xl p-5">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" class="text-brand mb-3"><path d="M6 3h12l3 5-9 13L3 8l3-5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+          {!! pb_icon('gem', 22, 'text-brand mb-3') !!}
           <div class="flex items-center gap-2 flex-wrap">
             <h3 class="text-[15px] font-semibold text-head">Your 14-day Business plan trial is live!</h3>
             <span class="text-[12px] bg-amber-100 text-amber-700 rounded-md px-2 py-0.5">Trial ends in 13 days</span>
@@ -104,7 +105,7 @@
         <h2 class="text-[18px] font-bold text-head mt-8">Get your team on board</h2>
         <p class="text-[14px] text-sub mb-4">Invite teammates and start collaborating in your workspace.</p>
         <div class="border border-line rounded-xl p-5 flex items-center gap-4">
-          <span class="h-10 w-10 rounded-full bg-hover grid place-items-center text-sub shrink-0"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3" stroke="currentColor" stroke-width="1.7"/><path d="M3 19a6 6 0 0112 0M16 6a3 3 0 010 6M18 19a6 6 0 00-3-5.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></span>
+          <span class="h-10 w-10 rounded-full bg-hover grid place-items-center text-sub shrink-0">{!! pb_icon('users-thin', 20) !!}</span>
           <div class="min-w-0">
             <div class="text-[14px] font-medium text-ink">Invite your team</div>
             <p class="text-[13px] text-sub">Work is better together — bring your teammates in.</p>
@@ -130,7 +131,7 @@
             </div>
             <div class="ml-4 flex shrink-0">
               <button type="button" onclick="document.getElementById('toast').remove()" class="inline-flex rounded-md text-faint hover:text-sub">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                {!! pb_icon('xmark', 18) !!}
               </button>
             </div>
           </div>

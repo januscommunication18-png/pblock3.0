@@ -5,10 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="csrf-token" content="{{ csrf_token() }}" />
   <title>{{ $project['name'] }} — {{ $workspace->name }}</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="{{ pb_asset('assets/js/tailwind.config.js') }}"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ pb_asset('assets/css/tailwind.css') }}" />
+  <link rel="stylesheet" href="{{ pb_asset('assets/css/inter.css') }}" />
   <link rel="stylesheet" href="{{ pb_asset('assets/css/styles.css') }}" />
+  {!! pb_icon_styles() !!}
+  {!! pb_icon_boot() !!}
+  <script defer src="{{ pb_asset('assets/js/icons.js') }}"></script>
 </head>
 <body class="bg-white text-ink h-screen flex flex-col overflow-hidden text-[13px]">
   @include('partials.app-topbar')
@@ -19,8 +21,9 @@
     <main class="flex-1 min-w-0 overflow-y-auto">
     {{-- Project context bar --}}
     <div class="flex items-center gap-2 px-5 sm:px-8 h-11 border-b border-line">
+      @include('partials.sidebar-expand')
       <a href="{{ route('projects.index') }}" class="flex items-center gap-2 text-sub hover:text-ink text-[13px]">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        {!! pb_icon('arrow-left', 16) !!}
         Projects
       </a>
       <span class="text-faint">/</span>

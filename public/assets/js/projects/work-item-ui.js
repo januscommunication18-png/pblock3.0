@@ -47,7 +47,7 @@ var WI_PRI = {
   low: { label: 'Low', icon: wiBars('#3b82f6'), cls: 'text-ink' },
   none: { label: 'None', icon: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.5" stroke="#9ca3af" stroke-width="1.6"/><path d="M6 6l12 12" stroke="#9ca3af" stroke-width="1.6" stroke-linecap="round"/></svg>', cls: 'text-sub' }
 };
-var WI_CAL = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" class="text-faint"><rect x="4" y="5" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+var WI_CAL = '' + wiIcon('calendar', 13, 'text-faint') + '';
 var WI_NO_STATE = 'none';
 
 // Escape user content before it reaches a Tabulator formatter (formatters return raw HTML).
@@ -62,7 +62,7 @@ function wiBlockedChip(count) {
   var label = count > 1 ? 'Blocked · ' + count : 'Blocked';
   return '<span class="inline-flex items-center gap-1 h-5 px-1.5 rounded border border-danger/30 bg-danger/5 text-[11px] font-semibold text-danger shrink-0" ' +
     'data-tip="Waiting on ' + count + ' unresolved ' + (count > 1 ? 'work items' : 'work item') + '">' +
-    '<svg width="11" height="11" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="2"/><path d="M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>' +
+    '' + wiIcon('circle-slash', 11) + '' +
     label + '</span>';
 }
 
@@ -74,22 +74,30 @@ function wiBlockedChip(count) {
  */
 function wiAvatar(person, px) {
   var size = px || 24;
-  var box = 'h-[' + size + 'px] w-[' + size + 'px] rounded-full shrink-0';
+  // The size is an inline STYLE, not `h-[Npx] w-[Npx]`.
+  //
+  // Building a class name by concatenation worked only because the Tailwind Play CDN
+  // compiled whatever it found in the live DOM. Against a pre-built stylesheet those classes
+  // are never generated — the scanner only ever sees `'h-[' +` — so the avatar lost its box
+  // and collapsed to the size of the letter inside it. A computed pixel size is a style, and
+  // saying so keeps it working whatever the CSS pipeline does.
+  var box = 'width:' + size + 'px;height:' + size + 'px';
   var title = wiEsc(person.name || '');
 
   if (person.avatar_url) {
     return '<img src="' + wiEsc(person.avatar_url) + '" alt="' + title + '" data-tip="' + title + '" ' +
-      'class="' + box + ' object-cover border border-line" />';
+      'style="' + box + '" class="rounded-full shrink-0 object-cover border border-line" />';
   }
 
-  return '<span class="' + box + ' bg-brand text-white grid place-items-center text-[10px] font-bold" data-tip="' + title + '" aria-label="' + title + '">' +
-    wiEsc(person.initial || '?') + '</span>';
+  return '<span style="' + box + '" class="rounded-full shrink-0 bg-brand text-white grid place-items-center text-[10px] font-bold" ' +
+    'data-tip="' + title + '" aria-label="' + title + '">' + wiEsc(person.initial || '?') + '</span>';
 }
 
 // Display chip — the POC's chip style: 24px tall, white, 12px label.
-function wiChip(inner, extra, tip) {
+function wiChip(inner, extra, tip, shrinkable) {
   var tipAttr = tip ? ' data-tip="' + wiEsc(tip) + '"' : '';
-  return '<span class="inline-flex items-center gap-1.5 h-6 px-2 rounded border border-line bg-white text-[12px] ' + (extra || 'text-ink') + ' shrink-0"' + tipAttr + '>' + inner + '</span>';
+  return '<span class="inline-flex items-center gap-1.5 h-6 px-2 rounded border border-line bg-white text-[12px] ' +
+    (extra || 'text-ink') + ' ' + (shrinkable ? 'min-w-0' : 'shrink-0') + '"' + tipAttr + '>' + inner + '</span>';
 }
 
 
@@ -115,15 +123,21 @@ function wiMetaCell(d, opts) {
   // Each chip carries its own tooltip: the row shows a value, the tooltip names the property
   // it belongs to and says the chip is clickable — a bare "Medium" or a lone calendar icon
   // does not tell you either.
-  var chip = function (inner, act, extra, tip) {
+  // `shrinkable` chips give up width instead of pushing the cluster past the cell — see the
+  // note on the container below.
+  var chip = function (inner, act, extra, tip, shrinkable) {
     var tipAttr = tip ? ' data-tip="' + wiEsc(tip) + '" aria-label="' + wiEsc(tip) + '"' : '';
-    if (!edit) return wiChip(inner, extra, tip);
+    if (!edit) return wiChip(inner, extra, tip, shrinkable);
     return '<button type="button" data-act="' + act + '" data-id="' + d.id + '"' + tipAttr +
-      ' class="inline-flex items-center gap-1.5 h-6 px-2 rounded border border-stroke bg-white text-[12px] hover:bg-hover shrink-0 ' + (extra || 'text-ink') + '">' + inner + '</button>';
+      ' class="inline-flex items-center gap-1.5 h-6 px-2 rounded border border-stroke bg-white text-[12px] hover:bg-hover ' +
+      (shrinkable ? 'min-w-0' : 'shrink-0') + ' ' + (extra || 'text-ink') + '">' + inner + '</button>';
   };
 
   var out = [
-    chip(wiStateIcon(d.state) + wiEsc(d.state ? d.state.name : 'No state'), 'state', null,
+    // ml-auto on the first chip rather than justify-end on the container: with justify-end an
+    // over-full cluster overflows to the LEFT, so the state chip was the one sliced in half.
+    // An auto margin collapses to 0 when there is no room, and the overflow goes right.
+    chip(wiStateIcon(d.state) + wiEsc(d.state ? d.state.name : 'No state'), 'state', 'text-ink ml-auto',
       (edit ? 'Change state — ' : 'State: ') + (d.state ? d.state.name : 'No state')),
     chip(pri.icon + pri.label, 'priority', pri.cls,
       (edit ? 'Change priority — ' : 'Priority: ') + pri.label)
@@ -142,7 +156,7 @@ function wiMetaCell(d, opts) {
   var avatars = (d.assignees || []).slice(0, 3).map(function (a) { return wiAvatar(a, 24); }).join('');
   if ((d.assignees || []).length > 3) avatars += '<span class="text-[11px] text-sub">+' + (d.assignees.length - 3) + '</span>';
   if (!avatars) {
-    avatars = '<span class="h-6 w-6 rounded-full border border-dashed border-stroke grid place-items-center text-faint shrink-0"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3" stroke="currentColor" stroke-width="1.7"/><path d="M5 20a7 7 0 0114 0" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></span>';
+    avatars = '<span class="h-6 w-6 rounded-full border border-dashed border-stroke grid place-items-center text-faint shrink-0">' + wiIcon('user-thin', 12) + '</span>';
   }
   var who = (d.assignees || []).map(function (a) { return a.name; }).join(', ');
   var assigneeTip = who ? (edit ? 'Change assignee — ' + who : 'Assigned to ' + who) : (edit ? 'Assign someone' : 'Unassigned');
@@ -150,34 +164,116 @@ function wiMetaCell(d, opts) {
     ? '<button type="button" data-act="assignees" data-id="' + d.id + '" class="inline-flex items-center gap-0.5 shrink-0" data-tip="' + wiEsc(assigneeTip) + '" aria-label="' + wiEsc(assigneeTip) + '">' + avatars + '</button>'
     : '<span class="inline-flex items-center gap-0.5 shrink-0" data-tip="' + wiEsc(assigneeTip) + '">' + avatars + '</span>');
 
-  // Labels
-  var labels = (d.labels || []).slice(0, 2).map(function (l) {
-    return '<span class="h-2 w-2 rounded-full shrink-0" style="background:' + wiEsc(l.color) + '"></span>' + wiEsc(l.name);
-  });
-  var labelInner = labels.length
-    ? labels.join('</span><span class="mx-1"></span><span>')
-    : '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" class="text-faint"><path d="M3 12l7-7h7a2 2 0 012 2v7l-7 7-9-9z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>';
-  var extraLabels = (d.labels || []).length > 2 ? ' +' + (d.labels.length - 2) : '';
+  // §16: the estimate on the row. Only when the item HAS one — an empty placeholder would
+  // cost width on every row to say nothing — and only from xl up, where there is room for it
+  // beside the dates. The label carries the reading, so it needs no icon.
+  if (d.estimate) {
+    out.push('<span class="hidden xl:inline-flex">' + chip(wiEsc(d.estimate.label), 'estimate', null,
+      (edit ? 'Change estimate — ' : 'Estimate: ') + d.estimate.label) + '</span>');
+  }
+
+  // Labels. Skipped entirely when the project has the feature switched off — §3 hides the
+  // label field from work items, and a row chip is a work item's label field. `opts.labels`
+  // rather than reading `d`: whether labels EXIST on this row is a different question from
+  // whether the project uses them, and the empty state is a chip too.
+  //
+  // Each one is a self-contained flex child of the chip — joining the names with a
+  // stray '</span>' used to close the chip early, so the second label escaped its own border
+  // and added width nothing had budgeted for, which is what pushed the state chip off the
+  // left edge of the cell.
+  //
+  // Only the FIRST label gets a name; the rest are a "+N" count. Two full names side by side
+  // are what made this cell overrun its width in the first place, and the pair was never
+  // readable anyway — the tooltip below carries every name, so nothing is lost by not
+  // printing them all in a cell this narrow.
+  var showLabels = opts.labels !== false;
+  var labels = (d.labels || []).slice(0, 1).map(function (l) {
+    return '<span class="inline-flex items-center gap-1 min-w-0">' +
+      '<span class="h-2 w-2 rounded-full shrink-0" style="background:' + wiEsc(l.color) + '"></span>' +
+      '<span class="truncate">' + wiEsc(l.name) + '</span></span>';
+  }).join('');
+  var labelInner = labels || wiIcon('tag', 13, 'text-faint');
+  if ((d.labels || []).length > 1) {
+    labelInner += '<span class="shrink-0 text-sub">+' + (d.labels.length - 1) + '</span>';
+  }
   var labelNames = (d.labels || []).map(function (l) { return l.name; }).join(', ');
-  out.push('<span class="hidden lg:inline-flex">' + chip(labelInner + extraLabels, 'labels',
-    labels.length ? 'text-ink' : 'text-faint',
-    labelNames ? (edit ? 'Change labels — ' + labelNames : 'Labels: ' + labelNames) : (edit ? 'Add labels' : 'No labels')) + '</span>');
+  // Label names are free text of any length, so this is the chip that gives up width when the
+  // cluster runs out. Everything else here is bounded (a date, a priority, an avatar).
+  if (showLabels) {
+    out.push('<span class="hidden lg:inline-flex min-w-0 max-w-[260px]">' + chip(labelInner, 'labels',
+      labels ? 'text-ink' : 'text-faint',
+      labelNames ? (edit ? 'Change labels — ' + labelNames : 'Labels: ' + labelNames) : (edit ? 'Add labels' : 'No labels'),
+      true) + '</span>');
+  }
 
   if (opts.action) out.push(opts.action);
 
-  return '<div class="flex items-center justify-end gap-1.5 flex-nowrap">' + out.join('') + '</div>';
+  // min-w-0 lets the shrinkable label chip actually shrink; overflow-hidden clips whatever is
+  // still too wide after that, and the ml-auto above decides which end pays for it.
+  return '<div class="flex w-full items-center gap-1.5 flex-nowrap min-w-0 overflow-hidden">' + out.join('') + '</div>';
 }
 
-/** The title cell: the title, preceded by a Blocked marker when something is holding it up. */
-function wiTitleCell(d) {
-  var chip = d.blocked_by_count > 0 ? wiBlockedChip(d.blocked_by_count) : '';
+/**
+ * Rich text as a short plain string — the client-side twin of RichTextSanitizer::excerpt().
+ *
+ * Used for the status-update tooltip, which is an attribute and so cannot hold markup.
+ */
+function wiPlainText(html, length) {
+  var el = document.createElement('div');
+  el.innerHTML = html || '';
+  var text = (el.textContent || '').replace(/\s+/g, ' ').trim();
 
-  return '<span class="inline-flex items-center gap-2">' + chip +
-    '<span class="text-[14px] text-ink">' + wiEsc(d.title) + '</span></span>';
+  return text.length > (length || 240) ? text.slice(0, length || 240) : text;
+}
+
+/**
+ * "At Risk" / "Off Track" from the work item's latest status update (§8).
+ *
+ * Only these two appear. On Track is the ordinary case, and a badge on every row saying
+ * "fine" is noise that makes the two that are NOT fine harder to spot.
+ *
+ * The label carries the update's own comment as its tooltip, because the label alone says
+ * something is wrong without saying what — and having to open the item to find out is what
+ * stops people checking.
+ */
+function wiStatusChip(update) {
+  if (!update || !update.label) return '';
+
+  var tone = update.status === 'off_track'
+    ? 'color:#b91c1c;background:#fef2f2;border-color:#fecaca'
+    : 'color:#b45309;background:#fffbeb;border-color:#fde68a';
+
+  // §8.4: the label always travels with the colour — never colour on its own.
+  var icon = update.status === 'off_track'
+    ? '<path d="M12 8v5M12 16v.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.7"/>'
+    : '<path d="M12 3l9.5 16.5H2.5L12 3z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M12 10v3.5M12 16.5v.5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>';
+
+  var tip = update.comment
+    ? update.label + ' — ' + update.comment
+    : update.label + ' — no comment on this update';
+
+  return '<span class="inline-flex items-center gap-1 h-5 px-1.5 rounded border text-[11px] font-semibold shrink-0" ' +
+    'style="' + tone + '" data-tip="' + wiEsc(tip) + '" aria-label="' + wiEsc(tip) + '">' +
+    '<svg width="12" height="12" viewBox="0 0 24 24" fill="none">' + icon + '</svg>' +
+    wiEsc(update.label) + '</span>';
+}
+
+/**
+ * The title cell: the title, preceded by the markers that say this row needs attention —
+ * Blocked (waiting on something else) and the At Risk / Off Track status update.
+ */
+function wiTitleCell(d) {
+  var blocked = d.blocked_by_count > 0 ? wiBlockedChip(d.blocked_by_count) : '';
+
+  return '<span class="inline-flex items-center gap-2 min-w-0">' + blocked + wiStatusChip(d.status_update) +
+    '<span class="text-[14px] text-ink truncate">' + wiEsc(d.title) + '</span></span>';
 }
 
 /** The ⋯ row actions control, and the cycle list's remove-from-cycle control. */
+// The trailing control on a row. Its box must match the group header's "+" (work-item-list.js)
+// — they are one vertical column to anyone reading down the list, and 24px against 28px reads
+// as a wobble even though both are flush to the same padding edge.
 function wiRowMenuButton(id) {
   return '<button type="button" data-act="menu" data-id="' + id + '" data-tip="Work item actions" aria-label="Work item actions" class="h-7 w-7 grid place-items-center rounded-md text-sub hover:bg-line shrink-0">' +
-    '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></button>';
+    '' + wiIcon('ellipsis-thin', 15) + '</button>';
 }

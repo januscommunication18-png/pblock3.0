@@ -7,7 +7,7 @@
   <header class="flex items-center justify-between px-5 sm:px-10 py-5">
     <div class="flex items-center gap-3">
       <a href="{{ route('onboarding.workspace') }}" class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        {!! pb_icon('chevron-left', 18) !!}
       </a>
       <a class="flex items-center gap-2" href="#">
         <svg width="24" height="24" viewBox="0 0 32 32" fill="#0f0f10"><path d="M5 21 L15 4 L20.5 4 L10.5 21 Z"/><path d="M13 28 L23 11 L28.5 11 L18.5 28 Z"/></svg>
@@ -22,7 +22,7 @@
       <form method="POST" action="{{ route('logout') }}">
         @csrf
         <button type="submit" title="Log out" aria-label="Log out" class="flex items-center gap-1.5 h-8 px-3 rounded-full border border-line text-[13px] text-sub hover:bg-hover hover:text-ink transition-colors">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 21H6a2 2 0 01-2-2V5a2 2 0 012-2h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 17l5-5-5-5M21 12H9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          {!! pb_icon('right-from-bracket', 16) !!}
           <span class="hidden sm:inline">Log out</span>
         </button>
       </form>
@@ -46,7 +46,7 @@
              data-rows="{{ $rows }}"></div>
 
         <button type="button" id="add-invite" class="flex items-center gap-1.5 mt-4 text-[14px] font-semibold text-link hover:underline">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          {!! pb_icon('plus', 16) !!}
           Add another
         </button>
 
@@ -72,7 +72,7 @@
         return ROLE_KEYS.map(function (k) {
           return '<li role="option" data-val="' + k + '" class="group relative flex items-center cursor-pointer select-none py-2 pl-3 pr-9 text-[14px] text-ink hover:bg-brand hover:text-white">' +
             '<span class="block truncate">' + ROLE_LABELS[k] + '</span>' +
-            '<span class="pb-combo-check hidden absolute inset-y-0 right-0 flex items-center pr-3 text-brand group-hover:text-white"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5 9-11" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>' +
+            '<span class="pb-combo-check hidden absolute inset-y-0 right-0 flex items-center pr-3 text-brand group-hover:text-white">{!! pb_icon('check-thin', 16) !!}</span>' +
             '</li>';
         }).join('');
       }
@@ -84,7 +84,7 @@
             '<button type="button" class="pb-combo-btn pb-input text-left cursor-pointer" aria-haspopup="listbox" aria-expanded="false">' +
               '<span class="flex items-center justify-between h-full">' +
                 '<span class="pb-combo-value text-faint truncate">Select role</span>' +
-                '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0 ml-1"><path d="M8 9l4-4 4 4M8 15l4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+                '{!! pb_icon('sort', 16, 'text-faint shrink-0 ml-1') !!}' +
               '</span>' +
             '</button>' +
             '<ul role="listbox" class="pb-combo-list hidden absolute z-40 mt-1 w-full max-h-56 overflow-auto rounded-md bg-white py-1 shadow-lg outline outline-1 outline-black/5">' + roleOptions() + '</ul>' +

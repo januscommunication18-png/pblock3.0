@@ -45,10 +45,7 @@
   <main class="flex-1 flex justify-center px-5">
     <div class="w-full max-w-[420px] pt-10 sm:pt-16 text-center">
       <span class="mx-auto mb-5 h-12 w-12 rounded-full bg-[#f3f4f6] grid place-items-center" aria-hidden="true">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" class="text-faint">
-          <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" />
-          <path d="M12 7v6M12 16.5v.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-        </svg>
+        {!! pb_icon('circle-exclamation', 22, 'text-faint') !!}
       </span>
       <h1 class="text-[22px] font-bold text-head leading-tight">{{ $panel['heading'] }}</h1>
       <p class="mt-2 text-[15px] text-sub">{{ $panel['body'] }}</p>

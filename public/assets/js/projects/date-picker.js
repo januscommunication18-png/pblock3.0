@@ -19,7 +19,7 @@
 // date, so out-of-range days are struck through here rather than surfacing as a 422.
 // ---------------------------------------------------------------------------------------
 var WI_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-var WI_CAL_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0"><rect x="4" y="5" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+var WI_CAL_ICON = '' + wiIcon('calendar', 15, 'text-faint shrink-0') + '';
 
 function wiParseISO(raw) {
   if (!raw) return null;
@@ -192,32 +192,32 @@ var WiCalendar = {
     '<template v-if="selected">' +
     '<div class="my-1 border-t border-line"></div>' +
     '<button type="button" @click="$emit(\'clear\')" class="w-full text-left flex items-center gap-2.5 px-2 h-9 rounded-md text-[13px] text-danger hover:bg-hover">' +
-    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="shrink-0"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Clear</button>' +
+    '' + wiIcon('xmark', 15, 'shrink-0') + 'Clear</button>' +
     '</template>' +
     '</template>' +
 
     // -- Custom Date grid --
     '<template v-else>' +
-    '<button type="button" @click="back" class="mb-2 inline-flex items-center gap-1 text-[12px] text-sub hover:text-ink"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Back</button>' +
+    '<button type="button" @click="back" class="mb-2 inline-flex items-center gap-1 text-[12px] text-sub hover:text-ink">' + wiIcon('chevron-left', 13) + 'Back</button>' +
     '<div class="flex items-center gap-1.5 mb-2">' +
-    '<button type="button" :disabled="!canPrev" @click="nav(-1)" :class="[\'h-8 w-8 grid place-items-center rounded-md text-sub shrink-0\', canPrev ? \'hover:bg-hover\' : \'opacity-30 cursor-not-allowed\']"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
+    '<button type="button" :disabled="!canPrev" @click="nav(-1)" :class="[\'h-8 w-8 grid place-items-center rounded-md text-sub shrink-0\', canPrev ? \'hover:bg-hover\' : \'opacity-30 cursor-not-allowed\']">' + wiIcon('chevron-left', 16) + '</button>' +
     // Month dropdown
     '<div class="relative flex-1 min-w-0">' +
-    '<button type="button" @click="monthOpen=!monthOpen; yearOpen=false" class="w-full flex items-center justify-between h-8 px-2.5 rounded-md text-[13px] text-ink outline outline-1 -outline-offset-1 outline-stroke hover:bg-hover"><span class="truncate">{{ monthLabel }}</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0 ml-1"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
+    '<button type="button" @click="monthOpen=!monthOpen; yearOpen=false" class="w-full flex items-center justify-between h-8 px-2.5 rounded-md text-[13px] text-ink outline outline-1 -outline-offset-1 outline-stroke hover:bg-hover"><span class="truncate">{{ monthLabel }}</span>' + wiIcon('chevron-down', 14, 'text-faint shrink-0 ml-1') + '</button>' +
     '<ul v-if="monthOpen" class="absolute z-50 mt-1 w-full max-h-52 overflow-auto rounded-md bg-white border border-line shadow-lg py-1">' +
     '<li v-for="mo in months" :key="mo.i" @click="setMonth(mo.i)" :class="[\'group relative flex items-center cursor-pointer select-none py-1.5 pl-3 pr-8 text-[13px] hover:bg-brand hover:text-white\', mo.i===vm ? \'text-brand font-medium\' : \'text-ink\']">' +
     '<span class="truncate">{{ mo.name }}</span>' +
-    '<span v-if="mo.i===vm" class="absolute right-2 text-brand group-hover:text-white"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5 9-11" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>' +
+    '<span v-if="mo.i===vm" class="absolute right-2 text-brand group-hover:text-white">' + wiIcon('check-thin', 14) + '</span>' +
     '</li></ul></div>' +
     // Year dropdown
     '<div class="relative w-[92px] shrink-0">' +
-    '<button type="button" @click="yearOpen=!yearOpen; monthOpen=false" class="w-full flex items-center justify-between h-8 px-2.5 rounded-md text-[13px] text-ink outline outline-1 -outline-offset-1 outline-stroke hover:bg-hover"><span class="shrink-0 whitespace-nowrap">{{ vy }}</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0 ml-1"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
+    '<button type="button" @click="yearOpen=!yearOpen; monthOpen=false" class="w-full flex items-center justify-between h-8 px-2.5 rounded-md text-[13px] text-ink outline outline-1 -outline-offset-1 outline-stroke hover:bg-hover"><span class="shrink-0 whitespace-nowrap">{{ vy }}</span>' + wiIcon('chevron-down', 14, 'text-faint shrink-0 ml-1') + '</button>' +
     '<ul v-if="yearOpen" class="absolute z-50 mt-1 w-full max-h-52 overflow-auto rounded-md bg-white border border-line shadow-lg py-1">' +
     '<li v-for="y in years" :key="y" @click="setYear(y)" :class="[\'group relative flex items-center cursor-pointer select-none py-1.5 pl-3 pr-8 text-[13px] hover:bg-brand hover:text-white\', y===vy ? \'text-brand font-medium\' : \'text-ink\']">' +
     '<span class="truncate">{{ y }}</span>' +
-    '<span v-if="y===vy" class="absolute right-2 text-brand group-hover:text-white"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5 9-11" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>' +
+    '<span v-if="y===vy" class="absolute right-2 text-brand group-hover:text-white">' + wiIcon('check-thin', 14) + '</span>' +
     '</li></ul></div>' +
-    '<button type="button" :disabled="!canNext" @click="nav(1)" :class="[\'h-8 w-8 grid place-items-center rounded-md text-sub shrink-0\', canNext ? \'hover:bg-hover\' : \'opacity-30 cursor-not-allowed\']"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
+    '<button type="button" :disabled="!canNext" @click="nav(1)" :class="[\'h-8 w-8 grid place-items-center rounded-md text-sub shrink-0\', canNext ? \'hover:bg-hover\' : \'opacity-30 cursor-not-allowed\']">' + wiIcon('chevron-right', 16) + '</button>' +
     '</div>' +
     // Day-of-week header
     '<div class="grid grid-cols-7 gap-0.5 mb-1">' +

@@ -28,7 +28,7 @@ PB.boot('teamspaces', {
     '</div>' +
     '<div v-else class="flex items-center gap-3">' +
     '<span class="h-8 w-8 rounded-full bg-success/15 text-success grid place-items-center shrink-0">' +
-    '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M5 12l4 4L19 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>' +
+    '' + wiIcon('check', 18) + '</span>' +
     '<div><div class="text-[14px] font-medium text-ink">Teamspaces is enabled for this workspace.</div>' +
     '<p class="text-[12px] text-sub">This setting is permanent and cannot be turned off.</p></div>' +
     '</div></div>' +

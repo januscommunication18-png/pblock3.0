@@ -43,13 +43,15 @@ class WorkItemsTest extends ProjectTestCase
 
         $response = $this->actingAs($owner)->get(route('projects.work-items', $project))->assertOk();
 
-        foreach (['Overview', 'Work items', 'Modules', 'Views', 'Pages'] as $label) {
+        foreach (['Overview', 'Work items', 'Views', 'Pages'] as $label) {
             $response->assertSee($label, false);
         }
 
-        // Cycles is feature-gated per project (Cycles §3.2.4) and is covered by CycleTest;
-        // it is absent here because this project has not switched it on.
-        $this->assertFalse(collect($response->viewData('tabs'))->pluck('key')->contains('cycles'));
+        // Cycles and Modules are feature-gated per project (Cycles §3.2.4, Modules §4.2) and
+        // are covered by CycleTest; both are absent here because this project has neither on.
+        $keys = collect($response->viewData('tabs'))->pluck('key');
+        $this->assertFalse($keys->contains('cycles'));
+        $this->assertFalse($keys->contains('modules'));
     }
 
     public function test_non_mvp_tabs_show_coming_soon_and_work_items_is_not_one(): void
@@ -57,9 +59,9 @@ class WorkItemsTest extends ProjectTestCase
         [$owner, $ws] = $this->owner();
         $project = $this->makeProject($owner, $ws, ['identifier' => 'TESTI']);
 
-        // Cycles is deliberately not in this list: it is a built feature with its own
-        // controller, routed ahead of the Coming Soon catch-all (Cycles §4).
-        foreach (['overview', 'modules', 'views', 'pages'] as $tab) {
+        // Cycles and Modules are deliberately not in this list: both are built features
+        // with their own controllers, routed ahead of the Coming Soon catch-all.
+        foreach (['overview', 'views', 'pages'] as $tab) {
             $this->actingAs($owner)
                 ->get(route('projects.workspace.tab', ['project' => $project->id, 'tab' => $tab]))
                 ->assertOk()
@@ -349,7 +351,7 @@ class WorkItemsTest extends ProjectTestCase
         // The ⋯ menu renders on every workspace tab, not just Work Items.
         foreach ([
             route('projects.work-items', $project),
-            route('projects.workspace.tab', ['project' => $project->id, 'tab' => 'modules']),
+            route('projects.workspace.tab', ['project' => $project->id, 'tab' => 'views']),
         ] as $url) {
             $response = $this->actingAs($owner)->get($url)->assertOk()->assertSee('Project actions', false);
 
@@ -951,6 +953,68 @@ class WorkItemsTest extends ProjectTestCase
             ->assertNotFound();
     }
 
+    /**
+     * Every screen that mounts the work item grid must load the skin AFTER Tabulator's own
+     * stylesheet.
+     *
+     * The two collide at equal specificity, so the later one wins — and when the Cycles
+     * screen listed these tags for itself, in the other order, every collapsed group row on
+     * that page turned grey while the identical component looked right on Work Items. Both
+     * pages now include partials/work-item-assets; this pins the property that block exists
+     * to guarantee.
+     */
+    public function test_the_grid_skin_loads_after_tabulators_own_stylesheet(): void
+    {
+        [$owner, $ws] = $this->owner();
+        $project = $this->makeProject($owner, $ws, ['identifier' => 'TESTI']);
+
+        $pages = [route('projects.work-items', $project)];
+
+        // The Cycles screen mounts the same grid, so it is held to the same order.
+        $this->actingAs($owner)->postJson(route('projects.settings.features.toggle', $project), [
+            'feature' => 'cycles', 'enabled' => true,
+        ])->assertOk();
+        $pages[] = route('projects.cycles', $project);
+
+        foreach ($pages as $url) {
+            $html = $this->actingAs($owner)->get($url)->assertOk()->getContent();
+
+            $vendor = strpos($html, 'tabulator.min.css');
+            $skin = strpos($html, 'assets/css/work-items.css');
+
+            $this->assertNotFalse($vendor, "Tabulator's stylesheet is missing from {$url}");
+            $this->assertNotFalse($skin, "The grid skin is missing from {$url}");
+            $this->assertLessThan($skin, $vendor, "work-items.css must load after tabulator.min.css on {$url}");
+        }
+    }
+
+    /**
+     * The group header's "+" and a row's ⋯ form one vertical column down the grid, but they
+     * are built in two different files and measured from two different boxes — the group's own
+     * padding-right, and the last cell's. They drifted: 24px against 28px, `rounded` against
+     * `rounded-md`. Nothing renders CSS here, so this pins what a PHP test can see — that the
+     * two controls are still declared with the same box.
+     */
+    public function test_the_group_add_button_and_the_row_action_share_one_box(): void
+    {
+        $list = file_get_contents(public_path('assets/js/projects/work-item-list.js'));
+        $ui = file_get_contents(public_path('assets/js/projects/work-item-ui.js'));
+
+        $box = 'h-7 w-7 grid place-items-center rounded-md';
+
+        $this->assertStringContainsString('data-gadd=', $list);
+        $this->assertStringContainsString($box, $list, 'The group "+" no longer uses the shared box.');
+        $this->assertStringContainsString($box, $ui, 'The row action no longer uses the shared box.');
+
+        // Both measure from the same edge, 20px in — the group through its own padding, the
+        // row through the last cell's.
+        $css = file_get_contents(public_path('assets/css/work-items.css'));
+        $this->assertStringContainsString('padding: 0 20px 0 24px;', $css);
+        $this->assertStringContainsString('.tabulator-cell:last-child { padding-right: 20px; }', $css);
+        // Tabulator's own 1px group border would put the two boxes 1px apart.
+        $this->assertMatchesRegularExpression('/tabulator-group[^}]*border-right:\s*none/s', $css);
+    }
+
     public function test_a_private_project_404s_for_an_outsider(): void
     {
         [$owner, $ws] = $this->owner();
@@ -962,7 +1026,7 @@ class WorkItemsTest extends ProjectTestCase
         // 404, never 403: do not reveal that an inaccessible project exists (spec §12).
         $this->actingAs($outsider)->get(route('projects.work-items', $project))->assertNotFound();
         $this->actingAs($outsider)
-            ->get(route('projects.workspace.tab', ['project' => $project->id, 'tab' => 'cycles']))
+            ->get(route('projects.workspace.tab', ['project' => $project->id, 'tab' => 'views']))
             ->assertNotFound();
     }
 }

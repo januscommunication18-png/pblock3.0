@@ -3,6 +3,7 @@
 namespace Tests\Feature\Settings;
 
 use App\Models\ProjectLabel;
+use App\Models\ProjectPriority;
 use App\Models\ProjectState;
 use App\Models\WorkspaceSettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -129,7 +130,7 @@ class ProjectsSettingsTest extends SettingsTestCase
             ->assertOk()
             ->assertSee('Urgent')->assertSee('High')->assertSee('Medium')->assertSee('Low')->assertSee('None');
 
-        $priorities = $workspace->run(fn () => \App\Models\ProjectPriority::orderBy('position')->pluck('name')->all());
+        $priorities = $workspace->run(fn () => ProjectPriority::orderBy('position')->pluck('name')->all());
         $this->assertSame(['Urgent', 'High', 'Medium', 'Low', 'None'], $priorities);
     }
 
@@ -138,7 +139,7 @@ class ProjectsSettingsTest extends SettingsTestCase
         [$owner, $workspace] = $this->owner();
         $this->actingAs($owner)->get(route('settings.projects'))->assertOk(); // seeds priorities
 
-        $urgent = $workspace->run(fn () => \App\Models\ProjectPriority::where('name', 'Urgent')->first());
+        $urgent = $workspace->run(fn () => ProjectPriority::where('name', 'Urgent')->first());
 
         $this->actingAs($owner)->patchJson(route('settings.projects.priorities.update', ['priority' => $urgent->id]), [
             'name' => 'Critical', 'color' => '#B91C1C',
@@ -154,11 +155,11 @@ class ProjectsSettingsTest extends SettingsTestCase
             'name' => 'Blocker', 'color' => '#7C3AED',
         ])->assertOk();
 
-        $blocker = $workspace->run(fn () => \App\Models\ProjectPriority::where('name', 'Blocker')->first());
+        $blocker = $workspace->run(fn () => ProjectPriority::where('name', 'Blocker')->first());
         $this->assertNotNull($blocker);
 
         $this->actingAs($owner)->deleteJson(route('settings.projects.priorities.destroy', ['priority' => $blocker->id]))
             ->assertOk();
-        $this->assertFalse($workspace->run(fn () => \App\Models\ProjectPriority::whereKey($blocker->id)->exists()));
+        $this->assertFalse($workspace->run(fn () => ProjectPriority::whereKey($blocker->id)->exists()));
     }
 }

@@ -12,11 +12,11 @@
   <!-- Minimal header: back (left) · title · close (right) — matches Create workspace -->
   <header class="relative h-14 shrink-0 border-b border-line flex items-center px-4">
     <a href="{{ route('welcome') }}" title="Back" class="h-9 w-9 grid place-items-center rounded-md text-sub hover:bg-hover">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      {!! pb_icon('chevron-left', 18) !!}
     </a>
     <span class="absolute left-1/2 -translate-x-1/2 font-semibold text-[15px] text-head">Invite teammates</span>
     <a href="{{ route('welcome') }}" title="Close" class="ml-auto h-9 w-9 grid place-items-center rounded-md text-sub hover:bg-hover">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      {!! pb_icon('xmark', 18) !!}
     </a>
   </header>
 
@@ -54,14 +54,14 @@
                   <button type="button" class="pb-combo-btn pb-input text-left cursor-pointer {{ $roleErr ? 'border-danger ring-1 ring-danger' : '' }}" aria-haspopup="listbox" aria-expanded="false">
                     <span class="flex items-center justify-between h-full">
                       <span class="pb-combo-value {{ $rowRole ? 'text-ink' : 'text-faint' }} truncate">{{ $rowRole ? $roleLabels[$rowRole] : 'Select role' }}</span>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0 ml-1"><path d="M8 9l4-4 4 4M8 15l4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                      {!! pb_icon('sort', 16, 'text-faint shrink-0 ml-1') !!}
                     </span>
                   </button>
                   <ul role="listbox" class="pb-combo-list hidden absolute z-40 mt-1 w-full max-h-56 overflow-auto rounded-md bg-white py-1 shadow-lg outline outline-1 outline-black/5">
                     @foreach ($roles as $rk)
                       <li role="option" data-val="{{ $rk }}" class="group relative flex items-center cursor-pointer select-none py-2 pl-3 pr-9 text-[14px] text-ink hover:bg-brand hover:text-white">
                         <span class="block truncate">{{ $roleLabels[$rk] }}</span>
-                        <span class="pb-combo-check {{ $rowRole === $rk ? '' : 'hidden' }} absolute inset-y-0 right-0 flex items-center pr-3 text-brand group-hover:text-white"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5 9-11" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                        <span class="pb-combo-check {{ $rowRole === $rk ? '' : 'hidden' }} absolute inset-y-0 right-0 flex items-center pr-3 text-brand group-hover:text-white">{!! pb_icon('check-thin', 16) !!}</span>
                       </li>
                     @endforeach
                   </ul>
@@ -74,7 +74,7 @@
         </div>
 
         <button type="button" id="add-invite" class="flex items-center gap-1.5 mt-4 text-[14px] font-semibold text-link hover:underline">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          {!! pb_icon('plus', 16) !!}
           Add another
         </button>
 
@@ -96,14 +96,14 @@
           <button type="button" class="pb-combo-btn pb-input text-left cursor-pointer" aria-haspopup="listbox" aria-expanded="false">
             <span class="flex items-center justify-between h-full">
               <span class="pb-combo-value text-faint truncate">Select role</span>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0 ml-1"><path d="M8 9l4-4 4 4M8 15l4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              {!! pb_icon('sort', 16, 'text-faint shrink-0 ml-1') !!}
             </span>
           </button>
           <ul role="listbox" class="pb-combo-list hidden absolute z-40 mt-1 w-full max-h-56 overflow-auto rounded-md bg-white py-1 shadow-lg outline outline-1 outline-black/5">
             @foreach ($roles as $rk)
               <li role="option" data-val="{{ $rk }}" class="group relative flex items-center cursor-pointer select-none py-2 pl-3 pr-9 text-[14px] text-ink hover:bg-brand hover:text-white">
                 <span class="block truncate">{{ $roleLabels[$rk] }}</span>
-                <span class="pb-combo-check hidden absolute inset-y-0 right-0 flex items-center pr-3 text-brand group-hover:text-white"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5 9-11" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                <span class="pb-combo-check hidden absolute inset-y-0 right-0 flex items-center pr-3 text-brand group-hover:text-white">{!! pb_icon('check-thin', 16) !!}</span>
               </li>
             @endforeach
           </ul>

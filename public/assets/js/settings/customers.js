@@ -97,7 +97,7 @@ PB.boot('customers', {
     '<div class="space-y-2"><div v-for="(o,i) in form.options" :key="i" class="flex items-center gap-2">' +
     '<input class="pb-input !h-9 flex-1" v-model="form.options[i]" placeholder="Option"/>' +
     '<button class="h-9 w-9 grid place-items-center rounded-md text-sub hover:bg-hover" @click="dropOption(i)">' +
-    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></div></div>' +
+    '' + wiIcon('xmark', 16) + '</button></div></div>' +
     '<button class="text-[13px] text-link font-medium mt-2" @click="addOption">+ Add option</button>' +
     '<p v-if="errors.options" class="text-[12px] text-danger mt-1">{{ errors.options[0] }}</p></div>' +
     '<div class="flex items-center gap-6 mt-4">' +

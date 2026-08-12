@@ -1,9 +1,14 @@
-@import 'tailwindcss';
+/* Project Block — Tailwind entry point.
+   ------------------------------------------------------------------
+   Compiled to public/assets/css/tailwind.css by `npm run build:css`, which is what every
+   layout links. This replaced the Tailwind Play CDN: nothing is fetched from a CDN.
 
-@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
-@source '../../storage/framework/views/*.php';
+   Tokens and content globs live in tailwind.config.js at the project root.
 
-@theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-        'Segoe UI Symbol', 'Noto Color Emoji';
-}
+   The app's own component CSS (form controls, scrollbars, the grid skin, the rich-text
+   styles) stays in public/assets/css/*.css as plain CSS — none of it uses @apply, so it has
+   no reason to go through this build.
+   ------------------------------------------------------------------ */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

@@ -26,8 +26,9 @@ class CycleTest extends ProjectTestCase
         [$owner, $ws] = $this->owner();
         $project = $this->makeProject($owner, $ws);
 
-        // §3.2.4: off by default — no tab, and the page itself is not reachable.
-        $this->actingAs($owner)->get(route('projects.cycles', $project))->assertNotFound();
+        // Feature Disable §5/§10 — never enabled, no records: no tab at all. The page still
+        // answers, because there is one screen and it renders its own disabled state; what
+        // the switch controls is whether anyone is pointed at it.
         $this->assertFalse($this->tabKeys($owner, $project)->contains('cycles'));
         $this->assertFalse($this->workItemBootstrap($owner, $project)['cyclesEnabled']);
 
@@ -37,6 +38,34 @@ class CycleTest extends ProjectTestCase
         $this->actingAs($owner)->get(route('projects.cycles', $project))->assertOk();
         $this->assertTrue($this->tabKeys($owner, $project)->contains('cycles'));
         $this->assertTrue($this->workItemBootstrap($owner, $project)['cyclesEnabled']);
+    }
+
+    public function test_the_cycle_detail_mounts_the_work_items_screen(): void
+    {
+        [$owner, $ws] = $this->owner();
+        $project = $this->makeProject($owner, $ws);
+        $this->enable($owner, $project, 'cycles');
+
+        $cycle = $this->cycle($ws, $project, 'Sprint 08');
+        $item = $this->workItem($owner, $project, 'Ship the banner');
+        $this->assign($owner, $project, $item, $cycle->id)->assertOk();
+        $outside = $this->workItem($owner, $project, 'Unrelated');
+
+        $screen = $this->actingAs($owner)->get(route('projects.cycles.show', [
+            'project' => $project->id, 'cycle' => $cycle->id,
+        ]))->assertOk()->viewData('bootstrap')['workItems'];
+
+        // Clicking a row opens the real drawer, which only works if the row's payload is the
+        // work items screen's payload — every picker option and every endpoint it needs.
+        $this->assertTrue($screen['canEdit']);
+        $this->assertArrayHasKey('update', $screen['endpoints']);
+        $this->assertArrayHasKey('feed', $screen['endpoints']);
+
+        // Narrowed to this cycle, and "Add work item" here adds work to it.
+        $this->assertSame(['Ship the banner'], array_column($screen['items'], 'title'));
+        $this->assertNotContains($outside->id, array_column($screen['items'], 'id'));
+        $this->assertSame(['cycle_id' => $cycle->id], $screen['seed']);
+        $this->assertTrue($screen['embedded']);
     }
 
     public function test_disabling_cycles_keeps_every_cycle_and_association(): void
@@ -50,22 +79,44 @@ class CycleTest extends ProjectTestCase
         $this->assign($owner, $project, $item, $cycle->id)->assertOk();
 
         $this->actingAs($owner)->postJson(route('projects.settings.features.toggle', $project), [
-            'feature' => 'cycles', 'enabled' => false,
+            'feature' => 'cycles', 'enabled' => false, 'confirm' => true,
         ])->assertOk()->assertJsonPath('features.cycles', false);
 
-        // §3.2.4: nothing is deleted. The tab is gone, the rows are not.
-        $this->actingAs($owner)->get(route('projects.cycles', $project))->assertNotFound();
+        // Feature Disable §4: nothing is deleted, and the page stays readable — a cycle with
+        // history has to remain reachable for reference.
+        $bootstrap = $this->actingAs($owner)->get(route('projects.cycles', $project))
+            ->assertOk()->viewData('bootstrap');
+        $this->assertFalse($bootstrap['featureEnabled']);
+        $this->assertFalse($bootstrap['canCreate']);
         $this->assertTrue($ws->run(fn () => Cycle::whereKey($cycle->id)->exists()));
         $this->assertSame($cycle->id, $ws->run(fn () => WorkItem::find($item->id)->cycle_id));
 
-        // …and no NEW assignment is accepted while it is off.
+        // The tab stays, marked Disabled (§5) — it is the only route to that history.
+        $tabs = $this->actingAs($owner)->get(route('projects.cycles', $project))->viewData('tabs');
+        $this->assertSame('disabled', collect($tabs)->firstWhere('key', 'cycles')['state']);
+
+        // Every write is refused, not merely hidden (§4).
+        $this->actingAs($owner)->postJson(route('projects.cycles.store', $project), [
+            'name' => 'Sprint 09',
+            'start_date' => now()->addDays(30)->toDateString(),
+            'end_date' => now()->addDays(43)->toDateString(),
+        ])->assertStatus(403);
+        $this->actingAs($owner)->deleteJson(route('projects.cycles.destroy', [
+            'project' => $project->id, 'cycle' => $cycle->id,
+        ]))->assertStatus(403);
+
+        // The assignment FREEZES: no new one, no move, and no removal.
         $other = $this->workItem($owner, $project, 'Second item');
         $this->assign($owner, $project, $other, $cycle->id)->assertStatus(422);
+        $this->assign($owner, $project, $item, null)
+            ->assertStatus(422)->assertJsonValidationErrors('cycle_id');
+        $this->assertSame($cycle->id, $ws->run(fn () => WorkItem::find($item->id)->cycle_id));
 
-        // §18: re-enabling restores the lot.
+        // §8: re-enabling restores the lot, with nothing to migrate or recreate.
         $this->enable($owner, $project, 'cycles');
         $this->actingAs($owner)->get(route('projects.cycles', $project))->assertOk();
         $this->assertSame($cycle->id, $ws->run(fn () => WorkItem::find($item->id)->cycle_id));
+        $this->assign($owner, $project, $item, null)->assertOk();
     }
 
     public function test_parallel_cycles_needs_cycles_on_first_and_switches_off_with_it(): void
@@ -84,7 +135,7 @@ class CycleTest extends ProjectTestCase
 
         // Turning the prerequisite off cannot leave the dependent stored as on.
         $this->actingAs($owner)->postJson(route('projects.settings.features.toggle', $project), [
-            'feature' => 'cycles', 'enabled' => false,
+            'feature' => 'cycles', 'enabled' => false, 'confirm' => true,
         ])->assertOk()->assertJsonPath('features.parallel_cycles', false);
     }
 
@@ -529,6 +580,81 @@ class CycleTest extends ProjectTestCase
         $survivor = $ws->run(fn () => WorkItem::find($item->id));
         $this->assertNotNull($survivor);
         $this->assertNull($survivor->cycle_id);
+    }
+
+    // ================= Project Settings sections =================
+
+    public function test_each_feature_toggle_lives_on_its_own_settings_section(): void
+    {
+        [$owner, $ws] = $this->owner();
+        $project = $this->makeProject($owner, $ws);
+
+        // Cycle owns the cycle switches…
+        $cycle = $this->actingAs($owner)
+            ->get(route('projects.settings', ['project' => $project->id, 'section' => 'features']))
+            ->assertOk()->viewData('bootstrap');
+
+        $this->assertSame('Cycle', $cycle['title']);
+        $this->assertSame(['cycles', 'parallel_cycles'], array_keys($cycle['catalog']));
+
+        // …and Module owns its own, on its own page, rather than everything piling onto
+        // whichever screen happens to render the whole catalog.
+        $modules = $this->actingAs($owner)
+            ->get(route('projects.settings', ['project' => $project->id, 'section' => 'modules']))
+            ->assertOk()->viewData('bootstrap');
+
+        $this->assertSame('Module', $modules['title']);
+        $this->assertSame(['modules'], array_keys($modules['catalog']));
+    }
+
+    public function test_enabling_modules_puts_the_tab_in_the_project_top_bar(): void
+    {
+        [$owner, $ws] = $this->owner();
+        $project = $this->makeProject($owner, $ws);
+
+        // Off: hidden rather than shown as "Soon" — a visible tab that refuses to open is
+        // worse than an absent one (Modules §4.2).
+        $this->assertFalse($this->tabKeys($owner, $project)->contains('modules'));
+
+        $this->enable($owner, $project, 'modules');
+
+        $this->assertTrue($this->tabKeys($owner, $project)->contains('modules'));
+
+        // Each tab follows its OWN feature: turning Modules on must not conjure up Cycles.
+        $this->assertFalse($this->tabKeys($owner, $project)->contains('cycles'));
+    }
+
+    public function test_the_settings_sidebar_links_to_the_module_section(): void
+    {
+        [$owner, $ws] = $this->owner();
+        $project = $this->makeProject($owner, $ws);
+
+        $html = $this->actingAs($owner)
+            ->get(route('projects.settings', ['project' => $project->id, 'section' => 'features']))
+            ->assertOk()->getContent();
+
+        $this->assertStringContainsString(
+            'href="'.e(route('projects.settings', ['project' => $project->id, 'section' => 'modules'])).'"',
+            $html,
+        );
+        $this->assertStringContainsString('>Module<', $html);
+    }
+
+    public function test_the_modules_toggle_works_from_its_own_page(): void
+    {
+        [$owner, $ws] = $this->owner();
+        $project = $this->makeProject($owner, $ws);
+
+        // One shared endpoint keyed on the feature name, so splitting the screens did not
+        // split the thing that actually stores the switch.
+        $this->actingAs($owner)->postJson(route('projects.settings.features.toggle', $project), [
+            'feature' => 'modules', 'enabled' => true,
+        ])->assertOk()->assertJsonPath('features.modules', true);
+
+        $this->assertTrue($ws->run(fn () => Project::find($project->id)->featureEnabled('modules')));
+
+        // …and it is independent of Cycles: turning one on does not turn the other on.
+        $this->assertFalse($ws->run(fn () => Project::find($project->id)->featureEnabled('cycles')));
     }
 
     // ================= helpers =================

@@ -3,8 +3,8 @@
    Font + scrollbars, plus the form-control component classes.
    Form controls follow the Tailwind Plus "Input groups" style:
    an inset outline (not border + ring) that thickens to 2px in the
-   brand color on focus. Written as plain CSS so it works with the
-   Tailwind Play CDN and maps 1:1 to a future Vue <TextField> / <Textarea>.
+   brand color on focus. Plain CSS — no @apply — so it needs no build step
+   of its own and maps 1:1 to a future Vue <TextField> / <Textarea>.
    Tokens: stroke #d1d5db · brand #1b5f8a · faint #9ca3af · ink #23272f
    ------------------------------------------------------------------ */
 
@@ -156,6 +156,22 @@ select.pb-input { padding-right: 2rem; color: #6b7280; }
 /* ------------------------------------------------------------------
    Combobox button states (built on .pb-input)
    ------------------------------------------------------------------ */
+
+/* The trigger is a row: label on the left, chevron on the right.
+   It says so HERE rather than relying on Tailwind's `flex` utility.
+   `.pb-input` sets `display:block`, and both are single-class
+   selectors — so whichever stylesheet loads last wins. This file loads
+   after tailwind.css, which meant `.pb-input` won and the chevron
+   dropped onto its own line under the label. Owning the layout in the
+   component's own rule settles it regardless of load order. */
+.pb-combo-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  text-align: left;
+  gap: 0.5rem;
+}
+
 .pb-combo-btn.is-error { outline-color: #ef4444; }
 .pb-combo-btn.is-error:focus { outline: 2px solid #ef4444; outline-offset: -2px; }
 .pb-combo-btn.is-readonly { background-color: #f3f4f6; color: #6b7280; outline-color: #e5e7eb; cursor: not-allowed; }
@@ -184,3 +200,33 @@ input[type="color"].pb-color-input {
 input[type="color"].pb-color-input::-webkit-color-swatch-wrapper { padding: 0; }
 input[type="color"].pb-color-input::-webkit-color-swatch { border: 1px solid #d1d5db; border-radius: 6px; }
 input[type="color"].pb-color-input::-moz-color-swatch { border: 1px solid #d1d5db; border-radius: 6px; }
+
+
+/* ------------------------------------------------------------------
+   Collapsible sidebar
+
+   Desktop only. On a narrow screen the sidebar is already a drawer that
+   slides over the content, and its own close button dismisses it — a
+   second, sticky "collapsed" state there would just be a way to lose the
+   navigation with no obvious way back.
+
+   Driven by an attribute on <html> set by an inline script before the
+   sidebar is parsed, so a collapsed panel never flashes into view.
+   ------------------------------------------------------------------ */
+/* The way back lives at the head of the page's own title row, so it only
+   ever exists while there is something to expand. */
+[data-sidebar-expand],
+[data-sidebar-divider] { display: none; }
+
+@media (min-width: 1024px) {
+  html[data-sidebar="collapsed"] #sidebar { display: none; }
+  html[data-sidebar="collapsed"] [data-sidebar-expand] { display: grid; }
+  html[data-sidebar="collapsed"] [data-sidebar-divider] { display: block; }
+
+  /* Pull the title row's gutter in behind the control. That padding is sized to
+     sit clear of the sidebar, and while the sidebar is collapsed there is
+     nothing to sit clear of — leaving it strands the icon in white space.
+     `:has(> …)` scopes this to the one row that actually hosts the control, so
+     each header keeps its own padding the rest of the time. */
+  html[data-sidebar="collapsed"] :has(> [data-sidebar-expand]) { padding-left: 12px; }
+}

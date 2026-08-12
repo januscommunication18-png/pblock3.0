@@ -22,7 +22,7 @@
         @csrf
         <button type="submit" title="Log out" aria-label="Log out"
           class="flex items-center gap-1.5 h-8 px-3 rounded-full border border-line text-[13px] text-sub hover:bg-hover hover:text-ink transition-colors">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 21H6a2 2 0 01-2-2V5a2 2 0 012-2h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 17l5-5-5-5M21 12H9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          {!! pb_icon('right-from-bracket', 16) !!}
           <span class="hidden sm:inline">Log out</span>
         </button>
       </form>
@@ -43,7 +43,7 @@
         <span id="avatar" class="h-14 w-14 rounded-full bg-brand grid place-items-center text-white text-[20px] font-semibold bg-cover bg-center shrink-0"
           @if($user->avatar_url) style="background-image:url('{{ $user->avatar_url }}')" @endif>{{ $user->avatar_url ? '' : $user->initial() }}</span>
         <button id="upload-btn" type="button" class="flex items-center gap-2 text-[14px] text-sub hover:text-ink">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.8"/><circle cx="9" cy="10" r="2" stroke="currentColor" stroke-width="1.8"/><path d="M4 18l5-4 4 3 3-2 4 3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          {!! pb_icon('image', 18) !!}
           Upload image
         </button>
         <input id="avatar-input" type="file" accept="image/*" class="hidden" />
@@ -80,7 +80,7 @@
               <label class="block text-[13px] text-sub mb-1.5">Set a password</label>
               <div class="relative">
                 <input name="password" type="password" placeholder="Set a password" class="pw-input pb-input has-suffix {{ $errors->has('password') ? 'is-error' : '' }}" />
-                <button type="button" class="pw-eye absolute right-3 top-1/2 -translate-y-1/2 text-faint hover:text-sub"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="2.5" stroke="currentColor" stroke-width="1.8"/></svg></button>
+                <button type="button" class="pw-eye absolute right-3 top-1/2 -translate-y-1/2 text-faint hover:text-sub">{!! pb_icon('eye', 17) !!}</button>
               </div>
               @error('password')<p class="mt-1 text-[12px] text-danger">{{ $message }}</p>@enderror
             </div>
@@ -88,7 +88,7 @@
               <label class="block text-[13px] text-sub mb-1.5">Confirm password</label>
               <div class="relative">
                 <input name="password_confirmation" type="password" placeholder="Confirm password" class="pw-input pb-input has-suffix" />
-                <button type="button" class="pw-eye absolute right-3 top-1/2 -translate-y-1/2 text-faint hover:text-sub"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="2.5" stroke="currentColor" stroke-width="1.8"/></svg></button>
+                <button type="button" class="pw-eye absolute right-3 top-1/2 -translate-y-1/2 text-faint hover:text-sub">{!! pb_icon('eye', 17) !!}</button>
               </div>
             </div>
           </div>

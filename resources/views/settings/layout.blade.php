@@ -8,11 +8,12 @@
 
   {{-- Project Block settings shell — hybrid Vue-in-Blade (CLAUDE.md §14, no FlyonUI).
        Same CDN Tailwind + POC design tokens the rest of the app uses. --}}
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="{{ pb_asset('assets/js/tailwind.config.js') }}"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ pb_asset('assets/css/tailwind.css') }}" />
+  <link rel="stylesheet" href="{{ pb_asset('assets/css/inter.css') }}" />
   <link rel="stylesheet" href="{{ pb_asset('assets/css/styles.css') }}" />
+  {!! pb_icon_styles() !!}
+  {!! pb_icon_boot() !!}
+  <script defer src="{{ pb_asset('assets/js/icons.js') }}"></script>
 
   {{-- Vue 3 (global build) + shared settings runtime/components. --}}
   <script src="{{ pb_asset('assets/js/vendor/vue.global.prod.js') }}"></script>
@@ -24,7 +25,7 @@
   {{-- Topbar (settings mode: minimal, not the full app topbar) --}}
   <header class="h-14 shrink-0 border-b border-line flex items-center gap-2 px-3 sm:px-4">
     <button id="open-nav" class="md:hidden h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      {!! pb_icon('bars', 18) !!}
     </button>
     <span class="flex items-center gap-2">
       <span class="h-6 w-6 rounded-md bg-slate-700 text-white grid place-items-center text-[11px] font-semibold">{{ $workspace->initial() }}</span>
@@ -35,7 +36,7 @@
     <div class="ml-auto flex items-center gap-2">
       <span class="h-6 w-px bg-line"></span>
       <a href="{{ route('welcome') }}" title="Close settings" class="h-9 w-9 grid place-items-center rounded-md text-sub hover:bg-hover">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        {!! pb_icon('xmark', 18) !!}
       </a>
     </div>
   </header>
@@ -47,7 +48,7 @@
     <aside id="settings-nav" class="w-64 shrink-0 border-r border-line bg-white flex flex-col fixed md:relative inset-y-0 left-0 z-40 -translate-x-full md:translate-x-0 transition-transform duration-200">
       <div class="md:hidden flex justify-end px-2 h-12 items-center shrink-0">
         <button id="close-nav" class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          {!! pb_icon('xmark', 16) !!}
         </button>
       </div>
       <nav class="flex-1 overflow-y-auto pt-2 pb-6 px-2">

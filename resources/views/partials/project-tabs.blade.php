@@ -6,8 +6,9 @@
        container and swallow the ⋯ menu, which is positioned below the 48px row. Only the tab
        list needs to scroll on narrow screens, so that lives on <nav>. --}}
   <div class="flex items-center gap-2 h-12">
+    @include('partials.sidebar-expand')
     <a href="{{ route('projects.index') }}" class="text-sub hover:text-ink shrink-0" title="Back to projects">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      {!! pb_icon('arrow-left', 16) !!}
     </a>
     <span class="inline-flex items-center gap-1.5 text-[14px] font-medium text-ink shrink-0">
       <span>{{ $project->emoji ?: '📁' }}</span>{{ $project->name }}
@@ -25,19 +26,19 @@
       <summary class="list-none [&::-webkit-details-marker]:hidden cursor-pointer"
                role="button" aria-haspopup="menu" title="Project actions">
         <span class="h-7 w-7 grid place-items-center rounded-md text-sub hover:bg-hover">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+          {!! pb_icon('ellipsis-thin', 16) !!}
         </span>
       </summary>
       <div role="menu" class="absolute left-0 top-full mt-1 w-56 rounded-md bg-white py-1 shadow-lg outline outline-1 outline-black/5 z-50">
 
         <span class="w-full flex items-center gap-2.5 px-3 h-9 text-[13px] text-faint cursor-not-allowed" aria-disabled="true">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="shrink-0"><path d="M12 4l2.3 4.7 5.2.8-3.8 3.6.9 5.1-4.6-2.4-4.6 2.4.9-5.1L4.5 9.5l5.2-.8L12 4z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+          {!! pb_icon('star', 15, 'shrink-0') !!}
           Add to favorites
           <span class="ml-auto text-[10px] font-semibold uppercase tracking-wide bg-hover rounded px-1 py-0.5">Soon</span>
         </span>
 
         <span class="w-full flex items-center gap-2.5 px-3 h-9 text-[13px] text-faint cursor-not-allowed" aria-disabled="true">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="shrink-0"><rect x="3" y="4" width="18" height="5" rx="1.5" stroke="currentColor" stroke-width="1.6"/><path d="M5 9v9a1 1 0 001 1h12a1 1 0 001-1V9M10 13h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          {!! pb_icon('box-archive', 15, 'shrink-0') !!}
           Archives
           <span class="ml-auto text-[10px] font-semibold uppercase tracking-wide bg-hover rounded px-1 py-0.5">Soon</span>
         </span>
@@ -53,7 +54,7 @@
         <div class="my-1 border-t border-line"></div>
 
         <span class="w-full flex items-center gap-2.5 px-3 h-9 text-[13px] text-faint cursor-not-allowed" aria-disabled="true">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="shrink-0"><path d="M10 17l-5-5 5-5M5 12h11M14 4h4a2 2 0 012 2v12a2 2 0 01-2 2h-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          {!! pb_icon('arrow-right-from-bracket', 15, 'shrink-0') !!}
           Leave project
           <span class="ml-auto text-[10px] font-semibold uppercase tracking-wide bg-hover rounded px-1 py-0.5">Soon</span>
         </span>
@@ -73,6 +74,11 @@
           {{ $tab['label'] }}
           @if (($tab['status'] ?? '') === 'soon')
             <span class="text-[10px] font-semibold uppercase tracking-wide text-faint bg-hover rounded px-1 py-0.5">Soon</span>
+          @elseif (($tab['state'] ?? '') === 'disabled')
+            {{-- Feature Disable §5: the tab stays so the history stays reachable, and says
+                 plainly that the feature is off. It still opens — read-only. --}}
+            <span class="text-[10px] font-semibold uppercase tracking-wide text-faint bg-hover rounded px-1 py-0.5"
+                  title="This feature is disabled. Existing records are read-only.">Disabled</span>
           @endif
         </a>
       @endforeach

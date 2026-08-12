@@ -13,9 +13,9 @@ var PB_COVER_FALLBACK = [
 
 // Inline icons used by the Access/Lead chips (from projects.html).
 var PB_SVG = {
-  globe: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/><path d="M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18" stroke="currentColor" stroke-width="1.6"/></svg>',
-  lock: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><rect x="5" y="10" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M8 10V7a4 4 0 018 0v3" stroke="currentColor" stroke-width="1.7"/></svg>',
-  person: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.2" stroke="currentColor" stroke-width="1.7"/><path d="M5 20a7 7 0 0114 0" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>'
+  globe: '' + wiIcon('globe', 15) + '',
+  lock: '' + wiIcon('lock-small', 15) + '',
+  person: '' + wiIcon('user', 15) + ''
 };
 
 // The modal's form doubles as a popover target so the status / priority / date pickers
@@ -566,16 +566,25 @@ PB.boot('projects-index', {
 
     // ===== Toolbar (matches projects.html ProjectsToolbar) =====
     '<div class="flex items-center gap-2 px-5 sm:px-8 h-12 border-b border-line">' +
+    // Brings the collapsed sidebar back. Same control as the Blade headers — hidden by CSS
+    // until there is something to expand, and handled by the sidebar's delegated listener.
+    '<button type="button" data-sidebar-expand title="Show sidebar" aria-label="Show sidebar" ' +
+    'aria-controls="sidebar" aria-expanded="false" ' +
+    'class="h-7 w-7 place-items-center rounded-md text-sub hover:bg-hover hover:text-ink shrink-0">' +
+    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none">' +
+    '<rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.7"/>' +
+    '<path d="M9 4v16" stroke="currentColor" stroke-width="1.7"/></svg></button>' +
+    '<span data-sidebar-divider aria-hidden="true" class="h-5 w-px bg-line shrink-0"></span>' +
     '<span class="flex items-center gap-2 text-[14px] font-medium text-ink">' +
-    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" class="text-sub"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>' +
+    '' + wiIcon('folder', 16, 'text-sub') + '' +
     '{{ archived ? \'Archived projects\' : \'Projects\' }}' +
     '</span>' +
     '<div class="ml-auto flex items-center gap-1.5 sm:gap-2">' +
-    '<button class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover" title="Search" @click="soon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>' +
-    '<button class="hidden sm:inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-stroke text-[13px] text-ink hover:bg-hover whitespace-nowrap" @click="soon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="text-faint"><path d="M4 7h16M7 12h10M10 17h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Created date<svg width="12" height="12" viewBox="0 0 24 24" fill="none" class="text-faint"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
-    '<button class="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-stroke text-[13px] text-ink hover:bg-hover whitespace-nowrap" @click="soon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="text-faint"><path d="M4 5h16l-6 8v5l-4 2v-7L4 5z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>Filters</button>' +
+    '<button class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover" title="Search" @click="soon">' + wiIcon('magnifying-glass', 16) + '</button>' +
+    '<button class="hidden sm:inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-stroke text-[13px] text-ink hover:bg-hover whitespace-nowrap" @click="soon">' + wiIcon('bars-sort', 14, 'text-faint') + 'Created date' + wiIcon('chevron-down', 12, 'text-faint') + '</button>' +
+    '<button class="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-stroke text-[13px] text-ink hover:bg-hover whitespace-nowrap" @click="soon">' + wiIcon('filter', 14, 'text-faint') + 'Filters</button>' +
     '<button class="inline-flex items-center h-8 px-3 rounded-md border border-stroke text-[13px] text-ink hover:bg-hover whitespace-nowrap" @click="toggleArchived">{{ archived ? \'Active\' : \'Archived\' }}</button>' +
-    '<button v-if="canCreate && !archived" class="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold whitespace-nowrap" @click="openCreate"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Add Project</button>' +
+    '<button v-if="canCreate && !archived" class="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold whitespace-nowrap" @click="openCreate">' + wiIcon('plus', 14) + 'Add Project</button>' +
     '</div></div>' +
 
     // ===== Card grid (when projects exist) =====
@@ -587,7 +596,7 @@ PB.boot('projects-index', {
     '<span class="text-[11px] bg-white/90 rounded px-1.5 py-0.5 text-sub capitalize">{{ p.visibility }}</span>' +
     // Actions kebab — Edit / Archive|Restore / Delete. The card is a link, so stop the click.
     '<button v-if="p.can_manage" type="button" @click.stop.prevent="openActionsMenu(p, $event)" :aria-expanded="actionsMenu.open && actionsMenu.projectId===p.id ? \'true\' : \'false\'" aria-haspopup="menu" title="Project actions" class="h-6 w-6 grid place-items-center rounded bg-white/90 text-sub hover:bg-white hover:text-ink shadow-sm">' +
-    '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5.5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="18.5" r="1.6"/></svg>' +
+    '' + wiIcon('ellipsis-vertical', 15) + '' +
     '</button>' +
     '</div>' +
     '</div>' +
@@ -599,12 +608,12 @@ PB.boot('projects-index', {
     '<div class="mt-2.5">' +
     '<button v-if="p.can_manage" type="button" @click.stop.prevent="openLeadMenu(p, $event)" class="inline-flex items-center gap-1.5 h-8 pl-1.5 pr-2 rounded-md border border-stroke text-[12px] text-ink hover:bg-hover max-w-full min-w-0">' +
     '<template v-if="p.lead"><span class="h-5 w-5 rounded-full bg-brand text-white grid place-items-center text-[9px] font-bold shrink-0">{{ p.lead.initial }}</span><span class="truncate">{{ p.lead.name }}</span></template>' +
-    '<template v-else><svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0"><circle cx="12" cy="8" r="3.2" stroke="currentColor" stroke-width="1.7"/><path d="M5 20a7 7 0 0114 0" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg><span class="text-sub">No lead</span></template>' +
-    '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+    '<template v-else>' + wiIcon('user', 15, 'text-faint shrink-0') + '<span class="text-sub">No lead</span></template>' +
+    '' + wiIcon('chevron-down', 12, 'text-faint shrink-0') + '' +
     '</button>' +
     '<span v-else class="inline-flex items-center gap-1.5 h-8 pl-1.5 pr-2 rounded-md border border-stroke text-[12px] text-ink max-w-full min-w-0">' +
     '<template v-if="p.lead"><span class="h-5 w-5 rounded-full bg-brand text-white grid place-items-center text-[9px] font-bold shrink-0">{{ p.lead.initial }}</span><span class="truncate">{{ p.lead.name }}</span></template>' +
-    '<template v-else><svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0"><circle cx="12" cy="8" r="3.2" stroke="currentColor" stroke-width="1.7"/><path d="M5 20a7 7 0 0114 0" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg><span class="text-sub">No lead</span></template>' +
+    '<template v-else>' + wiIcon('user', 15, 'text-faint shrink-0') + '<span class="text-sub">No lead</span></template>' +
     '</span>' +
     '</div>' +
     '</div>' +
@@ -616,7 +625,7 @@ PB.boot('projects-index', {
     '<button v-if="p.can_manage" type="button" @click.stop.prevent="openStatusMenu(p, $event)" class="inline-flex items-center gap-2 h-8 px-3 rounded-md border border-stroke text-[12px] text-ink hover:bg-hover shrink-0">' +
     '<span class="h-2.5 w-2.5 rounded-full shrink-0" :style="{background: p.state ? p.state.color : \'#94a3b8\'}"></span>' +
     '<span>{{ p.state ? p.state.name : \'Set status\' }}</span>' +
-    '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" class="text-faint ml-0.5"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+    '' + wiIcon('chevron-down', 12, 'text-faint ml-0.5') + '' +
     '</button>' +
     '<span v-else-if="p.state" class="inline-flex items-center gap-2 h-8 px-3 rounded-md border border-stroke text-[12px] text-ink shrink-0">' +
     '<span class="h-2.5 w-2.5 rounded-full shrink-0" :style="{background: p.state.color}"></span>' +
@@ -628,30 +637,30 @@ PB.boot('projects-index', {
     '<button v-if="p.can_manage && endpoints.priority" type="button" @click.stop.prevent="openPriorityMenu(p, $event)" class="inline-flex items-center gap-2 h-8 px-3 rounded-md border border-stroke text-[12px] text-ink hover:bg-hover shrink-0">' +
     '<span class="h-2.5 w-2.5 rounded-full shrink-0" :style="{background: p.priority ? p.priority.color : \'#cbd5e1\'}"></span>' +
     '<span>{{ p.priority ? p.priority.name : \'Priority\' }}</span>' +
-    '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" class="text-faint ml-0.5"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+    '' + wiIcon('chevron-down', 12, 'text-faint ml-0.5') + '' +
     '</button>' +
     '<span v-else-if="p.priority" class="inline-flex items-center gap-2 h-8 px-3 rounded-md border border-stroke text-[12px] text-ink shrink-0">' +
     '<span class="h-2.5 w-2.5 rounded-full shrink-0" :style="{background: p.priority.color}"></span><span>{{ p.priority.name }}</span></span>' +
 
     // Start date (opens the design-system calendar popover)
     '<button v-if="p.can_manage && endpoints.dates" type="button" @click.stop.prevent="openDateMenu(p, \'start_date\', $event)" class="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border border-stroke text-[12px] text-ink hover:bg-hover shrink-0" title="Start date">' +
-    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0"><rect x="4" y="5" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>' +
+    '' + wiIcon('calendar', 14, 'text-faint shrink-0') + '' +
     '<span>{{ p.start_date ? fmtDate(p.start_date) : \'Start date\' }}</span>' +
     '</button>' +
-    '<span v-else-if="p.start_date" class="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border border-stroke text-[12px] text-ink shrink-0"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="text-faint"><rect x="4" y="5" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>{{ fmtDate(p.start_date) }}</span>' +
+    '<span v-else-if="p.start_date" class="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border border-stroke text-[12px] text-ink shrink-0">' + wiIcon('calendar', 14, 'text-faint') + '{{ fmtDate(p.start_date) }}</span>' +
 
     // End date (opens the design-system calendar popover)
     '<button v-if="p.can_manage && endpoints.dates" type="button" @click.stop.prevent="openDateMenu(p, \'end_date\', $event)" class="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border border-stroke text-[12px] text-ink hover:bg-hover shrink-0" title="End date">' +
-    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0"><rect x="4" y="5" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>' +
+    '' + wiIcon('calendar', 14, 'text-faint shrink-0') + '' +
     '<span>{{ p.end_date ? fmtDate(p.end_date) : \'Due date\' }}</span>' +
     '</button>' +
-    '<span v-else-if="p.end_date" class="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border border-stroke text-[12px] text-ink shrink-0"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="text-faint"><rect x="4" y="5" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>{{ fmtDate(p.end_date) }}</span>' +
+    '<span v-else-if="p.end_date" class="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border border-stroke text-[12px] text-ink shrink-0">' + wiIcon('calendar', 14, 'text-faint') + '{{ fmtDate(p.end_date) }}</span>' +
 
     '</div></a>' +
 
     // Add Project card tile
     '<button v-if="canCreate && !archived" type="button" @click="openCreate" class="border border-dashed border-stroke rounded-xl min-h-[172px] flex flex-col items-center justify-center gap-2 text-sub hover:border-brand hover:text-brand hover:bg-hover/40 transition-colors">' +
-    '<span class="h-10 w-10 rounded-full border border-current grid place-items-center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>' +
+    '<span class="h-10 w-10 rounded-full border border-current grid place-items-center">' + wiIcon('plus', 18) + '</span>' +
     '<span class="text-[13px] font-semibold">Add Project</span>' +
     '</button>' +
     '</div>' +
@@ -663,26 +672,26 @@ PB.boot('projects-index', {
     '<div v-else class="flex flex-col items-center text-center px-6 py-14 max-w-lg mx-auto">' +
     '<div class="relative w-full max-w-md aspect-video rounded-xl bg-hover border border-line grid place-items-center overflow-hidden">' +
     '<div class="absolute inset-0 opacity-60" style="background:linear-gradient(120deg,#eef2ff 0%,#f5f3ff 55%,#ecfeff 100%)"></div>' +
-    '<span class="relative h-14 w-14 rounded-full bg-white shadow grid place-items-center text-brand"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></span>' +
+    '<span class="relative h-14 w-14 rounded-full bg-white shadow grid place-items-center text-brand">' + wiIcon('play', 24) + '</span>' +
     '<span class="absolute bottom-2.5 left-2.5 text-[11px] text-sub bg-white/80 rounded px-1.5 py-0.5">Watch a 60-sec intro</span>' +
     '</div>' +
     '<h2 class="text-[18px] font-bold text-head mt-6">Create your first project</h2>' +
     '<p class="text-[14px] text-sub mt-1.5 max-w-sm">Projects keep your work items, cycles, and docs together in one place. Watch the quick intro, then spin up your first project.</p>' +
-    '<button v-if="canCreate" type="button" @click="openCreate" class="mt-5 inline-flex items-center gap-1.5 h-9 px-4 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Add Project</button>' +
+    '<button v-if="canCreate" type="button" @click="openCreate" class="mt-5 inline-flex items-center gap-1.5 h-9 px-4 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold">' + wiIcon('plus', 15) + 'Add Project</button>' +
     '</div>' +
 
     // ===== Card actions menu (shared, fixed-positioned to escape card clipping) =====
     '<div v-if="actionsMenu.open" class="fixed inset-0 z-[110]" @click="closeActionsMenu"></div>' +
     '<div v-if="actionsMenu.open" :style="actionsMenu.style" role="menu" class="rounded-md bg-white py-1 shadow-lg ring-1 ring-black/5">' +
     '<button v-if="actionsProject && actionsProject.can_edit && (endpoints.update || actionsProject.settings_url)" type="button" role="menuitem" @click="editProject(actionsProject)" class="w-full text-left flex items-center gap-2.5 px-2.5 h-9 hover:bg-hover text-[13px] text-ink">' +
-    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0"><path d="M4 20h4l10-10a2.5 2.5 0 10-3.5-3.5L4.5 16.5 4 20z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>Edit</button>' +
+    '' + wiIcon('pen-line', 15, 'text-faint shrink-0') + 'Edit</button>' +
     '<button v-if="!archived && endpoints.archive" type="button" role="menuitem" @click="setArchived(actionsProject, true)" class="w-full text-left flex items-center gap-2.5 px-2.5 h-9 hover:bg-hover text-[13px] text-ink">' +
-    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0"><rect x="3" y="4" width="18" height="4" rx="1" stroke="currentColor" stroke-width="1.7"/><path d="M5 8v11a1 1 0 001 1h12a1 1 0 001-1V8M10 12h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>Archive</button>' +
+    '' + wiIcon('box-archive-thin', 15, 'text-faint shrink-0') + 'Archive</button>' +
     '<button v-if="archived && endpoints.restore" type="button" role="menuitem" @click="setArchived(actionsProject, false)" class="w-full text-left flex items-center gap-2.5 px-2.5 h-9 hover:bg-hover text-[13px] text-ink">' +
-    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0"><path d="M4 9a8 8 0 1114 5.3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M4 4v5h5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>Restore</button>' +
+    '' + wiIcon('arrow-rotate-left', 15, 'text-faint shrink-0') + 'Restore</button>' +
     '<div v-if="endpoints.destroy" class="my-1 border-t border-line"></div>' +
     '<button v-if="endpoints.destroy" type="button" role="menuitem" @click="askDelete(actionsProject)" class="w-full text-left flex items-center gap-2.5 px-2.5 h-9 hover:bg-hover text-[13px] text-danger">' +
-    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="shrink-0"><path d="M4 7h16M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2M6 7l1 13a1 1 0 001 1h8a1 1 0 001-1l1-13" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>Delete</button>' +
+    '' + wiIcon('trash', 15, 'shrink-0') + 'Delete</button>' +
     '</div>' +
 
     // ===== Delete confirmation — typed project identifier required (PRJ-047) =====
@@ -701,7 +710,7 @@ PB.boot('projects-index', {
     '<button v-for="s in states" :key="s.id" type="button" @click="setStatus(statusProject, s)" class="w-full text-left flex items-center gap-2 px-2.5 h-8 hover:bg-hover text-[13px] text-ink">' +
     '<span class="h-2.5 w-2.5 rounded-full shrink-0" :style="{background: s.color}"></span>' +
     '<span class="flex-1 truncate">{{ s.name }}</span>' +
-    '<svg v-if="statusProject && statusProject.state && statusProject.state.id===s.id" width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-brand shrink-0"><path d="M5 12l4 4L19 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+    '<span v-if="statusProject && statusProject.state && statusProject.state.id===s.id" class="text-brand shrink-0">' + wiIcon('check', 15) + '</span>' +
     '</button>' +
     '<div v-if="!states.length" class="px-2.5 py-2 text-[12px] text-sub">No statuses yet. Add them in Settings → Projects.</div>' +
     '</div>' +
@@ -712,7 +721,7 @@ PB.boot('projects-index', {
     '<button v-for="pr in priorities" :key="pr.id" type="button" @click="setPriority(priorityMenuProject, pr)" class="w-full text-left flex items-center gap-2 px-2.5 h-8 hover:bg-hover text-[13px] text-ink">' +
     '<span class="h-2.5 w-2.5 rounded-full shrink-0" :style="{background: pr.color}"></span>' +
     '<span class="flex-1 truncate">{{ pr.name }}</span>' +
-    '<svg v-if="priorityMenuProject && priorityMenuProject.priority && priorityMenuProject.priority.id===pr.id" width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-brand shrink-0"><path d="M5 12l4 4L19 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+    '<span v-if="priorityMenuProject && priorityMenuProject.priority && priorityMenuProject.priority.id===pr.id" class="text-brand shrink-0">' + wiIcon('check', 15) + '</span>' +
     '</button>' +
     '<div v-if="!priorities.length" class="px-2.5 py-2 text-[12px] text-sub">No priorities yet. Add them in Settings → Projects.</div>' +
     '</div>' +
@@ -723,34 +732,34 @@ PB.boot('projects-index', {
 
     // -- Quick options view --
     '<template v-if="dateMenu.mode===\'quick\'">' +
-    '<button type="button" :disabled="quickDisabled(0)" @click="dateQuickPick(0)" :class="[\'w-full text-left flex items-center gap-2.5 px-2 h-9 rounded-md text-[13px] text-ink\', quickDisabled(0) ? \'opacity-40 cursor-not-allowed\' : \'hover:bg-hover\']"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0"><rect x="4" y="5" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>Today</button>' +
-    '<button type="button" :disabled="quickDisabled(1)" @click="dateQuickPick(1)" :class="[\'w-full text-left flex items-center gap-2.5 px-2 h-9 rounded-md text-[13px] text-ink\', quickDisabled(1) ? \'opacity-40 cursor-not-allowed\' : \'hover:bg-hover\']"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0"><rect x="4" y="5" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>Tomorrow</button>' +
-    '<button type="button" :disabled="quickDisabled(3)" @click="dateQuickPick(3)" :class="[\'w-full text-left flex items-center gap-2.5 px-2 h-9 rounded-md text-[13px] text-ink\', quickDisabled(3) ? \'opacity-40 cursor-not-allowed\' : \'hover:bg-hover\']"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0"><rect x="4" y="5" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>Next 3 days</button>' +
-    '<button type="button" :disabled="quickDisabled(5)" @click="dateQuickPick(5)" :class="[\'w-full text-left flex items-center gap-2.5 px-2 h-9 rounded-md text-[13px] text-ink\', quickDisabled(5) ? \'opacity-40 cursor-not-allowed\' : \'hover:bg-hover\']"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0"><rect x="4" y="5" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>Next 5 days</button>' +
+    '<button type="button" :disabled="quickDisabled(0)" @click="dateQuickPick(0)" :class="[\'w-full text-left flex items-center gap-2.5 px-2 h-9 rounded-md text-[13px] text-ink\', quickDisabled(0) ? \'opacity-40 cursor-not-allowed\' : \'hover:bg-hover\']">' + wiIcon('calendar', 15, 'text-faint shrink-0') + 'Today</button>' +
+    '<button type="button" :disabled="quickDisabled(1)" @click="dateQuickPick(1)" :class="[\'w-full text-left flex items-center gap-2.5 px-2 h-9 rounded-md text-[13px] text-ink\', quickDisabled(1) ? \'opacity-40 cursor-not-allowed\' : \'hover:bg-hover\']">' + wiIcon('calendar', 15, 'text-faint shrink-0') + 'Tomorrow</button>' +
+    '<button type="button" :disabled="quickDisabled(3)" @click="dateQuickPick(3)" :class="[\'w-full text-left flex items-center gap-2.5 px-2 h-9 rounded-md text-[13px] text-ink\', quickDisabled(3) ? \'opacity-40 cursor-not-allowed\' : \'hover:bg-hover\']">' + wiIcon('calendar', 15, 'text-faint shrink-0') + 'Next 3 days</button>' +
+    '<button type="button" :disabled="quickDisabled(5)" @click="dateQuickPick(5)" :class="[\'w-full text-left flex items-center gap-2.5 px-2 h-9 rounded-md text-[13px] text-ink\', quickDisabled(5) ? \'opacity-40 cursor-not-allowed\' : \'hover:bg-hover\']">' + wiIcon('calendar', 15, 'text-faint shrink-0') + 'Next 5 days</button>' +
     '<div class="my-1 border-t border-line"></div>' +
-    '<button type="button" @click="dateCustom" class="w-full text-left flex items-center gap-2.5 px-2 h-9 rounded-md text-[13px] text-ink hover:bg-hover"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0"><rect x="4" y="5" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>Custom Date</button>' +
+    '<button type="button" @click="dateCustom" class="w-full text-left flex items-center gap-2.5 px-2 h-9 rounded-md text-[13px] text-ink hover:bg-hover">' + wiIcon('calendar', 15, 'text-faint shrink-0') + 'Custom Date</button>' +
     '<template v-if="dateSelected"><div class="my-1 border-t border-line"></div>' +
-    '<button type="button" @click="dateClear" class="w-full text-left flex items-center gap-2.5 px-2 h-9 rounded-md text-[13px] text-danger hover:bg-hover"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="shrink-0"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Clear</button></template>' +
+    '<button type="button" @click="dateClear" class="w-full text-left flex items-center gap-2.5 px-2 h-9 rounded-md text-[13px] text-danger hover:bg-hover">' + wiIcon('xmark', 15, 'shrink-0') + 'Clear</button></template>' +
     '</template>' +
 
     // -- Custom Date calendar grid --
     '<template v-else>' +
-    '<button type="button" @click="dateBack" class="mb-2 inline-flex items-center gap-1 text-[12px] text-sub hover:text-ink"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Back</button>' +
+    '<button type="button" @click="dateBack" class="mb-2 inline-flex items-center gap-1 text-[12px] text-sub hover:text-ink">' + wiIcon('chevron-left', 13) + 'Back</button>' +
     '<div class="flex items-center gap-1.5 mb-2">' +
-    '<button type="button" @click="calNav(-1)" class="h-8 w-8 grid place-items-center rounded-md hover:bg-hover text-sub shrink-0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
+    '<button type="button" @click="calNav(-1)" class="h-8 w-8 grid place-items-center rounded-md hover:bg-hover text-sub shrink-0">' + wiIcon('chevron-left', 16) + '</button>' +
     // Month dropdown
     '<div class="relative flex-1 min-w-0">' +
-    '<button type="button" @click.stop="dateMenu.monthOpen=!dateMenu.monthOpen; dateMenu.yearOpen=false" class="w-full flex items-center justify-between h-8 px-2.5 rounded-md text-[13px] text-ink outline outline-1 -outline-offset-1 outline-stroke hover:bg-hover"><span class="truncate">{{ calMonthLabel }}</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0 ml-1"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
+    '<button type="button" @click.stop="dateMenu.monthOpen=!dateMenu.monthOpen; dateMenu.yearOpen=false" class="w-full flex items-center justify-between h-8 px-2.5 rounded-md text-[13px] text-ink outline outline-1 -outline-offset-1 outline-stroke hover:bg-hover"><span class="truncate">{{ calMonthLabel }}</span>' + wiIcon('chevron-down', 14, 'text-faint shrink-0 ml-1') + '</button>' +
     '<ul v-if="dateMenu.monthOpen" class="absolute z-50 mt-1 w-full max-h-52 overflow-auto rounded-md bg-white border border-line shadow-lg py-1">' +
     '<li v-for="mo in calMonths" :key="mo.i" @click="calSetMonth(mo.i)" :class="[\'cursor-pointer select-none py-1.5 px-3 text-[13px] hover:bg-brand hover:text-white\', mo.i===dateMenu.vm ? \'text-brand font-medium\' : \'text-ink\']">{{ mo.name }}</li>' +
     '</ul></div>' +
     // Year dropdown
     '<div class="relative w-[92px] shrink-0">' +
-    '<button type="button" @click.stop="dateMenu.yearOpen=!dateMenu.yearOpen; dateMenu.monthOpen=false" class="w-full flex items-center justify-between h-8 px-2.5 rounded-md text-[13px] text-ink outline outline-1 -outline-offset-1 outline-stroke hover:bg-hover"><span class="shrink-0 whitespace-nowrap">{{ dateMenu.vy }}</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0 ml-1"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
+    '<button type="button" @click.stop="dateMenu.yearOpen=!dateMenu.yearOpen; dateMenu.monthOpen=false" class="w-full flex items-center justify-between h-8 px-2.5 rounded-md text-[13px] text-ink outline outline-1 -outline-offset-1 outline-stroke hover:bg-hover"><span class="shrink-0 whitespace-nowrap">{{ dateMenu.vy }}</span>' + wiIcon('chevron-down', 14, 'text-faint shrink-0 ml-1') + '</button>' +
     '<ul v-if="dateMenu.yearOpen" class="absolute z-50 mt-1 w-full max-h-52 overflow-auto rounded-md bg-white border border-line shadow-lg py-1">' +
     '<li v-for="y in calYears" :key="y" @click="calSetYear(y)" :class="[\'cursor-pointer select-none py-1.5 px-3 text-[13px] hover:bg-brand hover:text-white\', y===dateMenu.vy ? \'text-brand font-medium\' : \'text-ink\']">{{ y }}</li>' +
     '</ul></div>' +
-    '<button type="button" @click="calNav(1)" class="h-8 w-8 grid place-items-center rounded-md hover:bg-hover text-sub shrink-0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
+    '<button type="button" @click="calNav(1)" class="h-8 w-8 grid place-items-center rounded-md hover:bg-hover text-sub shrink-0">' + wiIcon('chevron-right', 16) + '</button>' +
     '</div>' +
     // Day-of-week header
     '<div class="grid grid-cols-7 gap-0.5 mb-1">' +
@@ -774,7 +783,7 @@ PB.boot('projects-index', {
     '<div v-if="leadMenu.open" class="fixed inset-0 z-[110]" @click="closeLeadMenu"></div>' +
     '<div v-if="leadMenu.open" :style="leadMenu.style" class="rounded-md bg-white p-2 shadow-lg ring-1 ring-black/5">' +
     '<div class="relative mb-1">' +
-    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-faint"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>' +
+    '' + wiIcon('magnifying-glass', 14, 'absolute left-2.5 top-1/2 -translate-y-1/2 text-faint') + '' +
     '<input v-model="leadMenuQuery" ref="leadMenuSearch" name="member-search" autocomplete="off" placeholder="Search members..." class="w-full h-9 pl-8 pr-3 rounded-md bg-hover text-[13px] text-ink placeholder:text-faint outline outline-1 -outline-offset-1 outline-transparent focus:bg-white focus:outline-stroke" />' +
     '</div>' +
     '<div class="max-h-52 overflow-y-auto">' +
@@ -782,7 +791,7 @@ PB.boot('projects-index', {
     '<span class="grid place-items-center text-faint" v-html="personIcon"></span><span>No lead</span></button>' +
     '<button v-for="m in leadMenuMembers" :key="m.id" type="button" @click="setLead(leadMenuProject, m)" class="w-full text-left flex items-center gap-2.5 px-2 h-9 rounded-md hover:bg-hover text-[13px] text-ink">' +
     '<span class="h-6 w-6 rounded-full bg-brand text-white grid place-items-center text-[10px] font-bold shrink-0">{{ m.initial }}</span><span class="flex-1 truncate">{{ m.name }}</span>' +
-    '<svg v-if="leadMenuProject && leadMenuProject.lead && leadMenuProject.lead.id===m.id" width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-brand shrink-0"><path d="M5 12l4 4L19 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+    '<span v-if="leadMenuProject && leadMenuProject.lead && leadMenuProject.lead.id===m.id" class="text-brand shrink-0">' + wiIcon('check', 15) + '</span>' +
     '</button>' +
     '<div v-if="!leadMenuMembers.length" class="px-2 py-3 text-[13px] text-sub text-center">No members found</div>' +
     '</div>' +
@@ -797,7 +806,7 @@ PB.boot('projects-index', {
     '<div class="relative h-32 rounded-t-xl shrink-0 bg-center bg-cover" :style="modalCoverStyle">' +
     '<button @click="pickCover" class="absolute top-3 left-3 h-8 px-3 rounded-md bg-white/85 text-[12px] font-medium text-ink hover:bg-white shadow-sm">Change cover</button>' +
     '<input ref="coverInput" type="file" accept="image/*" class="hidden" @change="onCoverChange" />' +
-    '<button @click="closeModal" class="absolute top-3 right-3 h-8 w-8 grid place-items-center rounded-md bg-white/85 text-sub hover:bg-white shadow-sm" title="Close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>' +
+    '<button @click="closeModal" class="absolute top-3 right-3 h-8 w-8 grid place-items-center rounded-md bg-white/85 text-sub hover:bg-white shadow-sm" title="Close">' + wiIcon('xmark', 16) + '</button>' +
     '<div v-if="!coverUploading" class="absolute bottom-3 right-3 flex items-center gap-1.5">' +
     '<button v-for="g in coverPresets" :key="g" type="button" @click="coverImage=\'\'; form.cover_gradient=g" :style="{background:g}" :class="[\'h-6 w-8 rounded-md ring-2 ring-offset-1 ring-offset-black/10 transition\', (!coverImage && form.cover_gradient===g) ? \'ring-white\' : \'ring-transparent hover:ring-white/60\']"></button>' +
     '</div>' +
@@ -829,14 +838,14 @@ PB.boot('projects-index', {
     '<button type="button" @click.stop="accessOpen=!accessOpen; leadOpen=false" class="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-stroke text-[12px] text-ink hover:bg-hover">' +
     '<span class="grid place-items-center text-sub" v-html="accessCurrent.icon"></span>' +
     '<span>{{ accessCurrent.label }}</span>' +
-    '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" class="text-faint"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+    '' + wiIcon('chevron-down', 12, 'text-faint') + '' +
     '</button>' +
     '<div v-if="accessOpen" class="fixed inset-0 z-40" @click="accessOpen=false"></div>' +
     '<div v-if="accessOpen" class="absolute left-0 top-full mt-1 w-72 rounded-md bg-white py-1 shadow-lg ring-1 ring-black/5 z-50">' +
     '<button v-for="o in accessOptions" :key="o.key" type="button" @click="form.visibility=o.key; accessOpen=false" :class="[\'w-full text-left flex items-start gap-2.5 px-2.5 py-2 hover:bg-hover\', form.visibility===o.key ? \'bg-hover\' : \'\']">' +
     '<span class="mt-0.5 text-sub" v-html="o.icon"></span>' +
     '<span class="flex-1 min-w-0"><span class="block text-[13px] font-medium text-ink">{{ o.label }}</span><span class="block text-[12px] text-sub">{{ o.desc }}</span></span>' +
-    '<svg v-if="form.visibility===o.key" width="16" height="16" viewBox="0 0 24 24" fill="none" class="text-ink shrink-0 mt-0.5"><path d="M5 12l5 5 9-11" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+    '<span v-if="form.visibility===o.key" class="text-ink shrink-0 mt-0.5">' + wiIcon('check-thin', 16) + '</span>' +
     '</button>' +
     '</div>' +
     '</div>' +
@@ -851,7 +860,7 @@ PB.boot('projects-index', {
     '<div v-if="leadOpen" class="fixed inset-0 z-40" @click="leadOpen=false"></div>' +
     '<div v-if="leadOpen" class="absolute left-0 top-full mt-1 w-72 rounded-md bg-white p-2 shadow-lg ring-1 ring-black/5 z-50">' +
     '<div class="relative mb-1">' +
-    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-faint"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>' +
+    '' + wiIcon('magnifying-glass', 14, 'absolute left-2.5 top-1/2 -translate-y-1/2 text-faint') + '' +
     '<input v-model="leadQuery" ref="leadSearch" name="member-search" autocomplete="off" placeholder="Search members..." class="w-full h-9 pl-8 pr-3 rounded-md bg-hover text-[13px] text-ink placeholder:text-faint outline outline-1 -outline-offset-1 outline-transparent focus:bg-white focus:outline-stroke" />' +
     '</div>' +
     '<div class="max-h-48 overflow-y-auto">' +
@@ -872,25 +881,25 @@ PB.boot('projects-index', {
     '<button type="button" @click.stop.prevent="openStatusMenu(form, $event)" class="inline-flex items-center gap-2 h-8 px-3 rounded-md border border-stroke text-[12px] text-ink hover:bg-hover">' +
     '<span class="h-2.5 w-2.5 rounded-full shrink-0" :style="{background: form.state ? form.state.color : \'#94a3b8\'}"></span>' +
     '<span>{{ form.state ? form.state.name : \'Status\' }}</span>' +
-    '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" class="text-faint"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+    '' + wiIcon('chevron-down', 12, 'text-faint') + '' +
     '</button>' +
 
     // Priority chip
     '<button type="button" @click.stop.prevent="openPriorityMenu(form, $event)" class="inline-flex items-center gap-2 h-8 px-3 rounded-md border border-stroke text-[12px] text-ink hover:bg-hover">' +
     '<span class="h-2.5 w-2.5 rounded-full shrink-0" :style="{background: form.priority ? form.priority.color : \'#cbd5e1\'}"></span>' +
     '<span>{{ form.priority ? form.priority.name : \'Priority\' }}</span>' +
-    '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" class="text-faint"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+    '' + wiIcon('chevron-down', 12, 'text-faint') + '' +
     '</button>' +
 
     // Start date chip
     '<button type="button" @click.stop.prevent="openDateMenu(form, \'start_date\', $event)" class="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border border-stroke text-[12px] text-ink hover:bg-hover" title="Start date">' +
-    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0"><rect x="4" y="5" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>' +
+    '' + wiIcon('calendar', 14, 'text-faint shrink-0') + '' +
     '<span>{{ form.start_date ? fmtDate(form.start_date) : \'Start date\' }}</span>' +
     '</button>' +
 
     // End date chip
     '<button type="button" @click.stop.prevent="openDateMenu(form, \'end_date\', $event)" class="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border border-stroke text-[12px] text-ink hover:bg-hover" title="Due date">' +
-    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0"><rect x="4" y="5" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>' +
+    '' + wiIcon('calendar', 14, 'text-faint shrink-0') + '' +
     '<span>{{ form.end_date ? fmtDate(form.end_date) : \'Due date\' }}</span>' +
     '</button>' +
 

@@ -31,7 +31,7 @@ class AvatarController extends Controller
         }
 
         $path = $request->file('avatar')->store('avatars', ['disk' => $disk, 'visibility' => 'public']);
-        $url  = Storage::disk($disk)->url($path);
+        $url = Storage::disk($disk)->url($path);
 
         $user->forceFill(['avatar_url' => $url])->save();
 

@@ -16,8 +16,8 @@ use Illuminate\Support\Facades\Auth;
  * Pages. They stay visible so the planned information architecture is legible, but must never
  * expose unfinished functionality as if it were production-ready (spec §13).
  *
- * Cycles is no longer one of them: it has its own controller and its own routes, registered
- * ahead of this catch-all.
+ * Cycles and Modules are no longer among them: each has its own controller and routes,
+ * registered ahead of this catch-all.
  */
 class ProjectWorkspaceController extends Controller
 {
@@ -33,7 +33,7 @@ class ProjectWorkspaceController extends Controller
         // controller and routed before this catch-all, so it must never resolve here.
         $current = collect(config('projects.workspace_tabs'))->firstWhere('key', $tab);
         abort_if($current === null || ($current['status'] ?? '') === 'active', 404);
-        abort_if($tab === 'cycles', 404);
+        abort_if(in_array($tab, ['cycles', 'modules'], true), 404);
 
         return view('projects.coming-soon', [
             'workspace' => Auth::user()->currentWorkspace,

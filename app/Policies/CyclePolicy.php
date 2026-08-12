@@ -24,7 +24,10 @@ class CyclePolicy
     /** Can the user open a project's Cycles page? Passed with [Cycle::class, $project]. */
     public function viewAny(User $user, Project $project): bool
     {
-        return $project->featureEnabled('cycles') && $user->can('viewAny', [WorkItem::class, $project]);
+        // NOT gated on the feature. Disabling Cycles is a configuration change, never a
+        // delete: existing records stay readable for historical reference (Feature Disable
+        // §1/§9). Every ability that WRITES is gated below; reading is not.
+        return $user->can('viewAny', [WorkItem::class, $project]);
     }
 
     public function view(User $user, Cycle $cycle): bool

@@ -45,6 +45,9 @@ class ProjectCreator
                     'visibility' => $data['visibility'],
                     'lead_user_id' => $data['lead_user_id'] ?? null,
                     'cover_url' => $coverUrl,
+                    // A cover is either an image or a gradient; an upload wins, since a file
+                    // was deliberately chosen.
+                    'cover_gradient' => $coverUrl ? null : ($data['cover_gradient'] ?? null),
                     'timezone' => $workspace->timezone, // PRJ-040: default from the workspace
                     'status' => Project::STATUS_ACTIVE,
                     'created_by' => $creator->id,

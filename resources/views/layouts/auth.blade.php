@@ -6,14 +6,13 @@
   <meta name="csrf-token" content="{{ csrf_token() }}" />
   <title>@yield('title', 'Project Block')</title>
 
-  {{-- Project Block auth UI — ported from the HTML POC. Plain Tailwind (CDN) + POC tokens; no FlyonUI. --}}
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="{{ pb_asset('assets/js/tailwind.config.js') }}"></script>
-
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  {{-- Project Block auth UI — ported from the HTML POC. Plain Tailwind (self-hosted build) + POC tokens; no FlyonUI. --}}
+  <link rel="stylesheet" href="{{ pb_asset('assets/css/tailwind.css') }}" />
+  <link rel="stylesheet" href="{{ pb_asset('assets/css/inter.css') }}" />
   <link rel="stylesheet" href="{{ pb_asset('assets/css/styles.css') }}" />
+  {!! pb_icon_styles() !!}
+  {!! pb_icon_boot() !!}
+  <script defer src="{{ pb_asset('assets/js/icons.js') }}"></script>
   @stack('head')
 </head>
 <body class="bg-white text-ink min-h-screen flex flex-col">

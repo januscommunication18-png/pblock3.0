@@ -749,3 +749,27 @@ Then open `http://127.0.0.1:8000/projects` and click any project: it lands on Wo
 the six tabs above it. **Add work item** (or a state group's `+`) opens the create modal; the
 saved item appears in its state group immediately with the next ID number. The other five tabs
 show Coming Soon. Assets are cache-busted by `pb_asset()`, so no hard refresh is needed.
+
+## The Parent property became editable (§5 / §25)
+
+Parent was display-only in the drawer: the only way to set one was to create the item from a
+parent's sub-task panel. It is now a chip that opens the **same** search modal sub-tasks and
+relations already use — the question ("which work item?") is identical, only the arity differs,
+so `picker.mode` carries that rather than a second modal that looks almost like the first. One
+parent per item, so picking replaces rather than adds, the footer reads "Set parent", and a
+separate ✕ clears it.
+
+Making it editable is what forced two server changes:
+
+- **Loop prevention.** `Rule::notIn([$item->id])` stopped an item parenting *itself*, but
+  A → B → A is just as circular. The walk that catches this already existed in
+  `WorkItemRelationManager::assertCanParent`, reachable only through the sub-task route; it is
+  now split into `parentRefusal()` and consulted by `App\Rules\ParentAssignable` on the PATCH
+  route too. Both directions ask the same question, so they share one answer.
+- **The picker hides what the rule would refuse.** `?for=parent` drops the item and every
+  descendant from the search results. A row you are allowed to click and not allowed to keep is
+  a worse answer than a row that is not there.
+
+The row payload also gained a `parent` object (id, identifier, title). Resolving the label from
+the loaded list only worked while the parent happened to be on screen — a parent in another
+project, or one filtered out, rendered as "None".

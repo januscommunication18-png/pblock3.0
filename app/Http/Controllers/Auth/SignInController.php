@@ -34,7 +34,7 @@ class SignInController extends Controller
      */
     public function store(SignInRequest $request): RedirectResponse
     {
-        $email    = $request->validated('email');
+        $email = $request->validated('email');
         $password = $request->validated('password');
 
         $user = User::where('email', $email)->first();

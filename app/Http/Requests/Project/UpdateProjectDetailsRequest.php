@@ -35,6 +35,16 @@ class UpdateProjectDetailsRequest extends FormRequest
         ]);
     }
 
+    /**
+     * The gradient palette offered by the modal — the same list the screen renders.
+     *
+     * @return array<int, string>
+     */
+    private function gradients(): array
+    {
+        return config('projects.cover_presets') ?? config('projects.cover_gradients') ?? [];
+    }
+
     public function rules(): array
     {
         $workspaceId = $this->user()->current_workspace_id;
@@ -55,6 +65,11 @@ class UpdateProjectDetailsRequest extends FormRequest
             ],
             // Existence of the status/priority is checked against the workspace's own
             // configured sets in the controller, which already memoizes both maps.
+            // PRJ-027: the cover is EITHER an uploaded image or one of the preset gradients.
+            // Restricted to the palette rather than accepting any string: the value is
+            // rendered straight into a `background:` style, so an open text field here would
+            // be a CSS injection point on every card that shows the project.
+            'cover_gradient' => ['nullable', 'string', Rule::in($this->gradients())],
             'state_id' => ['nullable', 'integer'],
             'priority_id' => ['nullable', 'integer'],
             'start_date' => ['nullable', 'date'],

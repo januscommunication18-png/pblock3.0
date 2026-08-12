@@ -15,7 +15,7 @@ class SsoController extends Controller
 {
     public function start(Request $request): RedirectResponse
     {
-        $email  = strtolower(trim((string) $request->input('email')));
+        $email = strtolower(trim((string) $request->input('email')));
         $domain = str_contains($email, '@') ? substr(strrchr($email, '@'), 1) : null;
 
         $map = (array) config('services.sso.domains', []);

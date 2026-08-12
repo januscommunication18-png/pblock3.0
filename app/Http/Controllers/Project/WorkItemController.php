@@ -7,16 +7,14 @@ use App\Http\Requests\Project\StoreWorkItemRequest;
 use App\Http\Requests\Project\UpdateWorkItemRequest;
 use App\Models\Cycle;
 use App\Models\Project;
-use App\Models\ProjectItemLabel;
-use App\Models\ProjectItemState;
 use App\Models\WorkItem;
 use App\Models\WorkItemActivity;
-use App\Models\WorkspaceMembership;
-use App\Policies\WorkItemPolicy;
 use App\Services\ProjectItemStateProvisioner;
 use App\Services\ProjectNavigation;
 use App\Services\WorkItemBlockers;
 use App\Services\WorkItemCreator;
+use App\Services\WorkItemScreenPayload;
+use App\Services\WorkItemStatusUpdates;
 use App\Services\WorkItemUpdater;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
@@ -38,6 +36,8 @@ class WorkItemController extends Controller
         private readonly WorkItemUpdater $updater,
         private readonly ProjectNavigation $navigation,
         private readonly WorkItemBlockers $blockers,
+        private readonly WorkItemStatusUpdates $statusUpdates,
+        private readonly WorkItemScreenPayload $payload,
     ) {}
 
     /** GET /projects/{project}/work-items */
@@ -73,64 +73,7 @@ class WorkItemController extends Controller
             'canCreateProject' => $canCreate,
             // Gates Settings in the header's ⋯ menu (the settings screen re-checks it).
             'canManage' => Auth::user()->can('manage', $project),
-            'bootstrap' => [
-                'project' => [
-                    'id' => $project->id,
-                    'name' => $project->name,
-                    'identifier' => $project->identifier,
-                    'emoji' => $project->emoji,
-                ],
-                'items' => $this->items($project, $pageItem),
-                'states' => $states->map(fn (ProjectItemState $s) => [
-                    'id' => $s->id, 'name' => $s->name, 'color' => $s->color, 'group' => $s->group,
-                ])->values()->all(),
-                'labels' => $this->labels($project),
-                'members' => $this->projectMembers($project),
-                // Cycles §8.1: the property only appears when the project has the feature on.
-                'cyclesEnabled' => $project->featureEnabled('cycles'),
-                'cycles' => $this->cycles($project),
-                'priorities' => collect(config('projects.work_item_priorities'))
-                    ->map(fn ($label, $key) => ['key' => $key, 'label' => $label])->values()->all(),
-                'defaultStateId' => $this->states->defaultState($project)?->id,
-                'canCreate' => $canCreate,
-                'canEdit' => $canCreate, // §34: whoever may create may also edit and delete.
-                // Description editor media limit — the client refuses oversized files before
-                // uploading them; the server re-checks (§80).
-                'mediaMaxKb' => (int) config('projects.media.max_kb'),
-                // §9.2: the Worklogs tab is meant to follow a project Time Tracking toggle.
-                // No such setting exists yet — `projects.features` is unbuilt — so it is on
-                // for every project, and this is the one line that changes when it ships.
-                'timeTracking' => true,
-                'currentUserId' => Auth::id(),
-                // Set only on the per-item URL: render the detail as a page, not a drawer.
-                'pageItemId' => $pageItem?->id,
-                'endpoints' => [
-                    'store' => route('projects.work-items.store', $project),
-                    'list' => route('projects.work-items', $project),
-                    // Row chips + the ⋯ action menu. `__ID__` is swapped client-side.
-                    'item' => route('projects.work-items.show', ['project' => $project->id, 'workItem' => '__ID__']),
-                    'activity' => route('projects.work-items.activity', ['project' => $project->id, 'workItem' => '__ID__']),
-                    // Collaboration tabs (§5-§11): one read, one write endpoint per kind.
-                    'feed' => route('projects.work-items.feed', ['project' => $project->id, 'workItem' => '__ID__']),
-                    'comments' => route('projects.work-items.comments.store', ['project' => $project->id, 'workItem' => '__ID__']),
-                    'updates' => route('projects.work-items.updates.store', ['project' => $project->id, 'workItem' => '__ID__']),
-                    'worklogs' => route('projects.work-items.worklogs.store', ['project' => $project->id, 'workItem' => '__ID__']),
-                    'update' => route('projects.work-items.update', ['project' => $project->id, 'workItem' => '__ID__']),
-                    'archive' => route('projects.work-items.archive', ['project' => $project->id, 'workItem' => '__ID__']),
-                    'duplicate' => route('projects.work-items.duplicate', ['project' => $project->id, 'workItem' => '__ID__']),
-                    'destroy' => route('projects.work-items.destroy', ['project' => $project->id, 'workItem' => '__ID__']),
-                    // The editor's image upload target and its gallery source.
-                    // Structure sections: one read endpoint, one write endpoint per kind.
-                    'structure' => route('projects.work-items.structure', ['project' => $project->id, 'workItem' => '__ID__']),
-                    'search' => route('projects.work-items.search', ['project' => $project->id, 'workItem' => '__ID__']),
-                    'subtasks' => route('projects.work-items.subtasks.store', ['project' => $project->id, 'workItem' => '__ID__']),
-                    'relations' => route('projects.work-items.relations.store', ['project' => $project->id, 'workItem' => '__ID__']),
-                    'links' => route('projects.work-items.links.store', ['project' => $project->id, 'workItem' => '__ID__']),
-                    'createLabel' => route('projects.work-items.labels.store', ['project' => $project->id, 'workItem' => '__ID__']),
-                    'mediaUpload' => route('projects.work-items.media.store', $project),
-                    'mediaGallery' => route('projects.work-items.media.index', $project),
-                ],
-            ],
+            'bootstrap' => $this->payload->build($project, $pageItem),
         ]);
     }
 
@@ -157,7 +100,7 @@ class WorkItemController extends Controller
 
         return response()->json([
             'ok' => true,
-            'item' => $this->card($item->fresh(['state', 'assignees', 'labels', 'cycle', 'creator'])),
+            'item' => $this->payload->card($item->fresh(['state', 'assignees', 'labels', 'parent:id,identifier,title', 'cycle', 'epic', 'estimateValue', 'modules', 'creator'])),
         ], 201);
     }
 
@@ -181,7 +124,7 @@ class WorkItemController extends Controller
 
         $item = $this->updater->update($workItem, Auth::user(), $request->validated());
 
-        return response()->json(['ok' => true, 'item' => $this->card($item)]);
+        return response()->json(['ok' => true, 'item' => $this->payload->card($item)]);
     }
 
     /** POST /projects/{project}/work-items/{workItem}/archive (§4.4). */
@@ -199,7 +142,7 @@ class WorkItemController extends Controller
         $this->guardItem($project, $workItem, 'update');
         $item = $this->updater->setArchived($workItem, Auth::user(), false);
 
-        return response()->json(['ok' => true, 'item' => $this->card($item), 'message' => 'Work item restored.']);
+        return response()->json(['ok' => true, 'item' => $this->payload->card($item), 'message' => 'Work item restored.']);
     }
 
     /**
@@ -231,7 +174,7 @@ class WorkItemController extends Controller
 
         return response()->json([
             'ok' => true,
-            'item' => $this->card($copy->fresh(['state', 'assignees', 'labels', 'cycle', 'creator'])),
+            'item' => $this->payload->card($copy->fresh(['state', 'assignees', 'labels', 'parent:id,identifier,title', 'cycle', 'epic', 'estimateValue', 'modules', 'creator'])),
             'message' => 'Work item copied.',
         ], 201);
     }
@@ -290,142 +233,5 @@ class WorkItemController extends Controller
             ])->all();
 
         return response()->json(['ok' => true, 'activity' => $entries]);
-    }
-
-    /**
-     * The project's live work items, newest state-order first.
-     *
-     * `$pageItem` is appended when it is not already in that set — the detail page must be
-     * able to render an archived item, or one past the list's page size, since its URL stays
-     * valid either way (§4.4).
-     *
-     * @return array<int, array<string, mixed>>
-     */
-    private function items(Project $project, ?WorkItem $pageItem = null): array
-    {
-        $user = Auth::user();
-        // §10: a project set to "assigned work items only" filters the LIST too — hiding rows
-        // in the client while the API still returns them is not a restriction.
-        $assignedOnly = ! app(WorkItemPolicy::class)->canSeeEveryItem($user, $project);
-
-        $items = WorkItem::query()
-            ->forProject($project->id)
-            ->active()
-            ->when($assignedOnly, fn ($q) => $q->whereHas('assignees', fn ($a) => $a->whereKey($user->id)))
-            ->with(['state', 'assignees', 'labels', 'cycle', 'creator'])
-            ->orderBy('sequence_no')
-            ->limit((int) config('projects.work_item_page_size'))
-            ->get();
-
-        if ($pageItem && ! $items->contains('id', $pageItem->id)) {
-            $items->push($pageItem->loadMissing(['state', 'assignees', 'labels', 'cycle', 'creator']));
-        }
-
-        $blocked = $this->blockers->counts($items->pluck('id')->all());
-
-        return $items->map(fn (WorkItem $i) => $this->card($i, $blocked[$i->id] ?? 0))->all();
-    }
-
-    /**
-     * @param  int|null  $blockedBy  Open blocker count; resolved on demand when not supplied
-     *                               by the caller's bulk lookup.
-     * @return array<string, mixed> The row payload the Tabulator grid renders.
-     */
-    private function card(WorkItem $item, ?int $blockedBy = null): array
-    {
-        $blockedBy ??= $this->blockers->counts([$item->id])[$item->id] ?? 0;
-
-        $state = $item->state;
-
-        return [
-            'id' => $item->id,
-            'identifier' => $item->identifier,
-            'title' => $item->title,
-            'description' => $item->description,
-            'state_id' => $item->state_id,
-            'state' => $state ? ['id' => $state->id, 'name' => $state->name, 'color' => $state->color, 'group' => $state->group] : null,
-            // The list groups by the state's stable group key, not its editable name.
-            'group' => $state?->group ?? 'backlog',
-            'priority' => $item->priority,
-            'start_date' => $item->start_date?->format('Y-m-d'),
-            'due_date' => $item->due_date?->format('Y-m-d'),
-            'parent_id' => $item->parent_id,
-            // §8.1: the chip shows the cycle's name, so the name travels with the row.
-            'cycle_id' => $item->cycle_id,
-            'cycle' => $item->cycle ? ['id' => $item->cycle->id, 'name' => $item->cycle->name, 'status' => $item->cycle->status()] : null,
-            'assignees' => $item->assignees->map(fn ($u) => [
-                'id' => $u->id, 'name' => $u->displayName(),
-                'initial' => $u->initial(), 'avatar_url' => $u->avatar_url,
-            ])->values()->all(),
-            'labels' => $item->labels->map(fn (ProjectItemLabel $l) => [
-                'id' => $l->id, 'name' => $l->name, 'color' => $l->color,
-            ])->values()->all(),
-            // Shown as a chip on the list row (§27): this item is waiting on something else.
-            'blocked_by_count' => $blockedBy,
-            // Detail view footer (§4.4): who opened this work item and when it last moved.
-            'created_by' => $item->creator?->displayName(),
-            'created_at' => $item->created_at?->toIso8601String(),
-            'updated_at' => $item->updated_at?->toIso8601String(),
-        ];
-    }
-
-    /**
-     * Cycles offered by the work item's Cycle picker (§8.2).
-     *
-     * Only cycles that can still take work: §8.3.5 keeps finished cycles out of new
-     * assignment, and offering them would mean showing options the server refuses. An item
-     * already sitting in a completed cycle still renders its chip — that comes from the row,
-     * not from this list.
-     *
-     * @return array<int, array<string, mixed>>
-     */
-    private function cycles(Project $project): array
-    {
-        if (! $project->featureEnabled('cycles')) {
-            return [];
-        }
-
-        return Cycle::query()
-            ->forProject($project->id)
-            ->assignable()
-            ->orderBy('start_date')
-            ->get()
-            ->map(fn (Cycle $c) => [
-                'id' => $c->id, 'name' => $c->name, 'status' => $c->status(),
-                'start_date' => $c->start_date?->format('Y-m-d'), 'end_date' => $c->end_date?->format('Y-m-d'),
-            ])->all();
-    }
-
-    /** @return array<int, array<string, mixed>> */
-    private function labels(Project $project): array
-    {
-        return ProjectItemLabel::query()
-            ->where('project_id', $project->id)
-            ->orderBy('position')
-            ->get()
-            ->map(fn (ProjectItemLabel $l) => ['id' => $l->id, 'name' => $l->name, 'color' => $l->color])
-            ->all();
-    }
-
-    /**
-     * Assignee options. Restricted to active members of this workspace (spec §4.3), so the
-     * picker cannot leak users from another workspace.
-     *
-     * @return array<int, array<string, mixed>>
-     */
-    private function projectMembers(Project $project): array
-    {
-        return WorkspaceMembership::query()
-            ->where('workspace_id', $project->tenant_id)
-            ->where('status', WorkspaceMembership::STATUS_ACTIVE)
-            ->with('user')
-            ->get()
-            ->map(fn (WorkspaceMembership $m) => [
-                'id' => $m->user_id,
-                'name' => $m->user?->displayName(),
-                'email' => $m->user?->email,
-                'initial' => $m->user?->initial(),
-                'avatar_url' => $m->user?->avatar_url,
-            ])->all();
     }
 }

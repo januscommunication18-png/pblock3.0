@@ -3,11 +3,13 @@
 namespace Tests\Feature\Project;
 
 use App\Mail\WorkItemBlockedMail;
+use App\Models\Project;
 use App\Models\ProjectItemLabel;
 use App\Models\ProjectItemState;
 use App\Models\ProjectMember;
 use App\Models\WorkItem;
 use App\Models\WorkItemRelation;
+use App\Services\ProjectLifecycle;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
 
@@ -30,6 +32,148 @@ class WorkItemStructureTest extends ProjectTestCase
     private function structureUrl($project, array $item): string
     {
         return route('projects.work-items.structure', ['project' => $project->id, 'workItem' => $item['id']]);
+    }
+
+    // ================= §5/§25: the Parent property =================
+
+    public function test_the_parent_property_is_set_and_cleared_through_the_work_item_itself(): void
+    {
+        [$owner, $ws] = $this->owner();
+        $project = $this->makeProject($owner, $ws, ['identifier' => 'TESTI']);
+        $this->actingAs($owner)->get(route('projects.work-items', $project));
+
+        $parent = $this->makeItem($owner, $project, 'Build checkout');
+        $child = $this->makeItem($owner, $project, 'Payment form');
+
+        // The chip needs the parent's ID and title, so the row carries them rather than making
+        // the client hunt for the parent in whatever happens to be loaded.
+        $card = $this->patchParent($owner, $project, $child, $parent['id'])->assertOk()->json('item');
+        $this->assertSame($parent['id'], $card['parent_id']);
+        $this->assertSame($parent['identifier'], $card['parent']['identifier']);
+        $this->assertSame('Build checkout', $card['parent']['title']);
+
+        $card = $this->patchParent($owner, $project, $child, null)->assertOk()->json('item');
+        $this->assertNull($card['parent_id']);
+        $this->assertNull($card['parent']);
+
+        // §26 again, from this direction: clearing the parent does not delete anything.
+        $this->assertTrue($ws->run(fn () => WorkItem::whereKey($parent['id'])->exists()));
+    }
+
+    public function test_an_item_cannot_be_parented_to_itself_or_to_its_own_descendant(): void
+    {
+        [$owner, $ws] = $this->owner();
+        $project = $this->makeProject($owner, $ws, ['identifier' => 'TESTI']);
+        $this->actingAs($owner)->get(route('projects.work-items', $project));
+
+        $top = $this->makeItem($owner, $project, 'Top');
+        $middle = $this->makeItem($owner, $project, 'Middle');
+        $bottom = $this->makeItem($owner, $project, 'Bottom');
+
+        $this->patchParent($owner, $project, $middle, $top['id'])->assertOk();
+        $this->patchParent($owner, $project, $bottom, $middle['id'])->assertOk();
+
+        // Its own id — the shortest loop.
+        $this->patchParent($owner, $project, $top, $top['id'])
+            ->assertStatus(422)->assertJsonValidationErrors('parent_id');
+
+        // A direct child, and a grandchild: both close a loop the sub-task panel has always
+        // refused. Until the Parent property became editable, PATCH was simply never asked.
+        foreach ([$middle, $bottom] as $descendant) {
+            $this->patchParent($owner, $project, $top, $descendant['id'])
+                ->assertStatus(422)->assertJsonValidationErrors('parent_id');
+        }
+
+        $this->assertNull($ws->run(fn () => WorkItem::find($top['id'])->parent_id));
+    }
+
+    public function test_the_parent_search_hides_the_item_itself_and_everything_below_it(): void
+    {
+        [$owner, $ws] = $this->owner();
+        $project = $this->makeProject($owner, $ws, ['identifier' => 'TESTI']);
+        $this->actingAs($owner)->get(route('projects.work-items', $project));
+
+        $top = $this->makeItem($owner, $project, 'Top');
+        $middle = $this->makeItem($owner, $project, 'Middle');
+        $bottom = $this->makeItem($owner, $project, 'Bottom');
+        $cousin = $this->makeItem($owner, $project, 'Cousin');
+
+        $this->patchParent($owner, $project, $middle, $top['id'])->assertOk();
+        $this->patchParent($owner, $project, $bottom, $middle['id'])->assertOk();
+
+        $url = route('projects.work-items.search', ['project' => $project->id, 'workItem' => $top['id']]);
+
+        // A row you may click and may not keep is a worse answer than a row that is not there,
+        // so the picker drops what the rule would refuse instead of offering it.
+        $titles = array_column($this->actingAs($owner)->getJson($url.'?for=parent')->assertOk()->json('items'), 'title');
+        $this->assertSame(['Cousin'], $titles);
+
+        // Only the parent search hides them — the sub-task and relation pickers are unchanged.
+        $titles = array_column($this->actingAs($owner)->getJson($url)->assertOk()->json('items'), 'title');
+        $this->assertEqualsCanonicalizing(['Middle', 'Bottom', 'Cousin'], $titles);
+    }
+
+    public function test_the_search_ignores_archived_projects_and_ones_the_user_cannot_see(): void
+    {
+        [$owner, $ws] = $this->owner();
+        $home = $this->makeProject($owner, $ws, ['identifier' => 'HOME', 'name' => 'Home']);
+        $live = $this->makeProject($owner, $ws, ['identifier' => 'LIVE', 'name' => 'Live']);
+        $shelved = $this->makeProject($owner, $ws, ['identifier' => 'OLD', 'name' => 'Shelved']);
+        $this->actingAs($owner)->get(route('projects.work-items', $home));
+
+        $anchor = $this->makeItem($owner, $home, 'Anchor');
+        $this->makeItem($owner, $home, 'Home work');
+        $this->makeItem($owner, $live, 'Live work');
+        $this->makeItem($owner, $shelved, 'Shelved work');
+
+        $ws->run(fn () => app(ProjectLifecycle::class)->archive(Project::find($shelved->id)));
+
+        $url = route('projects.work-items.search', ['project' => $home->id, 'workItem' => $anchor['id']]);
+        $titles = fn ($actor) => array_column(
+            $this->actingAs($actor)->getJson($url.'?all_projects=1')->assertOk()->json('items'), 'title'
+        );
+
+        // Archiving a project takes it off every list; its work items must not keep surfacing
+        // here as though nothing happened.
+        $this->assertEqualsCanonicalizing(['Home work', 'Live work'], $titles($owner));
+
+        // §18: a plain member sees only the projects they belong to, so the search must not
+        // hand them the titles of the ones they do not.
+        $sam = $this->member($ws, 'member', 'sam@example.com');
+        $ws->run(fn () => ProjectMember::create([
+            'tenant_id' => $ws->id, 'project_id' => $home->id, 'user_id' => $sam->id, 'role' => 'member',
+        ]));
+
+        $this->assertSame(['Home work'], $titles($sam));
+    }
+
+    public function test_a_projects_own_items_stay_searchable_after_it_is_archived(): void
+    {
+        [$owner, $ws] = $this->owner();
+        $project = $this->makeProject($owner, $ws, ['identifier' => 'TESTI']);
+        $this->actingAs($owner)->get(route('projects.work-items', $project));
+
+        $anchor = $this->makeItem($owner, $project, 'Anchor');
+        $this->makeItem($owner, $project, 'Sibling');
+
+        $ws->run(fn () => app(ProjectLifecycle::class)->archive(Project::find($project->id)));
+
+        // The project being worked in is exempt from the archived filter — otherwise archiving
+        // a project would break its own sub-task and relation pickers from the inside.
+        $titles = array_column($this->actingAs($owner)->getJson(
+            route('projects.work-items.search', ['project' => $project->id, 'workItem' => $anchor['id']])
+        )->assertOk()->json('items'), 'title');
+
+        $this->assertSame(['Sibling'], $titles);
+    }
+
+    /** PATCH the Parent property, the way the drawer chip does. */
+    private function patchParent($actor, $project, array $item, $parentId)
+    {
+        return $this->actingAs($actor)->patchJson(
+            route('projects.work-items.update', ['project' => $project->id, 'workItem' => $item['id']]),
+            ['parent_id' => $parentId],
+        );
     }
 
     public function test_existing_work_items_can_be_attached_and_detached_as_subtasks(): void

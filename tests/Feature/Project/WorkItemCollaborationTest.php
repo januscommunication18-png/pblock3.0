@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Project;
 
+use App\Models\Cycle;
 use App\Models\ProjectItemState;
 use App\Models\ProjectMember;
 use App\Models\WorkItemComment;
@@ -358,5 +359,109 @@ class WorkItemCollaborationTest extends ProjectTestCase
         $this->assertFalse(collect(app('router')->getRoutes())->contains(
             fn ($r) => str_contains($r->uri(), 'work-items') && str_contains($r->uri(), 'history')
         ));
+    }
+
+    // ================= §8: the At Risk / Off Track label on the list =================
+
+    public function test_a_concerning_update_labels_the_row_and_carries_its_comment(): void
+    {
+        [$owner, $ws] = $this->owner();
+        $project = $this->makeProject($owner, $ws);
+        $item = $this->makeItem($owner, $project, 'Migrate the billing job');
+
+        $this->actingAs($owner)->postJson($this->url('projects.work-items.updates.store', $project, $item), [
+            'status' => 'at_risk',
+            'content' => '<p>Waiting on the payment provider sandbox. Slipping about three days.</p>',
+        ])->assertOk();
+
+        $row = $this->rowFor($owner, $project, $item['id']);
+
+        // The label is what the row shows; the comment is what the tooltip shows, so it has
+        // to travel with it as plain text — it goes into an HTML attribute.
+        $this->assertSame('at_risk', $row['status_update']['status']);
+        $this->assertSame('At Risk', $row['status_update']['label']);
+        $this->assertStringContainsString('payment provider sandbox', $row['status_update']['comment']);
+        $this->assertStringNotContainsString('<p>', $row['status_update']['comment']);
+    }
+
+    public function test_off_track_is_labelled_too_and_on_track_is_not(): void
+    {
+        [$owner, $ws] = $this->owner();
+        $project = $this->makeProject($owner, $ws);
+        $off = $this->makeItem($owner, $project, 'Off track item');
+        $fine = $this->makeItem($owner, $project, 'Healthy item');
+
+        $this->actingAs($owner)->postJson($this->url('projects.work-items.updates.store', $project, $off), [
+            'status' => 'off_track', 'content' => 'Blocked on a vendor decision.',
+        ])->assertOk();
+
+        $this->actingAs($owner)->postJson($this->url('projects.work-items.updates.store', $project, $fine), [
+            'status' => 'on_track', 'content' => 'All good.',
+        ])->assertOk();
+
+        $this->assertSame('Off Track', $this->rowFor($owner, $project, $off['id'])['status_update']['label']);
+
+        // On Track is the ordinary case. A badge on every row saying "fine" is noise that
+        // makes the ones that are NOT fine harder to spot.
+        $this->assertNull($this->rowFor($owner, $project, $fine['id'])['status_update']);
+    }
+
+    public function test_an_item_that_recovers_stops_being_labelled(): void
+    {
+        [$owner, $ws] = $this->owner();
+        $project = $this->makeProject($owner, $ws);
+        $item = $this->makeItem($owner, $project, 'Recovering item');
+
+        $this->actingAs($owner)->postJson($this->url('projects.work-items.updates.store', $project, $item), [
+            'status' => 'off_track', 'content' => 'Badly behind.',
+        ])->assertOk();
+        $this->assertNotNull($this->rowFor($owner, $project, $item['id'])['status_update']);
+
+        // The CURRENT update decides, not the most recent concerning one — otherwise a row
+        // stays flagged forever after the team recovers.
+        $this->actingAs($owner)->postJson($this->url('projects.work-items.updates.store', $project, $item), [
+            'status' => 'on_track', 'content' => 'Caught up, back on schedule.',
+        ])->assertOk();
+
+        $this->assertNull($this->rowFor($owner, $project, $item['id'])['status_update']);
+    }
+
+    public function test_the_label_reaches_a_cycles_work_item_row_as_well(): void
+    {
+        [$owner, $ws] = $this->owner();
+        $project = $this->makeProject($owner, $ws);
+
+        $this->actingAs($owner)->postJson(route('projects.settings.features.toggle', $project), [
+            'feature' => 'cycles', 'enabled' => true,
+        ])->assertOk();
+
+        $cycle = $ws->run(fn () => Cycle::create([
+            'project_id' => $project->id, 'name' => 'Sprint 08',
+            'start_date' => now()->toDateString(), 'end_date' => now()->addDays(13)->toDateString(),
+        ]));
+
+        $item = $this->makeItem($owner, $project, 'Planned and at risk');
+        $this->actingAs($owner)->patchJson(
+            route('projects.work-items.update', ['project' => $project->id, 'workItem' => $item['id']]),
+            ['cycle_id' => $cycle->id],
+        )->assertOk();
+
+        $this->actingAs($owner)->postJson($this->url('projects.work-items.updates.store', $project, $item), [
+            'status' => 'at_risk', 'content' => 'Scope grew mid-sprint.',
+        ])->assertOk();
+
+        // Both lists render the SAME row component, so both have to be handed the same field.
+        $row = collect($this->actingAs($owner)
+            ->get(route('projects.cycles.show', ['project' => $project->id, 'cycle' => $cycle->id]))
+            ->assertOk()->viewData('bootstrap')['items'])->firstWhere('id', $item['id']);
+
+        $this->assertSame('At Risk', $row['status_update']['label']);
+    }
+
+    /** One row out of the work item list, as the grid receives it. */
+    private function rowFor($owner, $project, int $itemId): array
+    {
+        return collect($this->actingAs($owner)->get(route('projects.work-items', $project))
+            ->assertOk()->viewData('bootstrap')['items'])->firstWhere('id', $itemId);
     }
 }

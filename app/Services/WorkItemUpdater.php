@@ -3,6 +3,9 @@
 namespace App\Services;
 
 use App\Models\Cycle;
+use App\Models\Epic;
+use App\Models\EstimateValue;
+use App\Models\Module;
 use App\Models\ProjectItemLabel;
 use App\Models\ProjectItemState;
 use App\Models\User;
@@ -22,7 +25,7 @@ use Illuminate\Support\Facades\DB;
 class WorkItemUpdater
 {
     /** Scalar columns, in the order the feed reads best. */
-    private const FIELDS = ['title', 'description', 'state_id', 'priority', 'start_date', 'due_date', 'parent_id', 'cycle_id'];
+    private const FIELDS = ['title', 'description', 'state_id', 'priority', 'start_date', 'due_date', 'parent_id', 'cycle_id', 'epic_id', 'estimate_value_id'];
 
     public function __construct(
         private readonly WorkItemActivityRecorder $activity,
@@ -71,8 +74,13 @@ class WorkItemUpdater
             if (array_key_exists('label_ids', $data)) {
                 $this->syncRelation($item, $actor, 'labels', $data['label_ids']);
             }
+            // Modules §9.3: many-to-many, so it syncs like labels rather than being a column
+            // like `cycle_id`. §17 wants the add/remove in history, which syncRelation gives.
+            if (array_key_exists('module_ids', $data)) {
+                $this->syncRelation($item, $actor, 'modules', $data['module_ids']);
+            }
 
-            return $item->fresh(['state', 'assignees', 'labels', 'parent', 'cycle', 'creator']);
+            return $item->fresh(['state', 'assignees', 'labels', 'parent', 'cycle', 'epic', 'estimateValue', 'modules', 'creator']);
         });
     }
 
@@ -134,6 +142,20 @@ class WorkItemUpdater
                 'old_label' => $old ? WorkItem::find($old)?->identifier : null,
                 'new_label' => $new ? WorkItem::find($new)?->identifier : null,
             ];
+        } elseif ($field === 'estimate_value_id') {
+            // §31: "changed Estimate from 3 to 5". The LABEL is resolved now and frozen into
+            // the row, so renaming or archiving a value later cannot rewrite the history.
+            $meta = [
+                'old_label' => $old ? EstimateValue::find($old)?->label : null,
+                'new_label' => $new ? EstimateValue::find($new)?->label : null,
+            ];
+        } elseif ($field === 'epic_id') {
+            // Epic §22 wants the change in history. The title is resolved NOW and frozen into
+            // the row, so renaming or deleting an epic later cannot rewrite what it says.
+            $meta = [
+                'old_label' => $old ? Epic::find($old)?->title : null,
+                'new_label' => $new ? Epic::find($new)?->title : null,
+            ];
         } elseif ($field === 'cycle_id') {
             // Cycles §8.4 wants the feed to read "moved this work item from Sprint 08 to
             // Sprint 09". Names are resolved NOW and frozen into the row, so renaming or
@@ -157,6 +179,8 @@ class WorkItemUpdater
             'field' => match ($field) {
                 'state_id' => 'state',
                 'cycle_id' => 'cycle',
+                'epic_id' => 'epic',
+                'estimate_value_id' => 'estimate',
                 default => $field,
             },
             'old_value' => $old,
@@ -178,9 +202,11 @@ class WorkItemUpdater
             return [];
         }
 
-        return $relation === 'assignees'
-            ? User::whereIn('id', $ids)->get()->map(fn (User $u) => $u->displayName())->values()->all()
-            : ProjectItemLabel::whereIn('id', $ids)->pluck('name')->values()->all();
+        return match ($relation) {
+            'assignees' => User::whereIn('id', $ids)->get()->map(fn (User $u) => $u->displayName())->values()->all(),
+            'modules' => Module::whereIn('id', $ids)->pluck('title')->values()->all(),
+            default => ProjectItemLabel::whereIn('id', $ids)->pluck('name')->values()->all(),
+        };
     }
 
     /**
@@ -214,7 +240,12 @@ class WorkItemUpdater
     private function syncRelation(WorkItem $item, User $actor, string $relation, array $ids): void
     {
         $ids = array_values(array_unique(array_map('intval', $ids)));
-        $before = $item->{$relation}()->pluck($relation === 'assignees' ? 'users.id' : 'project_item_labels.id')
+        $key = match ($relation) {
+            'assignees' => 'users.id',
+            'modules' => 'modules.id',
+            default => 'project_item_labels.id',
+        };
+        $before = $item->{$relation}()->pluck($key)
             ->map(fn ($id) => (int) $id)->sort()->values()->all();
 
         $after = collect($ids)->sort()->values()->all();

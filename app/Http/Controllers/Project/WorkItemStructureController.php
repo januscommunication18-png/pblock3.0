@@ -55,6 +55,13 @@ class WorkItemStructureController extends Controller
 
         $term = trim((string) $request->query('q', ''));
         $workspaceWide = $request->boolean('all_projects');
+        // Picking a parent is the one search where the item's own descendants are illegal
+        // choices — putting an item under its own child closes a loop (§25). They are dropped
+        // from the results rather than offered and then refused: a row you are allowed to
+        // click and not allowed to keep is a worse answer than a row that is not there.
+        $excluded = $request->query('for') === 'parent'
+            ? $this->descendantIds($workItem)
+            : [];
 
         $user = Auth::user();
         // §10: the picker cannot become a way to read titles the setting hides.
@@ -65,6 +72,24 @@ class WorkItemStructureController extends Controller
             ->when(! $workspaceWide, fn ($q) => $q->forProject($project->id))
             ->when($assignedOnly, fn ($q) => $q->whereHas('assignees', fn ($a) => $a->whereKey($user->id)))
             ->whereKeyNot($workItem->id) // never offer the item itself (§25/§36)
+            ->when($excluded !== [], fn ($q) => $q->whereKeyNot($excluded))
+            // Workspace-wide search reaches outside this project, so it has to answer for the
+            // projects it reaches into. Two filters, both on the owning project:
+            //
+            //   - ARCHIVED projects are out. Archiving a project takes it off every list; its
+            //     work items should not keep surfacing here as if nothing happened. The
+            //     project being worked in is exempt — otherwise archiving it would break its
+            //     own sub-task and relation pickers.
+            //   - INVISIBLE projects are out. §18 gives a plain member only the projects they
+            //     belong to, and a search that ignores that hands them the titles of every
+            //     private project in the workspace. Owners and admins keep the full reach they
+            //     have everywhere else.
+            //
+            // whereHas also drops any orphan whose project row is gone — deleting a project
+            // cascades its work items, so that should be unreachable, and this makes it so.
+            ->whereHas('project', fn ($p) => $p
+                ->visibleTo($user)
+                ->where(fn ($w) => $w->active()->orWhere($p->qualifyColumn('id'), $project->id)))
             ->when($term !== '', fn ($q) => $q->where(function ($w) use ($term) {
                 $w->where('title', 'like', "%{$term}%")->orWhere('identifier', 'like', "%{$term}%");
             }))
@@ -85,6 +110,30 @@ class WorkItemStructureController extends Controller
             ])->values()->all();
 
         return response()->json(['ok' => true, 'items' => $items]);
+    }
+
+    /**
+     * Every work item below this one, however deep.
+     *
+     * Iterative and level-by-level: one query per depth rather than one per node, and a `$seen`
+     * guard so data that is already circular cannot spin here forever.
+     *
+     * @return array<int, int>
+     */
+    private function descendantIds(WorkItem $item): array
+    {
+        $seen = [];
+        $frontier = [$item->id];
+
+        while ($frontier !== []) {
+            $next = WorkItem::query()->whereIn('parent_id', $frontier)->pluck('id')->all();
+            $frontier = array_values(array_diff($next, $seen));
+            foreach ($frontier as $id) {
+                $seen[$id] = $id;
+            }
+        }
+
+        return array_values($seen);
     }
 
     /** POST /projects/{project}/work-items/{workItem}/subtasks — attach existing items (§22). */

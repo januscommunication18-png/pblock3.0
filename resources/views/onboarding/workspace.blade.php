@@ -7,7 +7,7 @@
   <header class="flex items-center justify-between px-5 sm:px-10 py-5">
     <div class="flex items-center gap-3">
       <a href="{{ route('onboarding.goals') }}" class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        {!! pb_icon('chevron-left', 18) !!}
       </a>
       <a class="flex items-center gap-2" href="#">
         <svg width="24" height="24" viewBox="0 0 32 32" fill="#0f0f10"><path d="M5 21 L15 4 L20.5 4 L10.5 21 Z"/><path d="M13 28 L23 11 L28.5 11 L18.5 28 Z"/></svg>
@@ -22,7 +22,7 @@
       <form method="POST" action="{{ route('logout') }}">
         @csrf
         <button type="submit" title="Log out" aria-label="Log out" class="flex items-center gap-1.5 h-8 px-3 rounded-full border border-line text-[13px] text-sub hover:bg-hover hover:text-ink transition-colors">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 21H6a2 2 0 01-2-2V5a2 2 0 012-2h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 17l5-5-5-5M21 12H9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          {!! pb_icon('right-from-bracket', 16) !!}
           <span class="hidden sm:inline">Log out</span>
         </button>
       </form>
@@ -61,7 +61,7 @@
           @foreach (config('workspace.apps') as $appKey => $app)
             @if ($app['available'])
               <div class="w-full flex items-start gap-3 p-4 rounded-lg border border-brand/40 bg-sel/40 text-left cursor-default" title="Projects is the default app and can’t be turned off">
-                <span class="mt-0.5 h-5 w-5 rounded-md bg-brand grid place-items-center shrink-0"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5 9-11" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                <span class="mt-0.5 h-5 w-5 rounded-md bg-brand grid place-items-center shrink-0">{!! pb_icon('check-on-brand', 12) !!}</span>
                 <div class="min-w-0">
                   <div class="flex items-center gap-2">
                     <span class="text-[14px] font-semibold text-head">{{ $app['label'] }}</span>
@@ -69,7 +69,7 @@
                   </div>
                   <div class="text-[12px] text-sub mt-0.5">{{ $app['description'] }}</div>
                 </div>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="ml-auto mt-0.5 shrink-0 text-faint" aria-label="Read only"><rect x="5" y="11" width="14" height="9" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M8 11V8a4 4 0 018 0v3" stroke="currentColor" stroke-width="1.7"/></svg>
+                <span role="img" aria-label="Read only" class="ml-auto mt-0.5 shrink-0 text-faint">{!! pb_icon('lock', 14) !!}</span>
                 <input type="hidden" name="apps[]" value="{{ $appKey }}" />
               </div>
             @else

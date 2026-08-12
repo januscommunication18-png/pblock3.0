@@ -7,10 +7,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class UserIdentity extends Model
 {
-    public const PROVIDER_EMAIL  = 'email';
+    public const PROVIDER_EMAIL = 'email';
+
     public const PROVIDER_GOOGLE = 'google';
+
     public const PROVIDER_GITHUB = 'github';
-    public const PROVIDER_SSO    = 'sso';
+
+    public const PROVIDER_SSO = 'sso';
 
     protected $fillable = ['user_id', 'provider', 'provider_subject'];
 

@@ -6,10 +6,12 @@
   <meta name="csrf-token" content="{{ csrf_token() }}" />
   <title>{{ $project->name }} · {{ $sectionLabel }} — Project settings</title>
 
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="{{ pb_asset('assets/js/tailwind.config.js') }}"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ pb_asset('assets/css/tailwind.css') }}" />
+  <link rel="stylesheet" href="{{ pb_asset('assets/css/inter.css') }}" />
   <link rel="stylesheet" href="{{ pb_asset('assets/css/styles.css') }}" />
+  {!! pb_icon_styles() !!}
+  {!! pb_icon_boot() !!}
+  <script defer src="{{ pb_asset('assets/js/icons.js') }}"></script>
   <script src="{{ pb_asset('assets/js/vendor/vue.global.prod.js') }}"></script>
   <script defer src="{{ pb_asset('assets/js/settings/app.js') }}"></script>
   @stack('section-script')
@@ -22,7 +24,7 @@
          out on the left as well as the Close affordance on the right. --}}
     <a href="{{ route('projects.work-items', $project->id) }}" title="Back to {{ $project->name }}"
        class="h-9 w-9 grid place-items-center rounded-md text-sub hover:bg-hover shrink-0">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      {!! pb_icon('arrow-left', 18) !!}
     </a>
     <a href="{{ route('projects.work-items', $project->id) }}" class="flex items-center gap-2 min-w-0">
       <span class="h-6 w-6 rounded-md grid place-items-center text-[13px] shrink-0" style="background: {{ $project->cover_gradient ?: '#334155' }}">{{ $project->emoji ?: '📁' }}</span>
@@ -33,7 +35,7 @@
     <div class="ml-auto flex items-center gap-2">
       <span class="h-6 w-px bg-line"></span>
       <a href="{{ route('projects.work-items', $project->id) }}" title="Close" class="h-9 w-9 grid place-items-center rounded-md text-sub hover:bg-hover">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        {!! pb_icon('xmark', 18) !!}
       </a>
     </div>
   </header>

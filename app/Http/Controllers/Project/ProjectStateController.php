@@ -74,7 +74,7 @@ class ProjectStateController extends ManagesProjectController
             'name' => ['required', 'string', 'max:60'],
             'color' => ['required', 'string', 'regex:/^#[0-9A-Fa-f]{6}$/'],
             'description' => ['nullable', 'string', 'max:255'],
-            'group' => ['required', Rule::in(array_keys(config('projects.state_groups')))],
+            'group' => ['required', Rule::in(array_keys(config('settings.state_groups')))],
         ]);
     }
 

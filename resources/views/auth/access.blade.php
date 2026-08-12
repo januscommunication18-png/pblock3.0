@@ -19,11 +19,7 @@
   <main class="flex-1 flex justify-center px-5">
     <div class="w-full max-w-[380px] pt-10 sm:pt-16">
       <span class="h-11 w-11 rounded-xl bg-hover grid place-items-center text-sub mb-5">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-          <rect x="4" y="10" width="16" height="10" rx="2" stroke="currentColor" stroke-width="1.7"/>
-          <path d="M8 10V7a4 4 0 018 0v3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
-          <circle cx="12" cy="15" r="1.4" fill="currentColor"/>
-        </svg>
+        {!! pb_icon('lock-keyhole', 22) !!}
       </span>
 
       <h1 class="text-[24px] font-bold text-head leading-tight">Secure page</h1>

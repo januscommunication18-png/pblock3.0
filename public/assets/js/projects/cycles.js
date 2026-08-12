@@ -55,7 +55,7 @@ var CyRing = {
 
 PB.boot('project-cycles', {
   props: { bootstrap: Object },
-  components: { 'cy-ring': CyRing, 'wi-calendar': WiCalendar, 'wi-list': WiList },
+  components: { 'cy-ring': CyRing, 'wi-calendar': WiCalendar, 'wi-list': WiList, 'work-items-screen': WorkItemsScreen },
   data: function () {
     var b = this.bootstrap || {};
     return {
@@ -65,6 +65,14 @@ PB.boot('project-cycles', {
       states: Array.isArray(b.states) ? b.states : [],
       pageCycleId: b.pageCycleId || null,
       canCreate: !!b.canCreate,
+      labelsEnabled: b.labelsEnabled !== false,
+      // The full work items payload for this record, or null on the landing page.
+      workItems: b.workItems || null,
+      // Feature Disable §4: the page still loads when Cycles is off so existing cycles stay
+      // readable; these render the read-only state and say why.
+      featureEnabled: b.featureEnabled !== false,
+      disabledNotice: b.disabledNotice || '',
+      settingsUrl: b.settingsUrl || '',
       canDelete: !!b.canDelete,
       parallel: !!b.parallel,
       nameMax: b.nameMax || 120,
@@ -339,25 +347,31 @@ PB.boot('project-cycles', {
   template:
     '<div class="flex-1 min-h-0 flex flex-col">' +
 
+    // Feature Disable §4: read-only notice, shown on the list and the detail alike.
+    '<div v-if="!featureEnabled" class="flex items-start gap-2.5 px-6 py-2.5 border-b border-line bg-amber-50 shrink-0">' +
+    '' + wiIcon('circle-info', 15, 'text-amber-700 shrink-0 mt-0.5') + '' +
+    '<p class="text-[12px] text-amber-900">{{ disabledNotice }}' +
+    '<a v-if="settingsUrl" :href="settingsUrl" class="ml-1 font-semibold underline">Project settings</a></p></div>' +
+
     // ============ Detail view (§7) ============
     '<template v-if="pageCycle">' +
     '<div class="flex items-center gap-2 px-6 h-12 border-b border-line shrink-0">' +
     '<a :href="endpoints.list" data-tip="Back to cycles" class="text-sub hover:text-ink shrink-0">' +
-    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></a>' +
+    '' + wiIcon('arrow-left', 16) + '</a>' +
     '<span class="text-[14px] font-medium text-ink truncate">{{ pageCycle.name }}</span>' +
     '<span class="inline-flex items-center h-6 px-2.5 rounded-md text-[12px] font-medium whitespace-nowrap"' +
     ' :style="{color: statusMeta(pageCycle.status).color, background: statusMeta(pageCycle.status).bg}">{{ statusMeta(pageCycle.status).label }}</span>' +
     '<span class="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md border border-stroke bg-white text-[12px] text-sub whitespace-nowrap">' +
-    '<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="4" y="5" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>' +
+    '' + wiIcon('calendar', 13) + '' +
     '{{ fmtRange(pageCycle) }}</span>' +
     '<span class="text-[12px] text-faint">{{ daysLabel(pageCycle) }}</span>' +
     '<div class="ml-auto flex items-center gap-2">' +
     '<button v-if="canCreate && pageCycle.status !== \'completed\'" type="button" @click="openPicker" ' +
     'class="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold">' +
-    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Add work items</button>' +
+    '' + wiIcon('plus', 14) + 'Add work items</button>' +
     '<button v-if="canCreate" type="button" @click="openMenu(pageCycle, $event.currentTarget)" data-tip="More" ' +
     'class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover border border-stroke">' +
-    '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></button>' +
+    '' + wiIcon('ellipsis-thin', 16) + '</button>' +
     '</div></div>' +
 
     '<div class="flex-1 min-h-0 overflow-y-auto"><div class="p-4 sm:p-6 max-w-[1200px] mx-auto w-full">' +
@@ -379,7 +393,7 @@ PB.boot('project-cycles', {
     '<span class="text-[12px] text-sub font-medium">{{ count(pageCycle, g.key) }}</span></div>' +
     '<div class="flex items-center justify-between">' +
     '<span class="inline-flex items-center gap-2 text-[12px] text-ink">' +
-    '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" class="text-sub"><path d="M4 7h16M4 12h16M4 17h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Scope</span>' +
+    '' + wiIcon('bars-staggered', 13, 'text-sub') + 'Scope</span>' +
     '<span class="text-[12px] text-sub font-medium">{{ count(pageCycle, \'scope\') }}</span></div>' +
     '</div></div>' +
 
@@ -395,17 +409,18 @@ PB.boot('project-cycles', {
     // reader has to make for no reason.
     '<div class="flex items-center gap-2 px-5 sm:px-6 h-12 border-b border-line">' +
     '<span class="flex items-center gap-2 text-[13px] font-medium text-ink shrink-0">' +
-    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-sub"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>' +
+    '' + wiIcon('bars-thin', 15, 'text-sub') + '' +
     'Cycle work items <span class="text-[11px] font-semibold text-sub bg-hover rounded-full px-1.5 py-0.5">{{ items.length }}</span></span>' +
     '</div>' +
     '<div v-show="!items.length" class="px-6 py-12 text-center">' +
     '<p class="text-[13px] text-sub">No work items in this cycle yet.</p>' +
     '<button v-if="canCreate && pageCycle.status !== \'completed\'" type="button" @click="openPicker" ' +
     'class="mt-3 h-9 px-4 rounded-md border border-stroke text-[13px] font-semibold text-ink hover:bg-hover">Add work items</button></div>' +
-    // v-show, not v-if: the grid measures itself on mount, and an element that has been
-    // display:none measures zero — the component redraws itself the first time it appears.
-    '<wi-list v-show="items.length" :items="items" :states="states" :can-edit="false" ' +
-    'row-action="remove" :height="gridHeight" @open="openItem" @remove="removeItem" />' +
+    // The work items SCREEN, given this cycle's rows — editable chips, the real drawer, the
+    // same everything, because it is the same component the project's list uses. v-if rather
+    // than v-show: the grid inside measures itself on mount and a display:none container
+    // gives it a height of zero.
+    '<work-items-screen v-if="workItems && items.length" :bootstrap="workItems" />' +
     '</div>' +
 
     '<div class="h-8"></div></div>' +
@@ -424,10 +439,10 @@ PB.boot('project-cycles', {
     '<input v-if="searchOpen" v-model="query" placeholder="Search cycles…" ref="search" ' +
     'class="h-8 w-52 px-3 rounded-md bg-hover text-[13px] text-ink placeholder:text-faint outline outline-1 -outline-offset-1 outline-transparent focus:bg-white focus:outline-stroke" />' +
     '<button type="button" @click="searchOpen = !searchOpen; query = \'\'" data-tip="Search" aria-label="Search" class="h-8 w-8 grid place-items-center rounded-md hover:bg-hover">' +
-    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="M21 21l-4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>' +
+    '' + wiIcon('magnifying-glass', 16) + '</button>' +
     '<button v-if="canCreate" type="button" @click="openCreate" ' +
     'class="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold shrink-0">' +
-    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span class="hidden sm:inline">Add cycle</span></button>' +
+    '' + wiIcon('plus', 14) + '<span class="hidden sm:inline">Add cycle</span></button>' +
     '</div></div>' +
 
     '<div class="flex-1 min-h-0 overflow-y-auto">' +
@@ -435,7 +450,7 @@ PB.boot('project-cycles', {
     // Empty state (§5.4)
     '<div v-if="!shown.length" class="h-full min-h-[360px] flex flex-col items-center justify-center text-center px-6 py-16">' +
     '<span class="h-16 w-16 rounded-2xl bg-hover grid place-items-center text-faint mb-4">' +
-    '<svg width="30" height="30" viewBox="0 0 24 24" fill="none"><path d="M21 12a9 9 0 11-3.6-7.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M21 4v4h-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>' +
+    '' + wiIcon('rotate', 30) + '</span>' +
     '<h3 class="text-[15px] font-semibold text-head">No {{ tab }} cycles</h3>' +
     '<p class="text-[13px] text-sub mt-1 max-w-[420px]">' +
     'Cycles are time boxes — a start date, an end date, and the work your team plans to finish between them. ' +
@@ -448,17 +463,17 @@ PB.boot('project-cycles', {
     '<div v-for="c in shown" :key="c.id" class="p-4 sm:p-6 max-w-[1200px] mx-auto w-full">' +
     '<div class="flex flex-wrap items-center gap-3 mb-4">' +
     '<a :href="cycleUrl(c)" class="inline-flex items-center gap-2 text-[16px] font-semibold text-head hover:text-brand">' +
-    '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" class="text-brand"><path d="M21 12a9 9 0 11-3.6-7.2" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><path d="M21 4v4h-4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>{{ c.name }}</a>' +
+    '' + wiIcon('rotate', 18, 'text-brand') + '{{ c.name }}</a>' +
     '<span class="inline-flex items-center h-6 px-2.5 rounded-md text-[12px] font-medium" :style="{color: statusMeta(c.status).color, background: statusMeta(c.status).bg}">{{ statusMeta(c.status).label }}</span>' +
     '<span class="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md border border-stroke bg-white text-[12px] text-sub">' +
-    '<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="4" y="5" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>{{ fmtRange(c) }}</span>' +
+    '' + wiIcon('calendar', 13) + '{{ fmtRange(c) }}</span>' +
     '<span class="text-[12px] text-faint">{{ daysLabel(c) }}</span>' +
     '<div class="ml-auto flex items-center gap-2">' +
     '<span v-if="c.created_by" class="h-6 w-6 rounded-full overflow-hidden grid place-items-center bg-slate-600 text-white text-[10px] font-bold" :data-tip="\'Created by \' + c.created_by.name">' +
     '<img v-if="c.created_by.avatar_url" :src="c.created_by.avatar_url" alt="" class="h-full w-full object-cover" /><span v-else>{{ c.created_by.initial }}</span></span>' +
     '<button v-if="canCreate" type="button" @click="openMenu(c, $event.currentTarget)" data-tip="More" ' +
     'class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover border border-stroke">' +
-    '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></button>' +
+    '' + wiIcon('ellipsis-thin', 16) + '</button>' +
     '</div></div>' +
     '<div class="rounded-card border border-line bg-white p-5">' +
     '<div class="flex items-center gap-4">' +
@@ -475,7 +490,7 @@ PB.boot('project-cycles', {
     '<span class="text-[12px] text-sub font-medium">{{ count(c, g.key) }}</span></div>' +
     '<div class="flex items-center justify-between">' +
     '<span class="inline-flex items-center gap-2 text-[12px] text-ink">' +
-    '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" class="text-sub"><path d="M4 7h16M4 12h16M4 17h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Scope</span>' +
+    '' + wiIcon('bars-staggered', 13, 'text-sub') + 'Scope</span>' +
     '<span class="text-[12px] text-sub font-medium">{{ count(c, \'scope\') }}</span></div>' +
     '</div>' +
     '<div class="mt-5 pt-4 border-t border-line">' +
@@ -494,7 +509,7 @@ PB.boot('project-cycles', {
     '<img v-if="c.created_by.avatar_url" :src="c.created_by.avatar_url" alt="" class="h-full w-full object-cover" /><span v-else>{{ c.created_by.initial }}</span></span>' +
     '<button v-if="canCreate" type="button" @click="openMenu(c, $event.currentTarget)" data-tip="More" aria-label="More" ' +
     'class="h-7 w-7 grid place-items-center rounded hover:bg-line text-faint opacity-0 group-hover:opacity-100 shrink-0">' +
-    '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></button>' +
+    '' + wiIcon('ellipsis-thin', 15) + '</button>' +
     '</div></div>' +
 
     '</div></template>' +
@@ -503,17 +518,17 @@ PB.boot('project-cycles', {
     '<div v-if="menu.open" class="fixed inset-0 z-[110]" @click="closeMenu"></div>' +
     '<div v-if="menu.open" :style="menu.style" class="rounded-md bg-white shadow-lg outline outline-1 outline-black/5 py-1 text-[13px]">' +
     '<button type="button" @click="openEdit(menu.cycle)" class="w-full text-left flex items-center gap-2.5 px-3 h-9 hover:bg-hover text-ink">' +
-    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4 12.5-12.5z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>Edit cycle</button>' +
+    '' + wiIcon('pen', 15, 'text-faint shrink-0') + 'Edit cycle</button>' +
     '<a :href="cycleUrl(menu.cycle)" class="w-full flex items-center gap-2.5 px-3 h-9 hover:bg-hover text-ink">' +
-    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0"><path d="M14 4h6v6M20 4l-8 8M10 6H5a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1v-5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>Open cycle</a>' +
+    '' + wiIcon('arrow-up-right-from-square', 15, 'text-faint shrink-0') + 'Open cycle</a>' +
     // §10: only offered on a finished cycle, which is the only time there is unfinished work
     // left behind to move on.
     '<button v-if="menu.cycle && menu.cycle.status === \'completed\' && pageCycleId === menu.cycle.id" type="button" @click="openTransfer" ' +
     'class="w-full text-left flex items-center gap-2.5 px-3 h-9 hover:bg-hover text-ink">' +
-    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0"><path d="M4 8h13l-3-3M20 16H7l3 3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>Transfer work items</button>' +
+    '' + wiIcon('arrow-right-arrow-left', 15, 'text-faint shrink-0') + 'Transfer work items</button>' +
     '<template v-if="canDelete"><div class="my-1 border-t border-line"></div>' +
     '<button type="button" @click="askDelete(menu.cycle)" class="w-full text-left flex items-center gap-2.5 px-3 h-9 hover:bg-hover text-danger">' +
-    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="shrink-0"><path d="M4 7h16M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2M6 7l1 13a1 1 0 001 1h8a1 1 0 001-1l1-13" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>Delete cycle</button></template>' +
+    '' + wiIcon('trash', 15, 'shrink-0') + 'Delete cycle</button></template>' +
     '</div>' +
 
     // ============ Create / edit cycle (§6.1) ============
@@ -532,7 +547,7 @@ PB.boot('project-cycles', {
     '<button type="button" @click="openDate(\'start_date\', $event.currentTarget)" ' +
     'class="w-full inline-flex items-center gap-1.5 h-9 px-2.5 rounded-md border text-[13px] hover:bg-hover" ' +
     ':class="[form.errors.start_date ? \'border-danger\' : \'border-stroke\', form.start_date ? \'text-ink\' : \'text-sub\']">' +
-    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0"><rect x="4" y="5" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>' +
+    '' + wiIcon('calendar', 14, 'text-faint shrink-0') + '' +
     '{{ form.start_date ? fmtDate(form.start_date) : \'Start date\' }}</button></div>' +
 
     '<div class="min-w-0">' +
@@ -540,7 +555,7 @@ PB.boot('project-cycles', {
     '<button type="button" @click="openDate(\'end_date\', $event.currentTarget)" ' +
     'class="w-full inline-flex items-center gap-1.5 h-9 px-2.5 rounded-md border text-[13px] hover:bg-hover" ' +
     ':class="[form.errors.end_date ? \'border-danger\' : \'border-stroke\', form.end_date ? \'text-ink\' : \'text-sub\']">' +
-    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0"><rect x="4" y="5" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>' +
+    '' + wiIcon('calendar', 14, 'text-faint shrink-0') + '' +
     '{{ form.end_date ? fmtDate(form.end_date) : \'End date\' }}</button></div>' +
     '</div>' +
     '<p v-if="form.errors.start_date" class="text-[12px] text-danger mt-1.5">{{ form.errors.start_date[0] }}</p>' +
@@ -561,7 +576,7 @@ PB.boot('project-cycles', {
     '<button v-for="r in picker.results" :key="r.id" type="button" @click="togglePicked(r)" ' +
     'class="w-full text-left flex items-center gap-2.5 px-2 py-2 rounded-md hover:bg-hover">' +
     '<span class="h-4 w-4 rounded border grid place-items-center shrink-0" :class="isPicked(r) ? \'bg-brand border-brand\' : \'border-stroke\'">' +
-    '<svg v-if="isPicked(r)" width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M5 12l4 4L19 7" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>' +
+    '<span v-if="isPicked(r)">' + wiIcon('check-on-fill', 12) + '</span></span>' +
     '<span class="text-[11px] text-faint font-medium shrink-0">{{ r.identifier }}</span>' +
     '<span class="text-[13px] text-ink truncate flex-1">{{ r.title }}</span>' +
     // §7.3: adding an item that already belongs elsewhere is a MOVE, and saying so up front
@@ -591,7 +606,7 @@ PB.boot('project-cycles', {
     '<button v-for="i in incompleteItems" :key="i.id" type="button" @click="toggleTransfer(i)" ' +
     'class="w-full text-left flex items-center gap-2.5 px-2 py-2 rounded-md hover:bg-hover">' +
     '<span class="h-4 w-4 rounded border grid place-items-center shrink-0" :class="isTransferring(i) ? \'bg-brand border-brand\' : \'border-stroke\'">' +
-    '<svg v-if="isTransferring(i)" width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M5 12l4 4L19 7" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>' +
+    '<span v-if="isTransferring(i)">' + wiIcon('check-on-fill', 12) + '</span></span>' +
     '<span class="text-[11px] text-faint font-medium shrink-0">{{ i.identifier }}</span>' +
     '<span class="text-[13px] text-ink truncate flex-1">{{ i.title }}</span></button>' +
     '<p v-if="!incompleteItems.length" class="px-2 py-6 text-[13px] text-sub text-center">Nothing unfinished — this cycle is fully closed out.</p>' +

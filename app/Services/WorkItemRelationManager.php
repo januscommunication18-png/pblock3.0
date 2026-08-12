@@ -87,24 +87,38 @@ class WorkItemRelationManager
      */
     public function assertCanParent(WorkItem $parent, WorkItem $child): void
     {
+        if ($reason = $this->parentRefusal($parent, $child)) {
+            throw ValidationException::withMessages(['work_item_ids' => $reason]);
+        }
+    }
+
+    /**
+     * Why `$parent` may not become `$child`'s parent, or null if it may (§25).
+     *
+     * Split out of assertCanParent because the same question is asked from two directions:
+     * the sub-task panel nominates the CHILD, and the Parent property on the work item
+     * nominates the PARENT. Both would close the same loop, so both consult this — the
+     * wording stays neutral about which end was picked.
+     */
+    public function parentRefusal(WorkItem $parent, WorkItem $child): ?string
+    {
         if ((int) $parent->id === (int) $child->id) {
-            throw ValidationException::withMessages([
-                'work_item_ids' => 'A work item cannot be its own sub-task.',
-            ]);
+            return 'A work item cannot be its own parent.';
         }
 
         // Walk up from the intended parent: meeting the child means this would close a loop.
+        // `$seen` guards the walk itself, so pre-existing bad data cannot hang the request.
         $seen = [];
         $cursor = $parent;
         while ($cursor && $cursor->parent_id && ! isset($seen[$cursor->id])) {
             $seen[$cursor->id] = true;
             if ((int) $cursor->parent_id === (int) $child->id) {
-                throw ValidationException::withMessages([
-                    'work_item_ids' => "{$child->identifier} is already above {$parent->identifier}, so it cannot become its sub-task.",
-                ]);
+                return "{$child->identifier} is already above {$parent->identifier}, so they cannot be nested this way.";
             }
             $cursor = WorkItem::find($cursor->parent_id);
         }
+
+        return null;
     }
 
     // ------------------------------------------------------- dependencies & relations (§27–§36)

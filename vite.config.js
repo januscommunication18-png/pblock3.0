@@ -1,8 +1,10 @@
 import { defineConfig } from 'vite';
 import laravel from 'laravel-vite-plugin';
 import { bunny } from 'laravel-vite-plugin/fonts';
-import tailwindcss from '@tailwindcss/vite';
 
+/* Tailwind is NOT a Vite plugin here: the app's pages are served plain CSS built by
+   `npm run build:css` (see tailwind.config.js). Tailwind 3 compiles through postcss.config.js
+   for anything that does go through Vite. */
 export default defineConfig({
     plugins: [
         laravel({
@@ -14,7 +16,6 @@ export default defineConfig({
                 }),
             ],
         }),
-        tailwindcss(),
     ],
     server: {
         watch: {

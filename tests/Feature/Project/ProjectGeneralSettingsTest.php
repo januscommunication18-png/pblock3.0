@@ -5,6 +5,8 @@ namespace Tests\Feature\Project;
 use App\Models\Project;
 use App\Models\ProjectMember;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * Project Settings → General.
@@ -13,6 +15,9 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 class ProjectGeneralSettingsTest extends ProjectTestCase
 {
     use RefreshDatabase;
+
+    /** The cover form posts multipart but asks for JSON back, exactly as the screen does. */
+    private const JSON = ['Accept' => 'application/json'];
 
     /** The full settings payload, so a save never blanks a field it did not mean to touch. */
     private function payload(Project $project, array $overrides = []): array
@@ -206,6 +211,52 @@ class ProjectGeneralSettingsTest extends ProjectTestCase
         $fresh = $ws->run(fn () => Project::find($project->id));
         $this->assertSame('web', $fresh->identifier);
         $this->assertSame('Renamed', $fresh->name);
+    }
+
+    // ================= §4: Change cover =================
+
+    public function test_the_cover_upload_stores_the_file_and_persists_a_reachable_url(): void
+    {
+        Storage::fake('public');
+
+        [$owner, $ws] = $this->owner();
+        $project = $this->makeProject($owner, $ws);
+
+        $url = $this->actingAs($owner)->post(route('projects.settings.cover', $project), [
+            'cover' => UploadedFile::fake()->image('banner.jpg', 1200, 400),
+        ], self::JSON)->assertOk()->json('cover_url');
+
+        // The file lands on the PUBLIC disk, which is the half that matters: it is served
+        // through the public/storage symlink, and without that link the upload succeeds and
+        // the image 404s — indistinguishable from "the upload is broken".
+        $this->assertNotEmpty(Storage::disk('public')->files("project-covers/{$ws->id}"));
+        $this->assertStringContainsString('/storage/', $url);
+        $this->assertSame($url, $ws->run(fn () => Project::find($project->id))->cover_url);
+    }
+
+    public function test_the_cover_upload_refuses_what_it_should(): void
+    {
+        Storage::fake('public');
+
+        [$owner, $ws] = $this->owner();
+        $project = $this->makeProject($owner, $ws);
+
+        // Not an image at all.
+        $this->actingAs($owner)->post(route('projects.settings.cover', $project), [
+            'cover' => UploadedFile::fake()->create('notes.pdf', 40, 'application/pdf'),
+        ], self::JSON)->assertStatus(422)->assertJsonValidationErrors('cover');
+
+        // Over the configured size cap.
+        $tooBig = (int) config('projects.cover.max_kb') + 512;
+        $this->actingAs($owner)->post(route('projects.settings.cover', $project), [
+            'cover' => UploadedFile::fake()->create('huge.jpg', $tooBig, 'image/jpeg'),
+        ], self::JSON)->assertStatus(422)->assertJsonValidationErrors('cover');
+
+        // §3: a contributor may look at settings but not restyle the project.
+        $contributor = $this->projectMember($ws, $project, 'contributor-cover@example.com');
+        $this->actingAs($contributor)->post(route('projects.settings.cover', $project), [
+            'cover' => UploadedFile::fake()->image('banner.jpg'),
+        ], self::JSON)->assertStatus(403);
     }
 
     public function test_only_authorized_users_can_change_general_settings(): void

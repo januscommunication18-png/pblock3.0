@@ -54,6 +54,12 @@ class WorkItemCreator
                 'parent_id' => $data['parent_id'] ?? null,
                 // Cycles §7.3: an item can be created already planned into a cycle, from the
                 // cycle detail page's "create new work item" action.
+                // Epic §9: an item can be created already in an epic, from the epic detail
+                // page's "create new work item" action. Independent of the cycle beside it —
+                // §12 is explicit that setting one must not set the other.
+                // §11: an item can be created with an estimate already on it.
+                'estimate_value_id' => $data['estimate_value_id'] ?? null,
+                'epic_id' => $data['epic_id'] ?? null,
                 'cycle_id' => $data['cycle_id'] ?? null,
                 'cycle_assigned_by' => ! empty($data['cycle_id']) ? $creator->id : null,
                 'cycle_assigned_at' => ! empty($data['cycle_id']) ? now() : null,
@@ -72,6 +78,10 @@ class WorkItemCreator
             }
             if (! empty($data['label_ids'])) {
                 $item->labels()->sync(array_values(array_unique($data['label_ids'])));
+            }
+            // Modules §9.1: created already grouped into one or more modules.
+            if (! empty($data['module_ids'])) {
+                $item->modules()->sync(array_values(array_unique($data['module_ids'])));
             }
 
             // Inside the transaction: a work item must never exist without its creation

@@ -17,7 +17,7 @@ class GoalsRequest extends FormRequest
         $allowed = array_keys(config('onboarding.goals'));
 
         return [
-            'goals'   => ['required', 'array', 'min:1'],
+            'goals' => ['required', 'array', 'min:1'],
             'goals.*' => ['string', Rule::in($allowed)],
         ];
     }

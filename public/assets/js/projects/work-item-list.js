@@ -32,7 +32,15 @@ var WiList = {
     /** Trailing control on each row: the ⋯ actions menu, a remove ×, or nothing. */
     rowAction: { type: String, default: 'menu' },
     /** Tabulator's height. '100%' fills a flex parent; a px value sizes to content. */
-    height: { type: String, default: '100%' }
+    height: { type: String, default: '100%' },
+    /**
+     * Does this project use labels (Project-Level Labels §3)?
+     *
+     * Defaults to true so a host that never had labels switched off does not have to say so.
+     * When false the label chip leaves the row entirely — including its empty placeholder,
+     * which would otherwise offer a field the project has turned off.
+     */
+    labelsEnabled: { type: Boolean, default: true }
   },
   emits: ['open', 'chip', 'group-add', 'remove'],
   data: function () {
@@ -204,13 +212,15 @@ var WiList = {
     groupHeader: function (value, count) {
       var state = this.statesById[String(value)] || null;
       var add = this.canAdd
-        ? '<button type="button" data-gadd="' + wiEsc(value) + '" class="ml-auto h-6 w-6 grid place-items-center rounded text-sub hover:bg-line" data-tip="Add work item" aria-label="Add work item"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>'
+        // h-7 w-7 and rounded-md to match wiRowMenuButton exactly: this "+" and a row's ⋯ line
+        // up in the same column, and both sit 20px from the right edge (work-items.css).
+        ? '<button type="button" data-gadd="' + wiEsc(value) + '" class="ml-auto h-7 w-7 grid place-items-center rounded-md text-sub hover:bg-line shrink-0" data-tip="Add work item" aria-label="Add work item">' + wiIcon('plus', 15) + '</button>'
         : '';
 
       // Inline colours, not utility classes: Tabulator's base theme styles `.tabulator-group
       // span` with a higher specificity than the skin's reset, and a class here loses to it —
       // which is exactly how the second copy of this grid ended up with red group headings.
-      return '<span class="wi-chevron grid place-items-center" style="color:#9ca3af"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>' +
+      return '<span class="wi-chevron grid place-items-center" style="color:#9ca3af">' + wiIcon('chevron-right', 14) + '</span>' +
         '<span class="grid place-items-center">' + wiStateIcon(state) + '</span>' +
         '<span class="text-[13px] font-semibold" style="color:#0f0f10">' + wiEsc(state ? state.name : 'No state') + '</span>' +
         '<span class="text-[11px] font-semibold rounded-full px-1.5 py-0.5" style="color:#6b7280;background:#f3f4f6">' + count + '</span>' +
@@ -225,10 +235,10 @@ var WiList = {
         action = '<button type="button" data-act="remove" data-id="' + d.id + '" ' +
           'data-tip="Remove from this list" aria-label="Remove from this list" ' +
           'class="h-7 w-7 grid place-items-center rounded-md text-sub hover:bg-line hover:text-danger shrink-0">' +
-          '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg></button>';
+          '' + wiIcon('xmark', 15) + '</button>';
       }
 
-      return wiMetaCell(d, { edit: this.canEdit, action: action });
+      return wiMetaCell(d, { edit: this.canEdit, action: action, labels: this.labelsEnabled });
     }
   },
   template: '<div ref="grid" class="wi-grid"></div>'

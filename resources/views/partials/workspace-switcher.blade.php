@@ -24,7 +24,7 @@
         <p class="text-[13px] text-sub mt-0.5">Switch, manage settings, or invite teammates.</p>
       </div>
       <button type="button" data-ws-close class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover" title="Close">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        {!! pb_icon('xmark', 18) !!}
       </button>
     </div>
 
@@ -63,7 +63,7 @@
 
     <div class="px-6 py-4 border-t border-line shrink-0">
       <a href="{{ route('workspaces.create') }}" class="w-full inline-flex items-center justify-center gap-2 h-9 rounded-md border border-stroke text-[13px] font-semibold text-ink hover:bg-hover">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        {!! pb_icon('plus', 16) !!}
         Create workspace
       </a>
     </div>

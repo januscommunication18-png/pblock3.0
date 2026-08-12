@@ -6,11 +6,12 @@
   <meta name="csrf-token" content="{{ csrf_token() }}" />
   <title>Projects — {{ $workspace->name }}</title>
 
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="{{ pb_asset('assets/js/tailwind.config.js') }}"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ pb_asset('assets/css/tailwind.css') }}" />
+  <link rel="stylesheet" href="{{ pb_asset('assets/css/inter.css') }}" />
   <link rel="stylesheet" href="{{ pb_asset('assets/css/styles.css') }}" />
+  {!! pb_icon_styles() !!}
+  {!! pb_icon_boot() !!}
+  <script defer src="{{ pb_asset('assets/js/icons.js') }}"></script>
   <script src="{{ pb_asset('assets/js/vendor/vue.global.prod.js') }}"></script>
   <script defer src="{{ pb_asset('assets/js/settings/app.js') }}"></script>
   <script defer src="{{ pb_asset('assets/js/projects/index.js') }}"></script>

@@ -25,7 +25,7 @@ class ProfileController extends Controller
         $user = Auth::user();
 
         $user->fill([
-            'full_name'        => $request->validated('full_name'),
+            'full_name' => $request->validated('full_name'),
             'marketing_opt_in' => (bool) $request->validated('marketing_opt_in'),
         ])->save();
 

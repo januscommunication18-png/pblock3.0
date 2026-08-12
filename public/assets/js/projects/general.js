@@ -189,7 +189,7 @@ PB.boot('project-general', {
     '{{ m.name }}' +
     '<button type="button" @click="toggleSubscriber(m)" :data-tip="\'Remove \' + m.name" :aria-label="\'Remove \' + m.name" ' +
     'class="h-5 w-5 grid place-items-center rounded-full text-faint hover:text-danger hover:bg-hover">' +
-    '<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></button>' +
+    '' + wiIcon('xmark', 12) + '</button>' +
     '</span></div></div>' +
 
     // 20px of air between the last field and the primary action (and before the card).

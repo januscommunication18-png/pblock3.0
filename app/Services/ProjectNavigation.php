@@ -21,13 +21,20 @@ use App\Models\WorkspaceMembership;
  */
 class ProjectNavigation
 {
+    public function __construct(private readonly ProjectFeatureState $featureState) {}
+
     /**
      * The project workspace tab bar, with per-project features resolved (Cycles §3.2.3/§4).
      *
-     * The config list is fixed; what varies is whether a feature-gated tab belongs in it at
-     * all. A disabled tab is REMOVED rather than shown as "Soon": §3.2.4 asks for it to be
-     * hidden or disabled for normal users, and a visible tab that refuses to open is worse
-     * than an absent one. Enabling the feature puts it back, functional.
+     * The config list is fixed; what varies is what a feature-gated tab looks like, and
+     * Feature Disable §5/§10 gives three answers rather than two:
+     *
+     *  - **on** — an ordinary tab.
+     *  - **off, with records** — the tab STAYS, marked Disabled. Switching a feature off must
+     *    never bury its history, and a tab that vanished would leave the only route to those
+     *    records being a URL somebody remembered. It opens read-only.
+     *  - **off, never used** — removed. There is nothing to preserve, and §5 asks for the
+     *    cleaner UI on projects that never touched the feature.
      *
      * Every screen that renders partials/project-tabs goes through here, so a feature can
      * never appear on one project page and not another.
@@ -36,11 +43,27 @@ class ProjectNavigation
      */
     public function tabs(Project $project): array
     {
-        $gated = ['cycles' => 'cycles'];
+        // tab key => the project feature that decides how it renders.
+        $gated = ['cycles' => 'cycles', 'modules' => 'modules', 'epics' => 'epics'];
 
         return collect(config('projects.workspace_tabs'))
-            ->reject(fn (array $tab) => isset($gated[$tab['key']]) && ! $project->featureEnabled($gated[$tab['key']]))
-            ->map(fn (array $tab) => isset($gated[$tab['key']]) ? ['status' => 'active'] + $tab : $tab)
+            // Resolved once per tab rather than once per question, so a gated tab costs one
+            // state lookup instead of two.
+            ->map(fn (array $tab) => isset($gated[$tab['key']])
+                ? $tab + ['feature_state' => $this->featureState->state($project, $gated[$tab['key']])]
+                : $tab)
+            ->reject(fn (array $tab) => ($tab['feature_state'] ?? null) === ProjectFeatureState::DISABLED_UNUSED)
+            ->map(function (array $tab) {
+                if (! isset($tab['feature_state'])) {
+                    return $tab;
+                }
+
+                // `status` stays 'active' either way — the page opens. `state` is what tells
+                // the tab bar to mark it Disabled.
+                return ['status' => 'active',
+                    'state' => $tab['feature_state'] === ProjectFeatureState::DISABLED_HISTORY ? 'disabled' : 'enabled',
+                ] + $tab;
+            })
             ->values()->all();
     }
 

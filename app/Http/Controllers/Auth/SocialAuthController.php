@@ -54,16 +54,16 @@ class SocialAuthController extends Controller
             $user = User::firstOrCreate(
                 ['email' => $email],
                 [
-                    'full_name'         => $oauth->getName(),
-                    'avatar_url'        => $oauth->getAvatar(),
-                    'status'            => 'active',
+                    'full_name' => $oauth->getName(),
+                    'avatar_url' => $oauth->getAvatar(),
+                    'status' => 'active',
                     'email_verified_at' => now(), // provider-verified email
                     'terms_accepted_at' => now(),
                 ],
             );
 
             UserIdentity::firstOrCreate([
-                'provider'         => self::PROVIDERS[$provider],
+                'provider' => self::PROVIDERS[$provider],
                 'provider_subject' => (string) $oauth->getId(),
             ], ['user_id' => $user->id]);
 

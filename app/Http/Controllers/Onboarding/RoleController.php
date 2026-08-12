@@ -15,7 +15,7 @@ class RoleController extends Controller
     public function show(): View
     {
         return view('onboarding.role', [
-            'user'  => Auth::user(),
+            'user' => Auth::user(),
             'roles' => config('onboarding.roles'),
         ]);
     }

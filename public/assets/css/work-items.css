@@ -18,12 +18,28 @@
 .wi-grid .tabulator-row .tabulator-cell:first-child { padding-left: 24px; }
 .wi-grid .tabulator-row .tabulator-cell:last-child { padding-right: 20px; }
 
-/* Group header: light gray band, aligned with rows, uniform height */
-.wi-grid .tabulator-group,
-.wi-grid .tabulator-group.tabulator-group-visible {
+/* Group header: light gray band, aligned with rows, uniform height.
+
+   Every group selector below is qualified with `.tabulator-row` on purpose. Tabulator's base
+   theme styles groups as `.tabulator-row.tabulator-group { background:#ccc }` — two classes,
+   the same weight as a bare `.wi-grid .tabulator-group`, so at equal specificity whichever
+   stylesheet loads LAST wins. Matching its selector shape puts us a class ahead and settles
+   it on specificity instead of load order.
+
+   That tie is not hypothetical: it turned every collapsed group row grey on the Cycles screen
+   for as long as that page loaded this file before Tabulator's. Expanded groups escaped,
+   because `.tabulator-group-visible` already carried the extra class. */
+.wi-grid .tabulator-row.tabulator-group,
+.wi-grid .tabulator-row.tabulator-group.tabulator-group-visible {
   background: #f6f7f8;
   border-top: none;
   border-bottom: 1px solid #e5e7eb;
+  /* Tabulator puts a 1px right border on group rows. The skin strips it from CELLS but never
+     from groups, so with box-sizing:border-box the group's content box ended 1px short of a
+     data row's — enough to make the group "+" and a row's ⋯ sit off the same axis. Those two
+     controls read as one column down the list, so they measure from the same edge: 20px here,
+     and 20px of padding-right on the last cell below. */
+  border-right: none;
   height: 40px;
   min-height: 40px;
   display: flex;
@@ -34,19 +50,21 @@
   color: #0f0f10;
   font-weight: 600;
 }
-.wi-grid .tabulator-group:hover { background: #eef0f2; cursor: pointer; }
+.wi-grid .tabulator-row.tabulator-group:hover { background: #eef0f2; cursor: pointer; }
 
 /* Hide Tabulator's native toggle so our own chevron sits at the group's left padding,
    aligned with the "Work items" toolbar label. */
-.wi-grid .tabulator-group .tabulator-group-toggle { display: none !important; }
-.wi-grid .tabulator-group .tabulator-arrow { display: none !important; }
+.wi-grid .tabulator-row.tabulator-group .tabulator-group-toggle { display: none !important; }
+.wi-grid .tabulator-row.tabulator-group .tabulator-arrow { display: none !important; }
 
-/* Tabulator's base theme sets group <span> { color:#d00; margin-left:10px } — reset both. */
-.wi-grid .tabulator-group span { color: inherit; margin-left: 0; }
+/* Tabulator's base theme sets group <span> { color:#d00; margin-left:10px } — reset both.
+   Qualified for the same reason as the band above: its rule is `.tabulator-row
+   .tabulator-group span`, which ties with an unqualified one. */
+.wi-grid .tabulator-row.tabulator-group span { color: inherit; margin-left: 0; }
 
 /* Collapse/expand chevron — points right when collapsed, down when expanded. */
-.wi-grid .tabulator-group .wi-chevron { transition: transform .15s ease; transform: rotate(0deg); }
-.wi-grid .tabulator-group.tabulator-group-visible .wi-chevron { transform: rotate(90deg); }
+.wi-grid .tabulator-row.tabulator-group .wi-chevron { transition: transform .15s ease; transform: rotate(0deg); }
+.wi-grid .tabulator-row.tabulator-group.tabulator-group-visible .wi-chevron { transform: rotate(90deg); }
 
 /* ---------------------------------------------------------------------------
    Rich text (read view)
@@ -201,7 +219,11 @@
   color: #fff;
   font-size: 11.5px;
   line-height: 1.4;
-  white-space: nowrap;
+  /* Wraps rather than running off the screen. Most tooltips are a few words and still sit on
+     one line inside max-width; the exception is the At Risk / Off Track label, which carries
+     the whole update comment — the reason to hover it at all. */
+  white-space: normal;
+  overflow-wrap: anywhere;
   box-shadow: 0 4px 12px rgba(15, 15, 16, .18);
 }
 .wi-tip.hidden { display: none; }

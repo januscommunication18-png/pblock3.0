@@ -1,6 +1,9 @@
 <?php
 
 use App\Http\Controllers\Project\CycleController;
+use App\Http\Controllers\Project\EpicController;
+use App\Http\Controllers\Project\EstimationController;
+use App\Http\Controllers\Project\ModuleController;
 use App\Http\Controllers\Project\ProjectController;
 use App\Http\Controllers\Project\ProjectLabelController;
 use App\Http\Controllers\Project\ProjectMembersController;
@@ -146,10 +149,75 @@ Route::middleware(['auth', 'workspace.tenancy'])
         Route::delete('/{project}/cycles/{cycle}', [CycleController::class, 'destroy'])
             ->whereNumber(['project', 'cycle'])->name('cycles.destroy');
 
+        // ---- Modules (Module Management §19). Registered BEFORE the {tab} catch-all, which
+        //      would otherwise swallow /modules and render Coming Soon over a built feature.
+        //      Every action re-checks ModulePolicy, which refuses when the project has the
+        //      feature switched off — the routes existing is not permission to use them.
+        Route::get('/{project}/modules', [ModuleController::class, 'index'])
+            ->whereNumber('project')->name('modules');
+        Route::post('/{project}/modules', [ModuleController::class, 'store'])
+            ->whereNumber('project')->name('modules.store');
+        Route::get('/{project}/modules/{module}/search', [ModuleController::class, 'search'])
+            ->whereNumber(['project', 'module'])->name('modules.search');
+        Route::post('/{project}/modules/{module}/archive', [ModuleController::class, 'archive'])
+            ->whereNumber(['project', 'module'])->name('modules.archive');
+        Route::post('/{project}/modules/{module}/restore', [ModuleController::class, 'restore'])
+            ->whereNumber(['project', 'module'])->name('modules.restore');
+        Route::post('/{project}/modules/{module}/work-items', [ModuleController::class, 'addWorkItems'])
+            ->whereNumber(['project', 'module'])->name('modules.items.store');
+        Route::delete('/{project}/modules/{module}/work-items/{workItem}', [ModuleController::class, 'removeWorkItem'])
+            ->whereNumber(['project', 'module', 'workItem'])->name('modules.items.destroy');
+        Route::get('/{project}/modules/{module}', [ModuleController::class, 'show'])
+            ->whereNumber(['project', 'module'])->name('modules.show');
+        Route::patch('/{project}/modules/{module}', [ModuleController::class, 'update'])
+            ->whereNumber(['project', 'module'])->name('modules.update');
+        Route::delete('/{project}/modules/{module}', [ModuleController::class, 'destroy'])
+            ->whereNumber(['project', 'module'])->name('modules.destroy');
+
+        // ---- Epics (Epic §21). Registered BEFORE the {tab} catch-all, which would otherwise
+        //      swallow /epics and render Coming Soon over a built feature. Every action
+        //      re-checks EpicPolicy, which refuses when the project has the feature switched
+        //      off — the routes existing is not permission to use them.
+        Route::get('/{project}/epics', [EpicController::class, 'index'])
+            ->whereNumber('project')->name('epics');
+        Route::post('/{project}/epics', [EpicController::class, 'store'])
+            ->whereNumber('project')->name('epics.store');
+        Route::get('/{project}/epics/{epic}/search', [EpicController::class, 'search'])
+            ->whereNumber(['project', 'epic'])->name('epics.search');
+        Route::post('/{project}/epics/{epic}/archive', [EpicController::class, 'archive'])
+            ->whereNumber(['project', 'epic'])->name('epics.archive');
+        Route::post('/{project}/epics/{epic}/restore', [EpicController::class, 'restore'])
+            ->whereNumber(['project', 'epic'])->name('epics.restore');
+        Route::post('/{project}/epics/{epic}/work-items', [EpicController::class, 'addWorkItems'])
+            ->whereNumber(['project', 'epic'])->name('epics.items.store');
+        Route::delete('/{project}/epics/{epic}/work-items/{workItem}', [EpicController::class, 'removeWorkItem'])
+            ->whereNumber(['project', 'epic', 'workItem'])->name('epics.items.destroy');
+        Route::get('/{project}/epics/{epic}', [EpicController::class, 'show'])
+            ->whereNumber(['project', 'epic'])->name('epics.show');
+        Route::patch('/{project}/epics/{epic}', [EpicController::class, 'update'])
+            ->whereNumber(['project', 'epic'])->name('epics.update');
+        Route::delete('/{project}/epics/{epic}', [EpicController::class, 'destroy'])
+            ->whereNumber(['project', 'epic'])->name('epics.destroy');
+
         Route::get('/{project}/{tab}', [ProjectWorkspaceController::class, 'tab'])
             ->whereNumber('project')
-            ->whereIn('tab', ['overview', 'modules', 'views', 'pages'])
+            ->whereIn('tab', ['overview', 'views', 'pages'])
             ->name('workspace.tab');
+
+        // ---- Estimation configuration (§10/§20-§23). Project Admin only; every action
+        //      re-checks it, because the routes existing is not permission to use them.
+        Route::post('/{project}/settings/estimation', [EstimationController::class, 'configure'])
+            ->whereNumber('project')->name('settings.estimation.configure');
+        Route::post('/{project}/settings/estimation/reorder', [EstimationController::class, 'reorder'])
+            ->whereNumber('project')->name('settings.estimation.reorder');
+        Route::post('/{project}/settings/estimation/values', [EstimationController::class, 'storeValue'])
+            ->whereNumber('project')->name('settings.estimation.values.store');
+        Route::post('/{project}/settings/estimation/values/{value}/restore', [EstimationController::class, 'restoreValue'])
+            ->whereNumber(['project', 'value'])->name('settings.estimation.values.restore');
+        Route::patch('/{project}/settings/estimation/values/{value}', [EstimationController::class, 'updateValue'])
+            ->whereNumber(['project', 'value'])->name('settings.estimation.values.update');
+        Route::delete('/{project}/settings/estimation/values/{value}', [EstimationController::class, 'destroyValue'])
+            ->whereNumber(['project', 'value'])->name('settings.estimation.values.destroy');
 
         // Project settings actions
         Route::prefix('/{project}/settings')->name('settings.')->group(function () {
@@ -168,6 +236,8 @@ Route::middleware(['auth', 'workspace.tenancy'])
             Route::post('/labels', [ProjectLabelController::class, 'store'])->name('labels.store');
             Route::patch('/labels/{label}', [ProjectLabelController::class, 'update'])->name('labels.update');
             Route::delete('/labels/{label}', [ProjectLabelController::class, 'destroy'])->name('labels.destroy');
+            // §11: Active → Archived → Restored, one endpoint because it is one switch.
+            Route::post('/labels/{label}/archive', [ProjectLabelController::class, 'archive'])->name('labels.archive');
         });
 
         // Section pages — LAST so the static settings routes above win. GET only.

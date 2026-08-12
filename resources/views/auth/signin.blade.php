@@ -45,7 +45,7 @@
         </a>
         <button type="button" id="sso-btn" class="relative w-full h-11 rounded-lg border border-stroke bg-white hover:bg-hover transition-colors text-[14px] font-semibold text-ink">
           <span class="absolute left-4 top-1/2 -translate-y-1/2">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0f0f10" stroke-width="2"><circle cx="8" cy="8" r="4"/><path d="M11 11l8 8M16 16l2-2M19 19l2-2" stroke-linecap="round"/></svg>
+            {!! pb_icon('key', 18) !!}
           </span>
           Sign in with Single Sign-On
         </button>
@@ -65,7 +65,7 @@
         <div class="relative">
           <input id="email" name="email" type="email" value="{{ old('email') }}" placeholder="name@company.com" class="pb-input has-suffix {{ $errors->has('email') ? 'is-error' : '' }}" required />
           <button id="email-clear" type="button" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-faint hover:text-sub" title="Clear">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/><path d="M9 9l6 6M15 9l-6 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+            {!! pb_icon('circle-xmark', 16) !!}
           </button>
         </div>
 
@@ -74,7 +74,7 @@
           <div class="relative">
             <input id="password" name="password" type="password" placeholder="Enter password" class="pb-input has-suffix" />
             <button id="pw-toggle" type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-faint hover:text-sub" title="Show password" aria-label="Show password">
-              <svg id="eye-open" width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.7"/></svg>
+              {!! pb_icon('eye-open', 18) !!}
             </button>
           </div>
           <button type="button" id="forgot-btn" class="inline-block mt-2 text-[13px] text-link font-medium hover:underline">Forgot your password?</button>

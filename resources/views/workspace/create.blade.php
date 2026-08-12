@@ -5,11 +5,11 @@
   <!-- Minimal header: back (left) · title · close (right) -->
   <header class="relative h-14 shrink-0 border-b border-line flex items-center px-4">
     <a href="{{ route('welcome') }}" title="Back" class="h-9 w-9 grid place-items-center rounded-md text-sub hover:bg-hover">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      {!! pb_icon('chevron-left', 18) !!}
     </a>
     <span class="absolute left-1/2 -translate-x-1/2 font-semibold text-[15px] text-head">Create workspace</span>
     <a href="{{ route('welcome') }}" title="Close" class="ml-auto h-9 w-9 grid place-items-center rounded-md text-sub hover:bg-hover">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      {!! pb_icon('xmark', 18) !!}
     </a>
   </header>
 
@@ -37,7 +37,7 @@
           <button type="button" id="range-btn" aria-haspopup="listbox" aria-expanded="false" class="pb-input text-left cursor-pointer">
             <span class="flex items-center justify-between h-full">
               <span id="range-value" class="text-faint truncate">Select a range</span>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0 ml-2"><path d="M8 9l4-4 4 4M8 15l4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              {!! pb_icon('sort', 16, 'text-faint shrink-0 ml-2') !!}
             </span>
           </button>
           <ul id="range-list" role="listbox" class="hidden absolute z-30 mt-1 w-full max-h-60 overflow-auto rounded-md bg-white py-1 shadow-lg outline outline-1 outline-black/5"></ul>
@@ -60,7 +60,7 @@
                   <div class="text-[14px] font-medium text-ink view-title">{{ $view['label'] }}</div>
                   <div class="text-[12px] text-sub mt-0.5">{{ $view['description'] }}</div>
                 </div>
-                <span class="view-check ml-auto h-5 w-5 rounded-full bg-brand grid place-items-center shrink-0 hidden"><svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5 9-11" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                <span class="view-check ml-auto h-5 w-5 rounded-full bg-brand grid place-items-center shrink-0 hidden">{!! pb_icon('check-on-brand', 11) !!}</span>
               </button>
             @else
               {{-- Classic — Coming Soon: visible but disabled, never selectable (WS-VIEW-002) --}}
@@ -86,7 +86,7 @@
           @foreach (config('workspace.apps') as $appKey => $app)
             @if ($app['available'])
               <div class="w-full flex items-start gap-3 p-4 rounded-lg border border-brand/40 bg-sel/40 text-left cursor-default" title="Projects is the default app and can’t be turned off">
-                <span class="mt-0.5 h-5 w-5 rounded-md bg-brand grid place-items-center shrink-0"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5 9-11" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                <span class="mt-0.5 h-5 w-5 rounded-md bg-brand grid place-items-center shrink-0">{!! pb_icon('check-on-brand', 12) !!}</span>
                 <div class="min-w-0">
                   <div class="flex items-center gap-2">
                     <span class="text-[14px] font-semibold text-head">{{ $app['label'] }}</span>
@@ -94,7 +94,7 @@
                   </div>
                   <div class="text-[12px] text-sub mt-0.5">{{ $app['description'] }}</div>
                 </div>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="ml-auto mt-0.5 shrink-0 text-faint" aria-label="Read only"><rect x="5" y="11" width="14" height="9" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M8 11V8a4 4 0 018 0v3" stroke="currentColor" stroke-width="1.7"/></svg>
+                <span role="img" aria-label="Read only" class="ml-auto mt-0.5 shrink-0 text-faint">{!! pb_icon('lock', 14) !!}</span>
                 <input type="hidden" name="apps[]" value="{{ $appKey }}" />
               </div>
             @else
@@ -165,7 +165,7 @@
           var sel = sizeEl.value === r;
           return '<li role="option" data-val="' + r + '" class="group relative flex items-center cursor-pointer select-none py-2 pl-3 pr-9 text-[14px] text-ink hover:bg-brand hover:text-white">' +
             '<span class="block truncate">' + r + '</span>' +
-            '<span class="' + (sel ? '' : 'hidden ') + 'absolute inset-y-0 right-0 flex items-center pr-3 text-brand group-hover:text-white"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5 9-11" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>' +
+            '<span class="' + (sel ? '' : 'hidden ') + 'absolute inset-y-0 right-0 flex items-center pr-3 text-brand group-hover:text-white">{!! pb_icon('check-thin', 16) !!}</span>' +
             '</li>';
         }).join('');
         rList.querySelectorAll('[data-val]').forEach(function (li) {

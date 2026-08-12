@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\StampsPivotTenant;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -18,7 +20,7 @@ use Stancl\Tenancy\Database\Concerns\BelongsToTenant;
  */
 class Project extends Model
 {
-    use BelongsToTenant;
+    use BelongsToTenant, StampsPivotTenant;
 
     public const VISIBILITY_PUBLIC = 'public';
 
@@ -39,6 +41,7 @@ class Project extends Model
         'work_item_view',
         'features',
         'cover_url',
+        'cover_gradient',
         'timezone',
         'status',
         'created_by',
@@ -51,6 +54,37 @@ class Project extends Model
             'archived_at' => 'datetime',
             'features' => 'array',
         ];
+    }
+
+    /** Live projects — archived ones stay readable, but drop out of every default list. */
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query->where('status', self::STATUS_ACTIVE);
+    }
+
+    /**
+     * The projects this user may see (§18, the same rule as ProjectPolicy@view).
+     *
+     * Workspace owners and admins keep visibility across every project; everyone else needs an
+     * explicit project membership. A scope rather than a per-row policy check, because the
+     * callers here are queries that must not load a row to decide whether it may be seen.
+     */
+    public function scopeVisibleTo(Builder $query, User $user): Builder
+    {
+        $role = WorkspaceMembership::query()
+            ->where('workspace_id', $this->tenant_id ?? tenant()?->getTenantKey())
+            ->where('user_id', $user->id)
+            ->where('status', WorkspaceMembership::STATUS_ACTIVE)
+            ->value('role');
+
+        if (in_array($role, [WorkspaceMembership::ROLE_OWNER, 'admin'], true)) {
+            return $query;
+        }
+
+        return $query->whereIn(
+            $query->qualifyColumn('id'),
+            ProjectMember::query()->where('user_id', $user->id)->select('project_id'),
+        );
     }
 
     /**
@@ -88,6 +122,12 @@ class Project extends Model
         return (bool) config("projects.entitlements.{$entitlement}", true);
     }
 
+    /** Work item groupings, when Modules is enabled for this project (Modules §2). */
+    public function modules(): HasMany
+    {
+        return $this->hasMany(Module::class);
+    }
+
     /** Sprint-style time boxes, when Cycles is enabled for this project (Cycles §5). */
     public function cycles(): HasMany
     {
@@ -120,7 +160,7 @@ class Project extends Model
     public function subscribers(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'project_subscribers')
-            ->withPivotValue('tenant_id', $this->tenant_id)
+            ->withPivotValue('tenant_id', $this->pivotTenantId())
             ->withTimestamps();
     }
 

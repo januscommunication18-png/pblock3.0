@@ -211,6 +211,19 @@ class ProjectController extends Controller
         $project->visibility = $data['visibility'];
         $project->lead_user_id = $data['lead_user_id'] ?? null;
 
+        // PRJ-027: a project's cover is EITHER an uploaded image or a gradient, never both —
+        // that is how the modal presents it, where picking a swatch visibly deselects the
+        // upload. Choosing a gradient therefore has to clear the image, or `cover_url` keeps
+        // winning in the card and the swatch appears to do nothing.
+        if (Schema::hasColumn('projects', 'cover_gradient') && array_key_exists('cover_gradient', $data)) {
+            $gradient = $data['cover_gradient'] ?: null;
+            $project->cover_gradient = $gradient;
+
+            if ($gradient !== null) {
+                $project->cover_url = null;
+            }
+        }
+
         // Status/priority must belong to THIS workspace's configured sets (same rule the
         // per-chip endpoints enforce). Dates and priority are guarded by hasColumn so an
         // edit still saves on an install where the later migrations have not run.

@@ -14,7 +14,7 @@ class SignInRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'email'    => ['required', 'string', 'email:rfc', 'max:255'],
+            'email' => ['required', 'string', 'email:rfc', 'max:255'],
             // Password optional: blank means "send me a login code" (passwordless).
             'password' => ['nullable', 'string'],
         ];

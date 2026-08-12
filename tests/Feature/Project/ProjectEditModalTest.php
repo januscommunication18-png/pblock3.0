@@ -238,4 +238,65 @@ class ProjectEditModalTest extends ProjectTestCase
 
         $this->assertSame('Website Rebuild', $ws->run(fn () => Project::find($project->id)->name));
     }
+
+    // ================= PRJ-027: cover image vs gradient =================
+
+    public function test_choosing_a_gradient_replaces_the_uploaded_cover(): void
+    {
+        [$owner, $ws] = $this->owner();
+        $project = $this->makeProject($owner, $ws, ['identifier' => 'web']);
+
+        // The project starts with an uploaded banner.
+        $ws->run(fn () => Project::whereKey($project->id)->update([
+            'cover_url' => 'http://localhost/storage/project-covers/x/banner.jpg',
+        ]));
+
+        $gradient = (config('projects.cover_presets') ?? config('projects.cover_gradients'))[2];
+
+        $response = $this->actingAs($owner)
+            ->patchJson(route('projects.update', ['project' => $project->id]), [
+                'name' => 'Website Redesign', 'visibility' => 'public', 'cover_gradient' => $gradient,
+            ])->assertOk();
+
+        // A cover is EITHER an image or a gradient. Leaving cover_url in place is what made
+        // picking a swatch look like it did nothing: the card prefers the image, so the old
+        // banner kept winning.
+        $response->assertJsonPath('project.cover_gradient', $gradient)
+            ->assertJsonPath('project.cover_url', null);
+
+        $fresh = $ws->run(fn () => Project::find($project->id));
+        $this->assertSame($gradient, $fresh->cover_gradient);
+        $this->assertNull($fresh->cover_url);
+    }
+
+    public function test_the_chosen_gradient_survives_a_reload(): void
+    {
+        [$owner, $ws] = $this->owner();
+        $project = $this->makeProject($owner, $ws, ['identifier' => 'web']);
+        $gradient = (config('projects.cover_presets') ?? config('projects.cover_gradients'))[4];
+
+        $this->actingAs($owner)->patchJson(route('projects.update', ['project' => $project->id]), [
+            'name' => 'Website Redesign', 'visibility' => 'public', 'cover_gradient' => $gradient,
+        ])->assertOk();
+
+        // It has to come back with the LIST too — the card on /projects reads it from there,
+        // and before this it was never stored, so every coverless card showed preset one.
+        $card = collect($this->actingAs($owner)->get(route('projects.index'))
+            ->assertOk()->viewData('bootstrap')['projects'])->firstWhere('id', $project->id);
+
+        $this->assertSame($gradient, $card['cover_gradient']);
+    }
+
+    public function test_a_gradient_outside_the_palette_is_refused(): void
+    {
+        [$owner, $ws] = $this->owner();
+        $project = $this->makeProject($owner, $ws, ['identifier' => 'web']);
+
+        // The value is rendered into a `background:` style on every card that shows this
+        // project, so free text here would be a CSS injection point.
+        $this->actingAs($owner)->patchJson(route('projects.update', ['project' => $project->id]), [
+            'name' => 'Website Redesign', 'visibility' => 'public',
+            'cover_gradient' => 'url(https://evil.example/track.png)',
+        ])->assertStatus(422)->assertJsonValidationErrors('cover_gradient');
+    }
 }

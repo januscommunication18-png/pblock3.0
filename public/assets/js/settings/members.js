@@ -109,7 +109,7 @@ PB.boot('members', {
     },
     actionButton: function (d) {
       return '<button type="button" class="pb-quickaction inline-flex items-center gap-1 h-7 pl-2.5 pr-2 rounded-md border border-stroke text-[12px] text-ink hover:bg-hover" data-id="' + d.id + '">Actions' +
-        '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" class="text-faint"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>';
+        '' + wiIcon('chevron-down', 12, 'text-faint') + '</button>';
     },
     openActionMenu: function (kind, row, btn) {
       var r = btn.getBoundingClientRect();
@@ -252,7 +252,7 @@ PB.boot('members', {
     '<button :class="[\'pb-2 -mb-px border-b-2 text-[14px] flex items-center gap-1.5\', tab===\'permission\' ? \'border-brand text-ink font-medium\' : \'border-transparent text-sub hover:text-ink\']" @click="setTab(\'permission\')">Permission<span class="text-[10px] font-medium text-sub bg-hover rounded px-1.5 py-0.5">Soon</span></button>' +
     '</div>' +
     '<div class="ml-auto flex items-center gap-2 pb-2">' +
-    '<div class="relative"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-faint"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>' +
+    '<div class="relative">' + wiIcon('magnifying-glass', 14, 'absolute left-2.5 top-1/2 -translate-y-1/2 text-faint') + '' +
     '<input class="pb-input !h-9 !w-56 !pl-8" placeholder="Search…" v-model="search" @input="applySearch"/></div>' +
     '<button class="h-9 px-3.5 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold" @click="openInvite">Add member</button>' +
     '</div></div>' +
@@ -280,7 +280,7 @@ PB.boot('members', {
     '<input class="pb-input !h-9 flex-1" :class="{\'is-error\': rowError(row.email)}" placeholder="name@company.com" v-model="row.email"/>' +
     '<div class="w-28 shrink-0"><pb-combo dense :searchable="false" v-model="row.role" :options="roleOptions"/></div>' +
     '<button class="h-9 w-9 grid place-items-center rounded-md text-sub hover:bg-hover" @click="dropRow(i)" title="Remove">' +
-    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>' +
+    '' + wiIcon('xmark', 16) + '</button>' +
     '</div>' +
     '<p v-if="rowError(row.email)" class="text-[12px] text-danger mt-1 ml-1">{{ rowError(row.email) }}</p>' +
     '</div></div>' +
@@ -321,13 +321,13 @@ PB.boot('members', {
     '<teleport to="body">' +
     '<div v-if="actionMenu.open" ref="actionMenuEl" :style="actionMenu.style" class="bg-white border border-line rounded-md shadow-lg py-1 text-[13px]">' +
     '<template v-if="actionMenu.kind===\'people\'">' +
-    '<button @click="runAction(\'view\')" class="w-full flex items-center gap-2 px-3 h-8 text-ink hover:bg-hover text-left"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="12" r="2.5" stroke="currentColor" stroke-width="1.7"/></svg>View</button>' +
+    '<button @click="runAction(\'view\')" class="w-full flex items-center gap-2 px-3 h-8 text-ink hover:bg-hover text-left">' + wiIcon('eye', 15) + 'View</button>' +
     '<template v-if="!actionMenu.row.is_owner">' +
-    '<button @click="runAction(\'edit\')" class="w-full flex items-center gap-2 px-3 h-8 text-ink hover:bg-hover text-left"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4 12.5-12.5z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>Edit</button>' +
-    '<button @click="runAction(\'delete\')" class="w-full flex items-center gap-2 px-3 h-8 text-danger hover:bg-red-50 text-left"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2M6 7l1 13a1 1 0 001 1h8a1 1 0 001-1l1-13" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>Delete</button>' +
+    '<button @click="runAction(\'edit\')" class="w-full flex items-center gap-2 px-3 h-8 text-ink hover:bg-hover text-left">' + wiIcon('pen', 15) + 'Edit</button>' +
+    '<button @click="runAction(\'delete\')" class="w-full flex items-center gap-2 px-3 h-8 text-danger hover:bg-red-50 text-left">' + wiIcon('trash', 15) + 'Delete</button>' +
     '</template></template>' +
     '<template v-else>' +
-    '<button @click="runAction(\'revoke\')" class="w-full flex items-center gap-2 px-3 h-8 text-danger hover:bg-red-50 text-left"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.7"/><path d="M15 9l-6 6M9 9l6 6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>Revoke</button>' +
+    '<button @click="runAction(\'revoke\')" class="w-full flex items-center gap-2 px-3 h-8 text-danger hover:bg-red-50 text-left">' + wiIcon('circle-xmark-thin', 15) + 'Revoke</button>' +
     '</template>' +
     '</div></teleport>' +
     '</div>'

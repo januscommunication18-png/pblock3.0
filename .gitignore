@@ -25,3 +25,8 @@ _ide_helper.php
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Font Awesome Pro source package — only the Classic Regular files we actually use are
+# vendored into public/assets/vendor/fontawesome. The full pack and its zip stay local.
+/fontawesome-pro-*-web
+/fontawesome-pro-*-web.zip

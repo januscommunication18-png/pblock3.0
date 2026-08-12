@@ -4,6 +4,10 @@ namespace App\Http\Requests\Project;
 
 use App\Models\WorkspaceMembership;
 use App\Rules\CycleAssignable;
+use App\Rules\EpicAssignable;
+use App\Rules\EstimateAssignable;
+use App\Rules\LabelAssignable;
+use App\Rules\ModuleAssignable;
 use App\Services\RichTextSanitizer;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -34,10 +38,13 @@ class StoreWorkItemRequest extends FormRequest
             'state_id' => $this->filled('state_id') ? $this->input('state_id') : null,
             'parent_id' => $this->filled('parent_id') ? $this->input('parent_id') : null,
             'cycle_id' => $this->filled('cycle_id') ? $this->input('cycle_id') : null,
+            'epic_id' => $this->filled('epic_id') ? $this->input('epic_id') : null,
+            'estimate_value_id' => $this->filled('estimate_value_id') ? $this->input('estimate_value_id') : null,
             'start_date' => $this->filled('start_date') ? $this->input('start_date') : null,
             'due_date' => $this->filled('due_date') ? $this->input('due_date') : null,
             'priority' => $this->filled('priority') ? $this->input('priority') : 'none',
             'assignee_ids' => $this->normalizeIds($this->input('assignee_ids')),
+            'module_ids' => $this->normalizeIds($this->input('module_ids')),
             'label_ids' => $this->normalizeIds($this->input('label_ids')),
         ]);
     }
@@ -74,6 +81,19 @@ class StoreWorkItemRequest extends FormRequest
                 Rule::exists('cycles', 'id')->where('project_id', $projectId),
                 new CycleAssignable($project),
             ],
+            // Estimation §11/§33: one estimate, from this project's own system. The rest
+            // of the check lives in EstimateAssignable.
+            'estimate_value_id' => [
+                'nullable', 'integer',
+                new EstimateAssignable($project),
+            ],
+            // Epic §9: zero or one epic, project-scoped so a crafted payload cannot file this
+            // item under another project's initiative. The rest lives in EpicAssignable.
+            'epic_id' => [
+                'nullable', 'integer',
+                Rule::exists('epics', 'id')->where('project_id', $projectId)->whereNull('deleted_at'),
+                new EpicAssignable($project),
+            ],
             // One assignee per work item (§4.3, revised) — see UpdateWorkItemRequest.
             'assignee_ids' => ['array', 'max:1'],
             'assignee_ids.*' => [
@@ -82,10 +102,18 @@ class StoreWorkItemRequest extends FormRequest
                     ->where('workspace_id', $workspaceId)
                     ->where('status', WorkspaceMembership::STATUS_ACTIVE),
             ],
+            // Modules §9.1: a work item can be created already in one or more modules.
+            'module_ids' => ['array', 'max:50'],
+            'module_ids.*' => [
+                'integer',
+                Rule::exists('modules', 'id')->where('project_id', $projectId)->whereNull('deleted_at'),
+                new ModuleAssignable($project),
+            ],
             'label_ids' => ['array'],
             'label_ids.*' => [
                 'integer',
                 Rule::exists('project_item_labels', 'id')->where('project_id', $projectId),
+                new LabelAssignable($project, []),
             ],
         ];
     }
@@ -100,6 +128,8 @@ class StoreWorkItemRequest extends FormRequest
             'assignee_ids.*.exists' => 'Assignees must be active members of this workspace.',
             'parent_id.exists' => 'The parent work item must belong to this project.',
             'cycle_id.exists' => 'That cycle does not belong to this project.',
+            'epic_id.exists' => 'That epic does not belong to this project.',
+            'module_ids.*.exists' => 'That module does not belong to this project.',
         ];
     }
 

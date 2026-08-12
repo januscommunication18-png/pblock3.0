@@ -18,7 +18,7 @@ class GoalsController extends Controller
     public function show(): View
     {
         return view('onboarding.goals', [
-            'user'  => Auth::user(),
+            'user' => Auth::user(),
             'goals' => config('onboarding.goals'),
         ]);
     }
@@ -43,7 +43,7 @@ class GoalsController extends Controller
         OnboardingProfile::updateOrCreate(
             ['user_id' => $user->id],
             [
-                'goals'        => $goals,
+                'goals' => $goals,
                 'current_step' => OnboardingProfile::STEP_COMPLETED,
                 'completed_at' => now(),
             ],
