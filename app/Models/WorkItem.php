@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\StampsPivotTenant;
+use App\Models\Scopes\ExcludesDrafts;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -21,6 +22,11 @@ use Stancl\Tenancy\Database\Concerns\BelongsToTenant;
  * workspace counter, so it names exactly one work item anywhere in the workspace. It is
  * assigned once by WorkItemCreator and never recomputed — moving or renaming a project must
  * not renumber or rewrite existing work item IDs.
+ *
+ * DRAFTS (docs/features/drafts.md): a row with `is_draft` set is a work item captured before it
+ * has a project — no project, no state, no ID number, private to its author until published.
+ * The ExcludesDrafts global scope keeps those rows out of every query in the application, so
+ * "work item" means what it always did everywhere except `drafts()`.
  */
 class WorkItem extends Model
 {
@@ -31,6 +37,7 @@ class WorkItem extends Model
     protected $fillable = [
         'tenant_id',
         'project_id',
+        'is_draft',
         'sequence_no',
         'identifier',
         'title',
@@ -49,9 +56,15 @@ class WorkItem extends Model
         'archived_at',
     ];
 
+    protected static function booted(): void
+    {
+        static::addGlobalScope(new ExcludesDrafts);
+    }
+
     protected function casts(): array
     {
         return [
+            'is_draft' => 'boolean',
             'sequence_no' => 'integer',
             'start_date' => 'date',
             'due_date' => 'date',
@@ -162,6 +175,18 @@ class WorkItem extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    /** Votes on this item (POC toolbar) — at most one per person, up or down. */
+    public function votes(): HasMany
+    {
+        return $this->hasMany(WorkItemVote::class);
+    }
+
+    /** People following THIS item, as distinct from the project it lives in. */
+    public function subscribers(): HasMany
+    {
+        return $this->hasMany(WorkItemSubscriber::class);
+    }
+
     /** Work items of one project — always applied, since a workspace holds many projects. */
     public function scopeForProject(Builder $query, int $projectId): Builder
     {
@@ -174,8 +199,27 @@ class WorkItem extends Model
         return $query->whereNull('archived_at');
     }
 
+    /**
+     * Drafts instead of work items (Drafts §3) — the one way past ExcludesDrafts.
+     *
+     * Always narrowed to an author, because a draft is private to whoever wrote it (§4) and an
+     * unfiltered draft query is a leak rather than a listing. The tenant scope still applies
+     * on top, so this reads one person's drafts inside the active workspace.
+     */
+    public function scopeDrafts(Builder $query, int $authorId): Builder
+    {
+        return $query->withoutGlobalScope(ExcludesDrafts::class)
+            ->where('is_draft', true)
+            ->where('created_by', $authorId);
+    }
+
     public function isArchived(): bool
     {
         return $this->archived_at !== null;
+    }
+
+    public function isDraft(): bool
+    {
+        return (bool) $this->is_draft;
     }
 }

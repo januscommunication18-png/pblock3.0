@@ -34,6 +34,7 @@ class WorkItemScreenPayload
         private readonly ProjectItemStateProvisioner $states,
         private readonly WorkItemBlockers $blockers,
         private readonly WorkItemStatusUpdates $statusUpdates,
+        private readonly WorkItemReactions $reactions,
     ) {}
 
     /**
@@ -89,6 +90,55 @@ class WorkItemScreenPayload
     }
 
     /**
+     * One payload for a set of work items spanning SEVERAL projects (Your Work).
+     *
+     * `build()` cannot serve this: it is project-scoped by design, because the drawer must be
+     * able to edit any property of any row it is given, and every one of those properties —
+     * state, label, member, cycle, module, epic, estimate — is a project's own vocabulary.
+     * A flat list mixing projects would offer one project's states for another's item.
+     *
+     * So the vocabulary is not flattened, it is INDEXED. `projects` carries each project's
+     * options and endpoints under its id, and the screen resolves both from the row it is
+     * acting on. The flat keys stay as the fallback for the first project, so every existing
+     * reference keeps working and a single-project payload is unchanged.
+     *
+     * @param  Collection<int, WorkItem>  $items
+     * @param  Collection<int, Project>  $projects  every project the user may see
+     * @return array<string, mixed>
+     */
+    public function forUser($items, $projects): array
+    {
+        $indexed = $projects->keyBy('id');
+
+        return [
+            'multiProject' => true,
+            'items' => $this->cards($items),
+            // Grouping is flat here: two projects' "In Progress" are different rows, so a
+            // state-grouped list across projects would show the same heading several times.
+            'states' => [],
+            'projects' => $indexed
+                ->map(fn (Project $p) => $this->pickerOptions($p) + [
+                    'endpoints' => $this->endpoints($p),
+                    'project' => [
+                        'id' => $p->id, 'name' => $p->name,
+                        'identifier' => $p->identifier, 'emoji' => $p->emoji,
+                    ],
+                ])
+                ->all(),
+            'priorities' => collect(config('projects.work_item_priorities'))
+                ->map(fn ($label, $key) => ['key' => $key, 'label' => $label])->values()->all(),
+            'currentUserId' => Auth::id(),
+            'mediaMaxKb' => (int) config('projects.media.max_kb'),
+            'timeTracking' => true,
+            // Nothing is created from this screen: "add a work item" has to be asked inside a
+            // project, because that is where the state and the ID come from.
+            'canCreate' => false,
+            'canEdit' => true,
+            'endpoints' => $projects->isNotEmpty() ? $this->endpoints($projects->first()) : [],
+        ];
+    }
+
+    /**
      * Just the option lists a picker needs — states, members, labels, cycles, epics, modules,
      * estimates, priorities — without the rows.
      *
@@ -121,8 +171,9 @@ class WorkItemScreenPayload
         $ids = $visible->pluck('id')->all();
         $blocked = $this->blockers->counts($ids);
         $concerns = $this->statusUpdates->currentConcerns($ids);
+        $reactions = $this->reactions->for($ids);
 
-        return $visible->map(fn (WorkItem $i) => $this->card($i, $blocked[$i->id] ?? 0, $concerns[$i->id] ?? null))->all();
+        return $visible->map(fn (WorkItem $i) => $this->card($i, $blocked[$i->id] ?? 0, $concerns[$i->id] ?? null, $reactions[$i->id] ?? null))->all();
     }
 
     /** @return array<string, string> */
@@ -141,6 +192,8 @@ class WorkItemScreenPayload
             'comments' => $withId('projects.work-items.comments.store'),
             'updates' => $withId('projects.work-items.updates.store'),
             'worklogs' => $withId('projects.work-items.worklogs.store'),
+            'vote' => $withId('projects.work-items.vote'),
+            'subscribe' => $withId('projects.work-items.subscribe'),
             'update' => $withId('projects.work-items.update'),
             'archive' => $withId('projects.work-items.archive'),
             'duplicate' => $withId('projects.work-items.duplicate'),
@@ -194,8 +247,9 @@ class WorkItemScreenPayload
         $blocked = $this->blockers->counts($ids);
         // §8: an item whose latest update says At Risk / Off Track says so on the row.
         $concerns = $this->statusUpdates->currentConcerns($ids);
+        $reactions = $this->reactions->for($ids);
 
-        return $items->map(fn (WorkItem $i) => $this->card($i, $blocked[$i->id] ?? 0, $concerns[$i->id] ?? null))->all();
+        return $items->map(fn (WorkItem $i) => $this->card($i, $blocked[$i->id] ?? 0, $concerns[$i->id] ?? null, $reactions[$i->id] ?? null))->all();
     }
 
     /**
@@ -204,10 +258,12 @@ class WorkItemScreenPayload
      * @param  array<string, mixed>|null  $concern  Latest At Risk / Off Track update, likewise.
      * @return array<string, mixed> The row payload the Tabulator grid renders.
      */
-    public function card(WorkItem $item, ?int $blockedBy = null, ?array $concern = null): array
+    public function card(WorkItem $item, ?int $blockedBy = null, ?array $concern = null, ?array $reactions = null): array
     {
         $blockedBy ??= $this->blockers->counts([$item->id])[$item->id] ?? 0;
         $concern ??= $this->statusUpdates->currentConcerns([$item->id])[$item->id] ?? null;
+        // The detail toolbar's vote counts and this viewer's own position (POC toolbar).
+        $reactions ??= $this->reactions->one($item->id);
 
         $state = $item->state;
 
@@ -215,6 +271,18 @@ class WorkItemScreenPayload
             'id' => $item->id,
             'identifier' => $item->identifier,
             'title' => $item->title,
+            // Which project this row belongs to. Redundant on a project's own list, where
+            // every row shares one — and load-bearing on Your Work, where a row carries the
+            // project chip and every picker and endpoint is resolved from it.
+            'project_id' => $item->project_id,
+            'project' => $item->relationLoaded('project') && $item->project
+                ? [
+                    'id' => $item->project->id,
+                    'name' => $item->project->name,
+                    'identifier' => $item->project->identifier,
+                    'emoji' => $item->project->emoji,
+                ]
+                : null,
             'description' => $item->description,
             'state_id' => $item->state_id,
             'state' => $state ? ['id' => $state->id, 'name' => $state->name, 'color' => $state->color, 'group' => $state->group] : null,
@@ -260,6 +328,9 @@ class WorkItemScreenPayload
             // latest update is On Track — or when there has never been one.
             'status_update' => $concern,
             // Detail view footer (§4.4): who opened this work item and when it last moved.
+            'votes' => $reactions['votes'],
+            'my_vote' => $reactions['my_vote'],
+            'subscribed' => $reactions['subscribed'],
             'created_by' => $item->creator?->displayName(),
             'created_at' => $item->created_at?->toIso8601String(),
             'updated_at' => $item->updated_at?->toIso8601String(),

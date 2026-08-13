@@ -23,8 +23,9 @@ use Illuminate\Support\Facades\Auth;
 /**
  * Project Workspace → Work Items (Phase 5).
  *
- * The only functional project tab this phase; the other five render a Coming Soon page from
- * ProjectWorkspaceController. Tenancy is initialized by the workspace.tenancy middleware, so
+ * Every project tab is a built screen with its own controller now — Overview was the last
+ * placeholder, so the Coming Soon catch-all it shared with the others is gone.
+ * Tenancy is initialized by the workspace.tenancy middleware, so
  * Project/WorkItem bindings and queries are auto-confined to the workspace; project scoping
  * is then applied explicitly on top (requirements §7).
  */
@@ -57,15 +58,18 @@ class WorkItemController extends Controller
      * list hidden (§4.4 — "open in new tab" must land on a real, linkable page, not a list
      * with a panel floating over it).
      */
-    private function screen(Project $project, ?WorkItem $pageItem = null): View
+    private function screen(Project $project, ?WorkItem $pageItem = null, string $view = 'projects.work-items'): View
     {
         $states = $this->states->for($project);
         $canCreate = Auth::user()->can('create', [WorkItem::class, $project]);
 
-        return view('projects.work-items', [
+        return view($view, [
             'workspace' => Auth::user()->currentWorkspace,
             'user' => Auth::user(),
             'project' => $project,
+            // Null in list mode. The chrome-less frame uses it for the document title, which
+            // is the tooltip a browser shows for an embedded page.
+            'workItem' => $pageItem,
             'tabs' => $this->navigation->tabs($project),
             'activeTab' => 'work-items',
             // Shared sidebar: project list + the gate on its "New work item" action.
@@ -115,6 +119,25 @@ class WorkItemController extends Controller
         $this->guardItem($project, $workItem, 'view');
 
         return $this->screen($project, $workItem);
+    }
+
+    /**
+     * GET /projects/{project}/work-items/{workItem}/frame — the same detail, without the app
+     * chrome, for embedding in a slide-over panel (Views §7.3).
+     *
+     * The Views grid opens a work item in a panel beside the grid rather than navigating away
+     * from it. The panel embeds THIS, so the detail is the real drawer with every picker, tab,
+     * editor and relation working — not a second, thinner copy that would drift from it.
+     *
+     * The guard is identical to `show()`, deliberately re-run rather than inherited from
+     * whatever screen linked here: an embeddable URL is still a URL, and it must answer for
+     * itself.
+     */
+    public function frame(Project $project, WorkItem $workItem): View
+    {
+        $this->guardItem($project, $workItem, 'view');
+
+        return $this->screen($project, $workItem, 'projects.work-item-frame');
     }
 
     /** PATCH /projects/{project}/work-items/{workItem} — inline row edits (§4.2). */

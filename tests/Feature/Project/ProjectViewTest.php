@@ -513,32 +513,26 @@ class ProjectViewTest extends ProjectTestCase
     }
 
     /**
-     * The grid bundle is vendored whole, and reachable.
+     * The grid library is vendored, and it is the free one.
      *
-     * RevoGrid is a Stencil build: the entry point registers the custom elements and then
-     * lazily imports the other files in its directory at runtime. Vendoring only the entry
-     * gives a grid that loads, defines <revo-grid>, and then fails at the first dynamic
-     * import — which presents as an EMPTY ELEMENT rather than an error, so nothing on the
-     * server side would notice. This is the same failure the Jodit drop hit.
+     * DataTables v3 is dependency-free — jQuery was only required up to v2 — so "vendored" is
+     * genuinely two files. The Plus assertion is the point of this test: Editor is a paid
+     * product, and a Views cell must keep opening the app's own picker, which writes through
+     * the work item endpoint behind all six of §11.3's checks. An editable grid cell would be
+     * a second, weaker path to the same data, and it would arrive as a licence bill.
      */
-    public function test_the_views_grid_bundle_is_vendored_with_its_chunks(): void
+    public function test_the_views_grid_library_is_vendored(): void
     {
-        $dir = public_path('assets/vendor/revogrid');
-        $entry = $dir.'/revo-grid.esm.js';
-
-        $this->assertFileExists($entry, 'the RevoGrid entry point is not vendored');
-
-        // The loader names its lazy bundles in a table; each must be on disk beside it.
-        preg_match_all('/"(revo-grid|revogr-[a-z0-9_.-]+)"/', (string) file_get_contents($entry), $found);
-
-        $chunks = collect($found[1] ?? [])->unique()
-            ->filter(fn (string $name) => is_file($dir.'/'.$name.'.entry.js'));
-
-        $this->assertGreaterThan(0, $chunks->count(), 'no lazy chunks were found beside the entry point');
-
-        foreach (['revo-grid', 'revogr-data_4', 'revogr-attribution_7'] as $required) {
-            $this->assertFileExists($dir.'/'.$required.'.entry.js');
+        foreach (['datatables.min.js', 'datatables.min.css'] as $file) {
+            $this->assertFileExists(public_path('assets/vendor/datatables/'.$file));
         }
+
+        $js = (string) file_get_contents(public_path('assets/vendor/datatables/datatables.min.js'));
+
+        $this->assertStringContainsString('window.DataTable', $js,
+            'the browser build must expose window.DataTable — this looks like the ESM build');
+        $this->assertStringNotContainsString('DataTables Editor', $js,
+            'Editor is a paid extension and must not be vendored');
     }
 
     public function test_the_views_screen_loads_the_grid_and_the_shared_chips(): void
@@ -551,9 +545,15 @@ class ProjectViewTest extends ProjectTestCase
             'project' => $project->id, 'view' => $view['id'],
         ]))->assertOk()->getContent();
 
-        // A module, because Stencil resolves its chunks relative to the script's own URL.
-        $this->assertStringContainsString('type="module"', $html);
-        $this->assertStringContainsString('assets/vendor/revogrid/revo-grid.esm.js', $html);
+        $this->assertStringContainsString('assets/vendor/datatables/datatables.min.js', $html);
+
+        // The grid skin has to load AFTER DataTables' own stylesheet: it wins on order rather
+        // than by out-specifying it, which is the same trap that turned the Cycles group rows
+        // grey for as long as those two were the other way round.
+        $this->assertLessThan(
+            strpos($html, 'assets/css/views.css'),
+            strpos($html, 'assets/vendor/datatables/datatables.min.css'),
+        );
 
         // The cells render through the work item chip helpers, so a status looks the same here
         // as it does in the Work Items list. That is the whole mitigation for running two grid
@@ -562,6 +562,137 @@ class ProjectViewTest extends ProjectTestCase
 
         // …and Tabulator is NOT dragged along for a screen that no longer uses it.
         $this->assertStringNotContainsString('vendor/tabulator', $html);
+    }
+
+    /**
+     * Rows are white, and nothing stripes them.
+     *
+     * This is the one piece of styling with a test, because it is the one that has broken
+     * three times across three grid engines: Tabulator's `.tabulator-row-even`, RevoGrid's
+     * focused-row fill, and now DataTables' `table.dataTable.stripe`. Each was a different
+     * mechanism reaching the same wrong result, so what is pinned here is the OUTCOME.
+     */
+    public function test_the_grid_rows_are_white_and_unstriped(): void
+    {
+        $js = (string) file_get_contents(public_path('assets/js/projects/view-grid.js'));
+        $css = (string) file_get_contents(public_path('assets/css/views.css'));
+
+        $this->assertMatchesRegularExpression('/stripeClasses:\s*\[\s*\]/', $js,
+            'DataTables must be told not to add alternating row classes');
+
+        $this->assertMatchesRegularExpression('/tbody[^{]*nth-child\(odd\)[^{]*\{[^}]*background:\s*#fff/s', $css,
+            'odd rows must be explicitly white — the stripe is what keeps coming back');
+
+        // The table must never carry DataTables' own striping classes, which paint rows through
+        // an inset box-shadow that a `background` rule would not override.
+        $this->assertStringNotContainsString('vg-grid stripe', $js);
+        $this->assertStringNotContainsString('vg-grid display', $js);
+
+        // The stripe is cancelled through DataTables' own variable, NOT by resetting
+        // `box-shadow` on the cells. That reset is how the pinned column's edge ended up drawn
+        // on alternating rows only: `tr:nth-child(odd) > td` outranks `.vg-pin-last` on element
+        // count, so odd rows lost their border and even rows kept it.
+        $this->assertMatchesRegularExpression('/--dt-row_alpha-stripe:\s*0/', $css,
+            'the stripe must be cancelled through its own variable');
+
+        // Comments are stripped first: this is about what the stylesheet DOES, and the
+        // explanation above the rule naturally mentions the property it is avoiding.
+        $rules = (string) preg_replace('#/\*.*?\*/#s', '', $css);
+
+        $this->assertStringNotContainsString('box-shadow: none', $rules,
+            'nothing may blanket-reset box-shadow — the pinned column edge is drawn with it');
+
+        $this->assertMatchesRegularExpression('/\.vg-pin-last\s*\{[^}]*box-shadow:[^}]*#e5e7eb/', $rules,
+            'the last fixed column must carry its 1px edge');
+    }
+
+    /**
+     * The ID and Title cells open the work item beside the grid (§7.3).
+     *
+     * The panel embeds the item's own detail page with the app chrome removed, so what it
+     * shows IS the Work Items drawer rather than a second copy of it. Two things are worth a
+     * test here: that the chrome-less page renders the detail (`pageItemId` is what puts the
+     * screen in `pageMode`), and that being embeddable did not make it any less guarded.
+     */
+    public function test_a_work_item_opens_in_a_chrome_less_frame_for_the_views_panel(): void
+    {
+        [$owner, $ws] = $this->owner();
+        $project = $this->ready($owner, $ws);
+        $item = $this->workItem($owner, $project, 'Ship the thing');
+        $args = ['project' => $project->id, 'workItem' => $item];
+
+        $html = $this->actingAs($owner)->get(route('projects.work-items.frame', $args))
+            ->assertOk()
+            // Same bootstrap as the per-item page: the detail is the drawer in page mode.
+            ->assertViewHas('bootstrap', fn ($b) => $b['pageItemId'] === $item)
+            ->getContent();
+
+        // No app chrome — that is the entire difference from projects.work-items.
+        $this->assertStringNotContainsString('id="app-sidebar"', $html);
+        $this->assertStringNotContainsString('data-tab="work-items"', $html);
+
+        // Links inside the frame must escape it, or the breadcrumb back to the list would
+        // load a second copy of the app inside an 80%-wide panel.
+        $this->assertStringContainsString('<base target="_top" />', $html);
+
+        // Embeddable is not a permission. Someone in the workspace but not on this project
+        // gets the same 404 `show` gives — the route re-runs the guard rather than trusting
+        // whatever screen embedded it.
+        $outsider = $this->member($ws, 'member', 'outsider@example.com');
+        $this->actingAs($outsider)->get(route('projects.work-items.frame', $args))->assertNotFound();
+    }
+
+    /**
+     * §7.3: only the ID and the Title are links, and they are not inline-editable.
+     *
+     * A cell cannot both open the item and edit it on one click. The title stays editable —
+     * in the detail panel the link opens, which is a better place to edit a title than a grid
+     * cell — so what this pins is that the two behaviours never land on the same cell.
+     */
+    public function test_the_id_and_title_cells_are_links_rather_than_editors(): void
+    {
+        $js = (string) file_get_contents(public_path('assets/js/projects/view-grid.js'));
+
+        $this->assertMatchesRegularExpression(
+            "/VG_LINK\s*=\s*\['work_item\.identifier',\s*'work_item\.title'\]/", $js,
+            'the ID and Title columns must be the linked ones',
+        );
+
+        // `link` suppresses `editable`, so a linked cell never also carries `data-cell`.
+        $this->assertMatchesRegularExpression('/var editable = !link &&/', $js,
+            'a link cell must not also be an edit target');
+    }
+
+    /**
+     * A date looks and behaves the same in a View as it does in the Work Items list.
+     *
+     * The grid had grown its own date formatter, so the same due date read `12 Aug 2026` in a
+     * View and `08/12/2026` in the list, and its own `<input type="date">`, which is a
+     * different control in every browser and different again from the picker two screens
+     * away. Both now come from the shared helpers — the same argument as the shared chips.
+     */
+    public function test_dates_use_the_shared_formatter_and_the_shared_picker(): void
+    {
+        // Comments stripped first. These assertions are about what the code DOES, and the
+        // comments naturally name the very things being asserted against — a note explaining
+        // why the native date input was removed would otherwise fail the check for it.
+        $strip = fn (string $js) => (string) preg_replace(['#/\*.*?\*/#s', '#^\s*//.*$#m'], '', $js);
+
+        $grid = $strip((string) file_get_contents(public_path('assets/js/projects/view-grid.js')));
+        $screen = $strip((string) file_get_contents(public_path('assets/js/projects/views.js')));
+
+        // One formatter, and it is date-picker.js's.
+        $this->assertStringContainsString('wiFmtDate', $grid);
+        $this->assertStringNotContainsString('toLocaleDateString', $grid,
+            'the grid must not format dates itself — wiFmtDate is the shared one');
+
+        // A date cell is the list's calendar chip, empty state included, so an unset date is
+        // still somewhere you can click rather than an em dash.
+        $this->assertStringContainsString('WI_CAL', $grid);
+
+        // …and editing one opens the shared picker, not a native date input.
+        $this->assertStringContainsString('<wi-calendar', $screen);
+        $this->assertStringNotContainsString('type="date"', $screen);
     }
 
     // ================= §24: paged rows =================

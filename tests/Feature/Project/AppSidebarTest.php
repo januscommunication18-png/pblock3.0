@@ -94,7 +94,7 @@ class AppSidebarTest extends ProjectTestCase
         foreach ([
             route('projects.work-items', $project),
             route('projects.cycles', $project),
-            route('projects.workspace.tab', ['project' => $project->id, 'tab' => 'overview']),
+            route('projects.overview', $project),
         ] as $url) {
             $html = $this->actingAs($owner)->get($url)->assertOk()->getContent();
             $this->assertStringContainsString('id="collapse-sidebar"', $html, "Missing collapse control on {$url}");
@@ -128,5 +128,41 @@ class AppSidebarTest extends ProjectTestCase
         $this->assertStringContainsString('fa-sharp fa-regular fa-gear', $fa);
         $this->assertStringContainsString('fa-sharp fa-regular fa-bars', $fa);
         $this->assertStringContainsString('sharp-regular.min.css', $fa);
+    }
+
+    /**
+     * The expand control's PARENT must carry the row's gutter.
+     *
+     * styles.css pulls the gutter in behind the icon while the sidebar is collapsed, with
+     * `html[data-sidebar="collapsed"] :has(> [data-sidebar-expand]) { padding-left: 12px }`.
+     * That rule targets the parent, so a host that puts its padding on a wrapper one level up
+     * gets 12px ADDED to the existing gutter instead of replacing it — which reads as a gap
+     * beside the icon, and is exactly what the project tab bar did.
+     */
+    public function test_the_expand_control_sits_inside_the_padded_row(): void
+    {
+        [$owner, $ws] = $this->owner();
+        $project = $this->makeProject($owner, $ws);
+
+        foreach ([
+            route('projects.work-items', $project),
+            route('welcome'),
+        ] as $url) {
+            $html = $this->actingAs($owner)->get($url)->assertOk()->getContent();
+
+            $dom = new \DOMDocument;
+            @$dom->loadHTML($html);
+            $xpath = new \DOMXPath($dom);
+
+            $control = $xpath->query('//*[@data-sidebar-expand]')->item(0);
+            $this->assertNotNull($control, "No expand control on {$url}");
+
+            $parentClass = $control->parentNode->getAttribute('class');
+
+            $this->assertMatchesRegularExpression(
+                '/(^|\s)px-\d/', $parentClass,
+                "The expand control's parent must carry the row gutter on {$url}, or the collapsed-state rule adds padding instead of replacing it. Got: {$parentClass}",
+            );
+        }
     }
 }

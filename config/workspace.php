@@ -114,4 +114,39 @@ return [
      * the fallback (docs/features/member-invite-flow.md D-I3).
      */
     'seat_limit' => env('WORKSPACE_SEAT_LIMIT') === null ? null : (int) env('WORKSPACE_SEAT_LIMIT'),
+
+    /**
+     * Interface languages (Account §2).
+     *
+     * One entry today. It is a list rather than a hardcoded 'English' because the control is
+     * a searchable combobox either way, and adding a language pack should be a line here
+     * rather than a change to a form — `available` is what tells the picker which ones can
+     * actually be chosen, so a coming-soon language can be shown without being selectable.
+     */
+    'languages' => [
+        ['value' => 'en', 'label' => 'English', 'available' => true],
+    ],
+
+    /**
+     * The days of the week, as ISO-8601 numbers (1 = Monday … 7 = Sunday).
+     *
+     * ISO because it is the numbering PHP, JavaScript's `getDay`-adjacent APIs and every date
+     * library already agree on, so a stored value never needs translating between them. The
+     * labels here are for display only.
+     */
+    'week_days' => [
+        1 => 'Monday',
+        2 => 'Tuesday',
+        3 => 'Wednesday',
+        4 => 'Thursday',
+        5 => 'Friday',
+        6 => 'Saturday',
+        7 => 'Sunday',
+    ],
+
+    /** Defaults for a workspace that has never opened the Preference tab. */
+    'week_defaults' => [
+        'first_day' => 7,
+        'weekend' => [6, 7],
+    ],
 ];

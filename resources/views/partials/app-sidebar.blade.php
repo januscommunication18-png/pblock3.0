@@ -4,6 +4,10 @@
 @php($__ws = $workspace ?? optional(auth()->user())->currentWorkspace)
 @php($__projects = $projects ?? [])
 @php($__canCreate = $canCreateProject ?? false)
+{{-- Drafts (docs/features/drafts.md D-D6): hidden for Viewers and Guests, who cannot create
+     work items and so could never publish one. Resolved defensively like the two above, so
+     the partial keeps working on any screen that does not pass it. --}}
+@php($__canDraft = $canDraft ?? (auth()->check() && auth()->user()->can('createDraft', \App\Models\WorkItem::class)))
 {{-- Restore the collapsed sidebar before it is parsed, so a collapsed panel never flashes
      into view and slide away on every page load. Inline and synchronous on purpose: these
      are full page navigations, so anything deferred is too late to matter. --}}
@@ -67,8 +71,12 @@
       </a>
     @endif
     <a href="{{ route('welcome') }}" class="flex items-center gap-2 px-2 h-8 rounded-md text-ink hover:bg-hover">{!! pb_icon('house', 15) !!}Home</a>
-    <a href="#" class="flex items-center gap-2 px-2 h-8 rounded-md text-ink hover:bg-hover">{!! pb_icon('pen', 15) !!}Drafts</a>
-    <a href="#" class="flex items-center gap-2 px-2 h-8 rounded-md text-ink hover:bg-hover">{!! pb_icon('user', 15) !!}Your work</a>
+    @if ($__canDraft)
+      <a href="{{ route('drafts.index') }}"
+         class="flex items-center gap-2 px-2 h-8 rounded-md text-ink hover:bg-hover {{ request()->routeIs('drafts.*') ? 'bg-sel text-brand' : '' }}">{!! pb_icon('pen', 15) !!}Drafts</a>
+    @endif
+    <a href="{{ route('your-work') }}"
+       class="flex items-center gap-2 px-2 h-8 rounded-md text-ink hover:bg-hover {{ request()->routeIs('your-work') ? 'bg-sel text-brand' : '' }}">{!! pb_icon('user', 15) !!}Your work</a>
     <a href="#" class="flex items-center gap-2 px-2 h-8 rounded-md text-ink hover:bg-hover">{!! pb_icon('note', 15) !!}Stickies</a>
 
     {{-- Workspace (collapsible, expanded by default) --}}

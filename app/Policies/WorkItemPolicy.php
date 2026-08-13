@@ -59,13 +59,7 @@ class WorkItemPolicy
             return true;
         }
 
-        $workspaceRole = WorkspaceMembership::query()
-            ->where('workspace_id', $project->tenant_id)
-            ->where('user_id', $user->id)
-            ->where('status', WorkspaceMembership::STATUS_ACTIVE)
-            ->value('role');
-
-        if (in_array($workspaceRole, [WorkspaceMembership::ROLE_OWNER, 'admin'], true)) {
+        if ($this->administersWorkspace($user, $project->tenant_id)) {
             return true;
         }
 
@@ -106,6 +100,61 @@ class WorkItemPolicy
     }
 
     /**
+     * ---- Drafts (docs/features/drafts.md §"User Roles") ----------------------------------
+     *
+     * A draft has no project, so none of the abilities above apply to one: they all start from
+     * ProjectPolicy@view and a draft has nothing to view. These five answer the two questions
+     * a draft actually raises — may this user keep drafts at all, and is this draft theirs.
+     */
+
+    /**
+     * May the user keep drafts in the active workspace?
+     *
+     * Everyone except Viewer and Guest, who cannot create work items anywhere (§7) — for them
+     * a draft would be a note they could never publish, so the screen is refused outright
+     * rather than offered as a dead end (D-D6).
+     */
+    public function createDraft(User $user): bool
+    {
+        return in_array($this->workspaceRole($user, (string) $user->current_workspace_id), [
+            WorkspaceMembership::ROLE_OWNER, 'admin', 'manager', 'member',
+        ], true);
+    }
+
+    /**
+     * May the user open this draft? Only its author — drafts are private (§4), and that holds
+     * against workspace Owners and Admins too. The controller 404s rather than 403s, so a
+     * refusal never confirms the draft exists.
+     */
+    public function viewDraft(User $user, WorkItem $draft): bool
+    {
+        return $draft->isDraft()
+            && (int) $draft->created_by === (int) $user->id
+            && $this->createDraft($user);
+    }
+
+    public function updateDraft(User $user, WorkItem $draft): bool
+    {
+        return $this->viewDraft($user, $draft);
+    }
+
+    public function deleteDraft(User $user, WorkItem $draft): bool
+    {
+        return $this->viewDraft($user, $draft);
+    }
+
+    /**
+     * May the user turn this draft into a work item in this project?
+     *
+     * Both halves: it must be their draft, and the project must be one they could have created
+     * the item in directly. Publishing is not a way around §16.
+     */
+    public function publishDraft(User $user, WorkItem $draft, Project $project): bool
+    {
+        return $this->viewDraft($user, $draft) && $this->create($user, $project);
+    }
+
+    /**
      * May this user create/edit work items here?
      *
      * Layer 2 of §16: the answer comes from the user's **project** role, per the §34 matrix
@@ -115,16 +164,27 @@ class WorkItemPolicy
      */
     private function isContributor(User $user, Project $project): bool
     {
-        $workspaceRole = WorkspaceMembership::query()
-            ->where('workspace_id', $project->tenant_id)
-            ->where('user_id', $user->id)
-            ->where('status', WorkspaceMembership::STATUS_ACTIVE)
-            ->value('role');
-
-        if (in_array($workspaceRole, [WorkspaceMembership::ROLE_OWNER, 'admin'], true)) {
+        if ($this->administersWorkspace($user, $project->tenant_id)) {
             return true;
         }
 
         return ProjectMember::contributes(ProjectMember::roleFor($user->id, $project->id));
+    }
+
+    /** Workspace Owner/Admin keep administrative access across every project (§18). */
+    private function administersWorkspace(User $user, string $workspaceId): bool
+    {
+        return in_array($this->workspaceRole($user, $workspaceId), [
+            WorkspaceMembership::ROLE_OWNER, 'admin',
+        ], true);
+    }
+
+    private function workspaceRole(User $user, string $workspaceId): ?string
+    {
+        return WorkspaceMembership::query()
+            ->where('workspace_id', $workspaceId)
+            ->where('user_id', $user->id)
+            ->where('status', WorkspaceMembership::STATUS_ACTIVE)
+            ->value('role');
     }
 }

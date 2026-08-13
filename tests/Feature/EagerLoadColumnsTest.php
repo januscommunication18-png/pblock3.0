@@ -43,6 +43,8 @@ class EagerLoadColumnsTest extends TestCase
         'cycle' => 'cycles',
         'epic' => 'epics',
         'user' => 'users',
+        // Your Work's Activity tab loads the item each entry happened to, for the line's link.
+        'workItem' => 'work_items',
     ];
 
     public function test_every_constrained_eager_load_names_real_columns(): void

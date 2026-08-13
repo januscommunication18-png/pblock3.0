@@ -246,6 +246,9 @@ class ProjectViewController extends Controller
                 'frozen' => $open ? $this->layout->frozenCount($open) : 0,
                 'fields' => $open ? $this->catalog->selector($project, collect($open->columns)->map->key()->all()) : [],
                 'sortable' => $this->grid->sortableKeys(),
+                // The grid pages in the same steps the endpoint does — a pager that offered a
+                // page size the server does not honour would skip rows.
+                'pageSize' => (int) config('projects.view_page_size'),
                 'densities' => collect(config('projects.view_densities'))
                     ->map(fn (array $meta, string $key) => ['key' => $key] + $meta)->values()->all(),
                 'visibilities' => $this->visibilityOptions($project),

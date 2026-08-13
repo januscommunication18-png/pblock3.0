@@ -27,6 +27,17 @@
     <button id="open-nav" class="md:hidden h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover">
       {!! pb_icon('bars', 18) !!}
     </button>
+    {{-- Back to the app. Settings is a full-screen detour, so it needs a way out on the left
+         as well as the Close affordance on the right — the same pair the PROJECT settings
+         shell already carries, and the reason this one looked half-finished beside it.
+
+         Points at Projects rather than at Close's destination: they are two different
+         answers to "get me out of here", and two controls that did the same thing would be
+         one control and a decoy. --}}
+    <a href="{{ route('projects.index') }}" title="Back to projects" aria-label="Back to projects"
+       class="h-9 w-9 grid place-items-center rounded-md text-sub hover:bg-hover shrink-0">
+      {!! pb_icon('arrow-left', 18) !!}
+    </a>
     <span class="flex items-center gap-2">
       <span class="h-6 w-6 rounded-md bg-slate-700 text-white grid place-items-center text-[11px] font-semibold">{{ $workspace->initial() }}</span>
       <span class="font-medium text-[13px] max-w-[160px] truncate">{{ $workspace->name }}</span>

@@ -53,7 +53,22 @@ class Project extends Model
         return [
             'archived_at' => 'datetime',
             'features' => 'array',
+            // Dates, not datetimes: a project starts on a day, not at an instant, and casting
+            // them is what lets the Overview format them without parsing strings by hand.
+            'start_date' => 'date',
+            'end_date' => 'date',
         ];
+    }
+
+    /** The project's own state (Draft, In progress, …) — not a work item state. */
+    public function state(): BelongsTo
+    {
+        return $this->belongsTo(ProjectState::class, 'state_id');
+    }
+
+    public function priority(): BelongsTo
+    {
+        return $this->belongsTo(ProjectPriority::class, 'priority_id');
     }
 
     /** Live projects — archived ones stay readable, but drop out of every default list. */

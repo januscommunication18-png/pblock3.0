@@ -74,6 +74,8 @@ class SelfHostedAssetsTest extends TestCase
             'assets/css/inter.css',
             'assets/vendor/tabulator/tabulator.min.js',
             'assets/vendor/tabulator/tabulator.min.css',
+            'assets/vendor/datatables/datatables.min.js',
+            'assets/vendor/datatables/datatables.min.css',
             'assets/vendor/quill/quill.js',
             'assets/vendor/quill/quill.snow.css',
         ] as $asset) {

@@ -10,7 +10,7 @@
    ------------------------------------------------------------------ */
 
 var ViewsScreen = {
-  components: { 'view-grid': ViewGrid },
+  components: { 'view-grid': ViewGrid, 'wi-calendar': WiCalendar },
 
   // PB.boot passes the server payload as a PROP, not on $root.$options — reading it from the
   // wrong place silently yields an empty object, and every default below wins. That presents
@@ -40,10 +40,10 @@ var ViewsScreen = {
       endpoints: b.endpoints || {},
 
       // ---- the grid ----
+      // The grid holds the current page; this copy exists so a cell edit can put the updated
+      // row back into the one on screen without a refetch.
       rows: [],
-      page: 1,
-      total: 0,
-      hasMore: false,
+      pageSize: b.pageSize || 100,
       loading: false,
       search: '',
       sort: '',
@@ -57,6 +57,9 @@ var ViewsScreen = {
       picker: { open: false, group: '', query: '' },
       cell: { open: false, key: '', row: null, style: {}, query: '' },
       menu: { open: false, id: null, style: {} },
+      // The work item detail, as a slide-over over the grid (§7.3). It holds an id, not an
+      // item: the panel embeds the work item's own page, so the detail is the real drawer.
+      panel: { open: false, id: null },
       drag: null
     };
   },
@@ -72,6 +75,14 @@ var ViewsScreen = {
     },
     scrollColumns: function () {
       return this.columns.filter(function (c) { return c.position === 'scroll'; });
+    },
+    /** Where a work item lives, e.g. `/projects/1/work-items`. */
+    itemUrl: function () {
+      return (this.endpoints.list || '').replace('/views', '/work-items');
+    },
+    /** The panel's source: the work item's detail page, without the app chrome. */
+    panelSrc: function () {
+      return this.panel.id ? this.itemUrl + '/' + this.panel.id + '/frame' : '';
     },
     rowHeight: function () {
       var key = (this.view && this.view.density) || 'standard';
@@ -143,11 +154,14 @@ var ViewsScreen = {
   },
 
   mounted: function () {
-    if (this.viewId) this.loadRows(true);
+    // No first load here: <view-grid> asks for page 1 as soon as DataTables builds itself, so
+    // kicking one off from this side would be a duplicate request for the same page.
     document.addEventListener('click', this.onGlobalClick, true);
+    document.addEventListener('keydown', this.onGlobalKey);
   },
   beforeUnmount: function () {
     document.removeEventListener('click', this.onGlobalClick, true);
+    document.removeEventListener('keydown', this.onGlobalKey);
   },
 
   methods: {
@@ -287,44 +301,46 @@ var ViewsScreen = {
 
     // ================= rows (§7, §24) =================
     /**
-     * Fetch a page of rows. `reset` starts again from page 1 — a new search or sort — and
-     * anything else appends, which is what makes scrolling continuous rather than paginated.
+     * Fetch one page of rows, for the grid.
+     *
+     * The grid asks; this answers. It is passed to <view-grid> as a function prop rather than
+     * the grid being given the URL, so the endpoints, the CSRF handling and what a failure
+     * says to the user all stay in one place — the grid only knows "a page of rows".
      */
-    loadRows: async function (reset) {
-      if (this.loading) return;
+    fetchRows: async function (params) {
       this.loading = true;
 
-      if (reset) { this.page = 1; }
-
       var url = this.$pb.withId(this.endpoints.rows, this.viewId) +
-        '?page=' + this.page +
-        '&q=' + encodeURIComponent(this.search) +
-        '&sort=' + encodeURIComponent(this.sort) +
-        '&dir=' + encodeURIComponent(this.dir);
+        '?page=' + params.page +
+        '&q=' + encodeURIComponent(params.search || '') +
+        '&sort=' + encodeURIComponent(params.sort || '') +
+        '&dir=' + encodeURIComponent(params.dir || 'asc');
 
       try {
         var resp = await this.$pb.api(url);
-        this.rows = reset ? resp.rows : this.rows.concat(resp.rows);
-        this.hasMore = resp.has_more;
-        if (reset) this.total = resp.total;
+        this.rows = resp.rows;
+
+        return { rows: resp.rows, total: resp.total };
       } catch (e) {
+        this.rows = [];
         this.$pb.toast(this.$pb.firstError(e, 'Could not load the rows.'));
+
+        throw e;
       } finally {
         this.loading = false;
       }
     },
 
-    loadMore: function () {
-      if (!this.hasMore || this.loading) return;
-      this.page += 1;
-      this.loadRows(false);
+    /** Ask the grid to fetch again. `reset` goes back to page 1 — a new search or sort. */
+    reloadRows: function (reset) {
+      if (this.$refs.grid) this.$refs.grid.reload(reset !== false);
     },
 
     /** §24: debounced, so typing does not fire a query per keystroke. */
     onSearch: function () {
       clearTimeout(this._searchTimer);
       var self = this;
-      this._searchTimer = setTimeout(function () { self.loadRows(true); }, 300);
+      this._searchTimer = setTimeout(function () { self.reloadRows(true); }, 300);
     },
 
     /** A sortable header was clicked (§12.3). The grid tells us which column. */
@@ -335,7 +351,7 @@ var ViewsScreen = {
       // spreadsheet does and therefore what people expect.
       this.dir = this.sort === key && this.dir === 'asc' ? 'desc' : 'asc';
       this.sort = key;
-      this.loadRows(true);
+      this.reloadRows(true);
     },
 
     /**
@@ -357,16 +373,40 @@ var ViewsScreen = {
       setTimeout(function () { window.location.href = back; }, 50);
     },
 
+    /**
+     * Open a work item beside the grid (§7.3).
+     *
+     * The panel embeds the item's own detail page rather than rebuilding it here. The drawer
+     * is 700-odd lines of the Work Items screen and drives most of that screen's methods —
+     * nine chip pickers, the rich-text editor, sub-items, dependencies, relations, links and
+     * five collaboration tabs. A second copy in this file would be a copy that drifts. What
+     * the panel shows IS the drawer, in the same `pageMode` the per-item URL already renders.
+     */
     openRow: function (row) {
-      // The drawer lives on the Work Items screen; from a View the honest thing is to open
-      // the item's own page rather than rebuild the whole detail panel here.
-      window.location.href = this.endpoints.list.replace('/views', '/work-items') + '/' + row.id;
+      this.panel = { open: true, id: row.id };
+    },
+
+    /**
+     * Close it, and re-read the page underneath.
+     *
+     * Anything could have changed in there — a state, a title, an assignee — and the grid has
+     * no way to hear about it across the frame boundary. Re-reading the page the user is on
+     * costs one request at the moment they are looking away from the rows.
+     */
+    closePanel: function () {
+      if (!this.panel.open) return;
+
+      this.panel = { open: false, id: null };
+      this.reloadRows(false);
     },
 
     // ================= inline editing (§11) =================
     openCell: function (payload) {
       var r = payload.el.getBoundingClientRect();
-      var width = 260;
+      // The calendar needs the room a month grid needs; 260 crushes it to unreadable columns.
+      // Same 300 the Work Items list gives its date menus, for the same picker.
+      var dated = ['work_item.start_date', 'work_item.due_date'].indexOf(payload.key) > -1;
+      var width = dated ? 300 : 260;
 
       this.cell = {
         open: true, key: payload.key, row: payload.row, query: '',
@@ -452,9 +492,10 @@ var ViewsScreen = {
         this.replaceRow(resp.row);
       } catch (e) {
         // §11.4's revert: the row on screen was never optimistically changed, so re-reading
-        // the page is the revert. The message says why.
+        // the page is the revert. Re-read the page the user is ON, not page 1 — losing their
+        // place is not part of undoing a rejected edit.
         this.$pb.toast(this.$pb.firstError(e, 'That change was not saved.'));
-        this.loadRows(true);
+        this.reloadRows(false);
       }
     },
 
@@ -547,9 +588,6 @@ var ViewsScreen = {
       } catch (e) { this.$pb.toast(this.$pb.firstError(e, 'Could not save the column order.')); }
     },
 
-    /** A reorder from the grid's own header drag — the same save, different source. */
-    onGridReorder: function (payload) { this.saveOrder(payload.fixed, payload.scroll); },
-
     applyColumns: function (resp) {
       if (resp.columns) this.columns = resp.columns;
       if (typeof resp.frozen === 'number') this.frozen = resp.frozen;
@@ -562,8 +600,28 @@ var ViewsScreen = {
       if (this.cell.open && !e.target.closest('[data-cellmenu]') && !e.target.closest('[data-cell]')) this.cell.open = false;
     },
 
+    /**
+     * Escape closes the innermost thing that is open.
+     *
+     * The panel is last, so a picker opened over it closes first — Escape never pulls the
+     * whole detail out from under a menu the user was aiming at.
+     *
+     * Note that this cannot see an Escape pressed INSIDE the panel: key events do not cross a
+     * frame boundary. The panel's own screen handles that case, and the close button and the
+     * backdrop are always reachable from this side.
+     */
+    onGlobalKey: function (e) {
+      if (e.key !== 'Escape') return;
+
+      if (this.menu.open) { this.menu.open = false; return; }
+      if (this.cell.open) { this.cell.open = false; return; }
+      if (this.panel.open) this.closePanel();
+    },
+
     icon: function (name, size, cls) { return wiIcon(name, size || 16, cls || ''); },
-    when: function (value) { return vgDate(value); }
+    // The shared formatter from date-picker.js, the one the Work Items list uses. There was a
+    // second one living in view-grid.js until it started showing the same date two ways.
+    when: function (value) { return wiFmtDate(value); }
   },
 
   template: '' +
@@ -660,7 +718,7 @@ var ViewsScreen = {
             ' class="h-8 rounded-md border border-line bg-white px-2 text-[12px] text-sub" aria-label="Row density">' +
             '<option v-for="d in densities" :key="d.key" :value="d.key">{{ d.label }}</option>' +
           '</select>' +
-          '<button type="button" @click="loadRows(true)" class="h-8 w-8 grid place-items-center rounded-md border border-line text-sub hover:bg-hover"' +
+          '<button type="button" @click="reloadRows(false)" class="h-8 w-8 grid place-items-center rounded-md border border-line text-sub hover:bg-hover"' +
             ' aria-label="Refresh" v-html="icon(\'rotate-right\', 15)"></button>' +
           '<button v-if="canEditView" type="button" @click="config.open = !config.open"' +
             ' class="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border border-line text-[13px] text-ink hover:bg-hover"' +
@@ -676,13 +734,15 @@ var ViewsScreen = {
         '</div>' +
       '</div>' +
 
-      '<div class="flex-1 min-h-0 flex">' +
+      '<div class="flex-1 min-h-0 flex relative">' +
+        '<div v-if="loading" class="absolute bottom-14 left-1/2 -translate-x-1/2 z-10 h-7 px-3 rounded-full bg-white border border-line shadow-sm text-[12px] text-sub inline-flex items-center gap-2">' +
+          'Loading…' +
+        '</div>' +
         '<view-grid ref="grid" class="flex-1 min-w-0"' +
-          ' :rows="rows" :columns="columns" :frozen="frozen" :row-height="rowHeight"' +
-          ' :can-edit-data="canEditData" :has-more="hasMore" :loading="loading"' +
-          ' :sort="sort" :dir="dir" :sortable="sortable"' +
-          ' @cell="openCell" @open="openRow" @more="loadMore" @resize="setColumnWidth"' +
-          ' @reorder="onGridReorder" @sort="onSort"></view-grid>' +
+          ' :columns="columns" :frozen="frozen" :row-height="rowHeight" :item-url="itemUrl"' +
+          ' :can-edit-data="canEditData" :page-size="pageSize"' +
+          ' :sort="sort" :dir="dir" :sortable="sortable" :search="search" :fetch="fetchRows"' +
+          ' @cell="openCell" @open="openRow" @resize="setColumnWidth" @sort="onSort"></view-grid>' +
 
         // ---- the two-card column panel (§8) ----
         '<aside v-if="config.open && canEditView" class="vg-config w-[300px] shrink-0 bg-white flex flex-col overflow-y-auto">' +
@@ -743,6 +803,22 @@ var ViewsScreen = {
           '</div>' +
         '</aside>' +
       '</div>' +
+
+      // ---------- work item detail, as a slide-over (§7.3) ----------
+      // What is inside the frame is the Work Items screen in `pageMode` — the real drawer,
+      // with every picker, tab, editor and relation live. Not a second copy of it.
+      '<div v-if="panel.open" class="fixed inset-0 z-[85]">' +
+        '<div class="absolute inset-0 bg-black/20" @click="closePanel"></div>' +
+        '<aside class="absolute right-0 top-0 h-full w-full sm:w-[80%] bg-white shadow-2xl flex flex-col">' +
+          '<button type="button" @click="closePanel" data-tip="Close" aria-label="Close"' +
+            ' class="absolute top-3 left-3 z-10 h-8 w-8 grid place-items-center rounded-md bg-white/90 text-sub hover:bg-hover"' +
+            ' v-html="icon(\'arrow-right-long\', 18)"></button>' +
+          // `key` on the src: opening a different work item must build a fresh frame rather
+          // than leave the previous item's editors and unsaved drafts behind in this one.
+          '<iframe :key="panelSrc" :src="panelSrc" class="flex-1 min-h-0 w-full border-0"' +
+            ' title="Work item detail"></iframe>' +
+        '</aside>' +
+      '</div>' +
     '</template>' +
 
     // ---------- cell picker (§11) ----------
@@ -753,11 +829,16 @@ var ViewsScreen = {
           ' class="w-full h-9 px-2.5 text-[13px] outline-none" />' +
         '<div class="px-2.5 pb-2 text-[11px] text-faint">Enter to save · Esc to cancel</div>' +
       '</template>' +
+      // Dates: the same calendar the Work Items list and the create modal use, with the same
+      // ordering bounds — a due date cannot land before the start date, and vice versa. A
+      // native <input type="date"> was here before; it looked and behaved differently in every
+      // browser, and differently again from the picker two screens away.
       '<template v-else-if="cellColumn && [\'work_item.start_date\', \'work_item.due_date\'].indexOf(cellColumn.key) > -1">' +
-        '<input :value="cell.row ? (cellColumn.key === \'work_item.start_date\' ? cell.row.start_date : cell.row.due_date) : \'\'"' +
-          ' type="date" @change="commitCellText($event.target.value)"' +
-          ' class="w-full h-9 px-2.5 text-[13px] outline-none" />' +
-        '<button type="button" @click="commitCellText(\'\')" class="w-full text-left h-8 px-2.5 text-[12px] text-sub hover:bg-hover border-t border-line">Clear</button>' +
+        '<wi-calendar class="!static !mb-0 !w-full !shadow-none !outline-none"' +
+          ' :value="cell.row ? (cellColumn.key === \'work_item.start_date\' ? cell.row.start_date : cell.row.due_date) : null"' +
+          ' :after="cellColumn.key === \'work_item.due_date\' && cell.row ? cell.row.start_date : null"' +
+          ' :before="cellColumn.key === \'work_item.start_date\' && cell.row ? cell.row.due_date : null"' +
+          ' @pick="commitCellText($event)" @clear="commitCellText(\'\')" />' +
       '</template>' +
       '<template v-else>' +
         '<input v-model="cell.query" type="search" placeholder="Search" class="w-full h-8 px-2.5 text-[12px] border-b border-line outline-none" />' +

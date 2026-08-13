@@ -1,59 +1,154 @@
-/* Views — the RevoGrid spreadsheet.
+/* Views — the DataTables spreadsheet.
    ------------------------------------------------------------------
-   RevoGrid runs its own `default` theme, the one on rv-grid.com/demo — header band, row
-   dividers, hover, pinned-column edge, focus ring, scrollbars, all of it. This file
-   deliberately does NOT restyle any of that.
+   Loaded AFTER assets/vendor/datatables/datatables.min.css, so everything here wins on order
+   without needing to out-specify anything. That ordering is asserted by a test, because it is
+   the same trap that turned the Cycles group rows grey: two stylesheets, equal specificity,
+   and whichever loads last decides.
 
-   An earlier version did, matching the work item list's palette by hand. Every one of those
-   rules was `.vg-grid .rgCell`-shaped, which outranks the theme's own selectors, so the theme
-   was being paid for and then painted over. If the app's colours are wanted here again, the
-   way to do it is the theme's public tokens — `--revo-grid-header-bg`, `--revo-grid-row-hover`,
-   `--revo-grid-cell-border` and the rest, set once on `.vg-grid` — not a second set of rules
-   fighting the first.
-
-   What is left below is only what the theme cannot know about: the layout of OUR cell content,
-   and the chrome around the grid.
+   The grid is an ordinary <table>. That is the entire reason this engine was chosen over
+   RevoGrid — a row background is a rule here, not an archaeology exercise in a minified
+   bundle's custom properties.
    ------------------------------------------------------------------ */
 
-/* The element sizes itself to this box. The sizing is done with flex classes in the template
-   (`flex-1 min-h-0`), the same shape <wi-list> uses, not with a percentage height — a
-   percentage on a flex item is measured against a height the layout has not settled yet.
-
-   `display` is deliberately not set here: RevoGrid declares `display: flex !important` on the
-   element and would win anyway. */
-.vg-grid {
-  font-family: inherit;
-
-  /* ---- Rows stay white ---------------------------------------------------
-     Set through the theme's own TOKENS, not by overriding its selectors — which is the mistake
-     the previous version of this file made, and the reason the theme was being painted over.
-
-     RevoGrid never paints an ordinary row: rows are transparent over the grid surface, which is
-     `--revo-grid-background` and already white. What shaded them was the FOCUSED row —
-     `canFocus` is on for keyboard navigation (§7.1, §26), and clicking a cell to open its picker
-     left that row sitting at rgba(233, 234, 237, .5) afterwards.
-
-     So the focused-row fill goes transparent and the row stays white. Focus itself is not lost:
-     the focused CELL still gets its ring, which is the part that says where you are. */
-  --revo-grid-background: #fff;
-  --revo-grid-focused-bg: transparent;
-
-  /* ---- Header and cell text on the same left edge -------------------------
-     The theme pads both by `0 15px`. But our cell content is a custom span (`.vg-cell`) that
-     does its own padding, so a themed cell padding would be applied TWICE — and the header,
-     which has no such span, would be padded once. The two ended up on different left edges,
-     with the header text sitting further in than the values under it.
-
-     So the cell's own padding is zeroed and `.vg-cell` is the only thing that pads, and the
-     header is set to match it exactly. One number, in one place, for both. */
-  --revo-grid-cell-padding: 0;
-  --revo-grid-header-padding: 0 10px;
+/* DataTables wraps the <table> in .dt-container and hangs the info line and pager off the
+   bottom of it. Made a flex column so the table scrolls and the pager does not: a pager that
+   scrolls away with the rows is a pager you cannot reach. */
+.vg-wrap .dt-container {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
-/* ---- Our cell content ----------------------------------------------------
+/* DataTables spaces its layout rows by .75em. Inside this grid the rows ARE the chrome — our
+   toolbar sits above and the pager below — so that spacing is ours to set, not the library's.
+   Left in place it shows up as a strip of dead space above the column headers. */
+.vg-wrap .dt-container div.dt-layout-row { margin: 0; }
+
+/* `dt-layout-table` is a class ON the row, not a child of it. Written as `:has(...)` it
+   silently matches nothing — and the negation further down then matched EVERYTHING, which is
+   how the pager's padding and border ended up above the grid instead of below it. */
+.vg-wrap .dt-layout-row.dt-layout-table {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* DataTables forces `display: block !important` on this cell, so it cannot be made a flex
+   container — but it is still a flex ITEM, which is all that is needed to give it a definite
+   height to scroll inside. Hence `flex: 1` rather than `height: 100%`. */
+.vg-wrap .dt-layout-table .dt-layout-cell {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+/* ---- the table ----------------------------------------------------------
+   `fixed` is load-bearing, not a preference. It is what makes a <col> width authoritative for
+   the header AND the body, so a resize drag cannot move one without the other — the defect
+   that took two attempts to fix while this grid ran on Tabulator. */
+table.vg-grid {
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-family: inherit;
+  font-size: 13px;
+  margin: 0;
+}
+
+/* ---- rows stay white ----------------------------------------------------
+   Stated plainly, for every row, in every state. DataTables only stripes when the table
+   carries `.stripe` or `.display` (it carries neither, and `stripeClasses: []` keeps it that
+   way), but this is the thing that has broken three times across three grid engines, so it is
+   written down rather than left to the absence of another rule.
+
+   The stripe is neutralised through DataTables' OWN variable rather than by resetting
+   `box-shadow` on the cells. It paints via an inset shadow, so a blanket `box-shadow: none`
+   here does kill it — and also killed the pinned column's edge, but only on odd rows, because
+   `tr:nth-child(odd) > td` (0,2,4) beat `.vg-pin-last` (0,2,2) on element count while even
+   rows fell through to a weaker rule and kept their border. Alternating borders down the
+   frozen edge. Two different things wanted the same property on the same cells; this leaves
+   `box-shadow` to the one that has a use for it. */
+table.vg-grid { --dt-row_alpha-stripe: 0; }
+table.vg-grid > tbody > tr > td,
+table.vg-grid > tbody > tr:nth-child(odd) > td,
+table.vg-grid > thead > tr > th {
+  background: #fff;
+}
+table.vg-grid > tbody > tr:hover > td { background: #f8f9fa; }
+
+table.vg-grid > tbody > tr > td {
+  height: var(--vg-row-h, 44px);
+  padding: 0;
+  border-bottom: 1px solid #f1f2f4;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+/* ---- header -------------------------------------------------------------
+   Sticky rather than a second cloned table: one table means one source of row and column
+   geometry, so a header cell cannot drift out of line with the column under it. */
+table.vg-grid > thead > tr > th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  height: 36px;
+  padding: 0 10px;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+/* Every column reads left-to-right, headers included.
+   DataTables right-aligns whatever it detects as numeric or as a date, at a specificity
+   (`table.dataTable th.dt-type-numeric`) that outranks a plain `th` rule of ours. The columns
+   are declared `type: 'string'` in view-grid.js so those classes are never applied — this is
+   the belt to that braces, written at matching weight so a future type class cannot quietly
+   swing the ID column's header away from the values under it. */
+table.vg-grid.dataTable > thead > tr > th,
+table.vg-grid.dataTable > tbody > tr > td { text-align: left; }
+
+/* …except the columns view-grid.js marks (VG_RIGHT — the ID). Header and values move together,
+   which is the part the automatic detection kept getting wrong: `text-align` reaches the
+   header's inline content but not the cell below it, because `.vg-cell` is a flex box and has
+   to be told separately. Extra right padding keeps the label clear of the resize grip. */
+table.vg-grid.dataTable > thead > tr > th.vg-right {
+  text-align: right;
+  padding-right: 16px;
+}
+table.vg-grid .vg-right .vg-cell { justify-content: flex-end; }
+
+/* ---- pinned (Fixed) columns, §7.2 --------------------------------------
+   `left` is set per cell in JS from the running total of the widths before it; only the edge
+   is described here. The header's pinned cells need to outrank both the sticky header and the
+   pinned body cells, hence the third z-index. */
+table.vg-grid .vg-pin { position: sticky; z-index: 1; }
+table.vg-grid > thead > tr > th.vg-pin { z-index: 3; }
+
+/* The edge of the pinned block. A 1px light grey line always, so the boundary between what
+   holds still and what moves is readable even at rest.
+   Drawn as a box-shadow rather than a border: with `table-layout: fixed` a border would eat
+   into the column's own width, and the pinned columns' `left` offsets are the running total of
+   those widths — so a border here would push every pinned column 1px out of line with itself. */
+table.vg-grid .vg-pin-last { box-shadow: 1px 0 0 0 #e5e7eb; }
+
+/* …and a soft shadow only once there is something scrolled underneath it. A drop shadow with
+   nothing behind it reads as an edge that has come loose; it should appear when it is doing
+   its job, which is telling you the rows continue under the frozen columns. `.vg-scrolled` is
+   set on the wrapper by view-grid.js from the scroll position. */
+.vg-scrolled table.vg-grid .vg-pin-last {
+  box-shadow: 1px 0 0 0 #e5e7eb, 6px 0 9px -6px rgba(15, 23, 42, .28);
+}
+table.vg-grid .vg-pin-last { transition: box-shadow .15s ease; }
+
+/* ---- our cell content ---------------------------------------------------
    Cells render chips from work-item-ui.js — the same helpers the Work Items list uses, so a
-   status or a priority means the same thing wherever you see it. This is the box that holds
-   them: the theme paints the cell, this lays out what is inside it. */
+   status or a priority means the same thing wherever you see it. The <td> is the box; this is
+   the layout of what sits inside it. Padding lives HERE and nowhere else, so the header above
+   uses the same 10px and the two line up on one left edge. */
 .vg-cell {
   display: flex;
   align-items: center;
@@ -64,27 +159,92 @@
   overflow: hidden;
   white-space: nowrap;
 }
-.vg-head { display: flex; align-items: center; min-width: 0; }
+.vg-head { min-width: 0; }
 [data-sort] { cursor: pointer; user-select: none; }
+
+/* ---- ID and Title, as links ---------------------------------------------
+   They carry a real href to the work item, so ⌘-click and middle-click open a tab; a plain
+   click is intercepted and opens the detail panel instead. Undecorated at rest — a grid of
+   underlined blue would be unreadable — and stated on hover, which is where the affordance
+   is actually needed. `min-width: 0` so a long title still truncates inside the cell. */
+.vg-link {
+  color: inherit;
+  text-decoration: none;
+  min-width: 0;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.vg-link:hover { color: #1b5f8a; text-decoration: underline; }
 
 /* An editable cell reads as one. Cells that are read-only — a system field, or a column whose
    feature is off — deliberately get none of this, so "can I change this?" is answerable by
-   pointing at it.
-
-   Drawn from the theme's OWN hover token rather than a colour of ours, so it stays correct if
-   the theme changes; and as an inset ring rather than a border, so hovering does not add a
-   pixel and nudge the row. */
+   pointing at it. An inset ring rather than a border, so hovering does not add a pixel and
+   nudge the row. */
 .vg-editable { cursor: pointer; }
 .vg-editable:hover {
-  background: var(--revo-grid-row-hover, rgba(0, 0, 0, .04));
-  box-shadow: inset 0 0 0 1px var(--revo-grid-border, rgba(0, 0, 0, .12));
+  background: #eef0f2;
+  box-shadow: inset 0 0 0 1px #d1d5db;
 }
 
-/* ---- The column configuration panel --------------------------------------
-   Not part of the grid, so not the theme's business. It slides in beside the grid, and its
-   leading edge needs to read as an edge: a border alone is lost against the grid's own column
-   lines, and the shadow is what separates a panel sitting ON the screen from one more column
-   in the table. */
+/* ---- the resize grip, §10 ----------------------------------------------
+   Invisible until aimed at, and wider than it looks: a 1px target is a target you miss. */
+.vg-grip {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 9px;
+  height: 100%;
+  cursor: col-resize;
+  user-select: none;
+}
+.vg-grip:hover { background: linear-gradient(to right, transparent 3px, #1b5f8a 3px, #1b5f8a 5px, transparent 5px); }
+/* The grip is absolutely positioned against its header cell. `position: sticky` on the <th>
+   above is non-static, so it already establishes the containing block — no `relative` needed. */
+
+/* While a drag is running the cursor must not flicker to a text caret over the cells it
+   passes, and nothing may select. */
+body.vg-resizing { cursor: col-resize; user-select: none; }
+body.vg-resizing .vg-cell { pointer-events: none; }
+
+/* ---- pager and info line ------------------------------------------------
+   DataTables' own controls, brought in line with the app's buttons. */
+/* An empty top row — `layout` sets topStart and topEnd to null — still takes up space: the
+   empty CELLS hide themselves, but nothing collapses the row around them. So a non-table row
+   shows only when it actually carries something. */
+.vg-wrap .dt-layout-row:not(.dt-layout-table) { display: none; }
+.vg-wrap .dt-layout-row:not(.dt-layout-table):has(.dt-info),
+.vg-wrap .dt-layout-row:not(.dt-layout-table):has(.dt-paging) {
+  display: flex;
+  padding: 8px 12px;
+  border-top: 1px solid #e5e7eb;
+  font-size: 12px;
+  color: #6b7280;
+}
+.vg-wrap .dt-paging button.dt-paging-button {
+  height: 28px;
+  min-width: 28px;
+  padding: 0 8px;
+  margin-left: 4px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #fff;
+  color: #1f2328;
+  font-size: 12px;
+}
+.vg-wrap .dt-paging button.dt-paging-button:hover:not(.disabled) { background: #f3f4f6; }
+.vg-wrap .dt-paging button.dt-paging-button.current {
+  background: #1b5f8a;
+  border-color: #1b5f8a;
+  color: #fff;
+}
+.vg-wrap .dt-paging button.dt-paging-button.disabled { opacity: .45; cursor: default; }
+
+/* ---- the column configuration panel --------------------------------------
+   Not part of the grid. It slides in beside it, and its leading edge needs to read as an edge:
+   a border alone is lost against the grid's own column lines, and the shadow is what separates
+   a panel sitting ON the screen from one more column in the table. */
 .vg-config {
   border-left: 1px solid var(--stroke, #d1d5db);
   box-shadow: -8px 0 16px -8px rgba(15, 23, 42, .14);

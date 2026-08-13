@@ -16,8 +16,9 @@
         "vite": "^8.0.0"
     },
     "dependencies": {
-        "@revolist/revogrid": "^4.25.2",
         "@vitejs/plugin-vue": "^6.0.8",
+        "datatables.net": "^3.0.1",
+        "datatables.net-dt": "^3.0.1",
         "flyonui": "^2.4.1",
         "jodit-pro": "^4.13.37",
         "laravel-echo": "^2.4.0",

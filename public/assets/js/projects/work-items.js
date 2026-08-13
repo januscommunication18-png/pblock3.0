@@ -579,17 +579,17 @@ var WorkItemsScreen = {
       states: Array.isArray(b.states) ? b.states : [],
       labels: Array.isArray(b.labels) ? b.labels : [],
       // Cycles §8.1: the property is only offered when the project has the feature on.
-      cyclesEnabled: !!b.cyclesEnabled,
+      baseCyclesEnabled: !!b.cyclesEnabled,
       // Labels §3/§15: the picker appears only where the project has labels on. Chips
       // already on a work item stay readable either way (§28.5).
-      labelsEnabled: b.labelsEnabled !== false,
+      baseLabelsEnabled: b.labelsEnabled !== false,
       // Estimation §4/§26: the chip appears only where the project has it on and a system is
       // configured — an estimate property with nothing to choose from is not a property.
-      estimatesEnabled: !!b.estimatesEnabled,
+      baseEstimatesEnabled: !!b.estimatesEnabled,
       estimates: Array.isArray(b.estimates) ? b.estimates : [],
       // Epic §4/§9: the property appears only where the project has the feature on.
       pagesEnabled: !!b.pagesEnabled,
-      epicsEnabled: !!b.epicsEnabled,
+      baseEpicsEnabled: !!b.epicsEnabled,
       epics: Array.isArray(b.epics) ? b.epics : [],
       // Set when this screen is mounted inside an epic, cycle or module: new work items
       // created there belong to it, and that host owns the page-level Add button.
@@ -597,14 +597,28 @@ var WorkItemsScreen = {
       embedded: !!b.embedded,
       cycles: Array.isArray(b.cycles) ? b.cycles : [],
       // Modules §9.1: the property only appears when the project has the feature on.
-      modulesEnabled: !!b.modulesEnabled,
+      baseModulesEnabled: !!b.modulesEnabled,
       modules: Array.isArray(b.modules) ? b.modules : [],
       members: Array.isArray(b.members) ? b.members : [],
       priorities: Array.isArray(b.priorities) ? b.priorities : [],
       defaultStateId: b.defaultStateId || '',
       canCreate: !!b.canCreate,
       canEdit: !!b.canEdit,
-      endpoints: b.endpoints || {},
+      /*
+       * MULTI-PROJECT MODE (Your Work).
+       *
+       * This screen is project-scoped by design: the rows share a project, so one set of
+       * states, labels, members, cycles and endpoints serves every one of them. Your Work
+       * hands it rows from SEVERAL projects, where that assumption would offer one project's
+       * states for another's item and PATCH it to the wrong URL.
+       *
+       * `projects` is that vocabulary INDEXED by project id. When it is present, `vocab` and
+       * `endpoints` below resolve from the row being acted on instead of from the flat
+       * arrays; when it is absent — every existing caller — they return the flat arrays
+       * unchanged, so a single-project screen behaves exactly as it did.
+       */
+      projectsById: b.projects || null,
+      baseEndpoints: b.endpoints || {},
       // Detail view (§4.4). One component renders it two ways: a right-hand drawer over the
       // list, and — when the per-item URL was opened — the same panel as a full page with the
       // list hidden. `pageItemId` is the server telling us which.
@@ -684,6 +698,76 @@ var WorkItemsScreen = {
     };
   },
   computed: {
+    /**
+     * The row every picker and every endpoint is currently about.
+     *
+     * A chip picker wins over the drawer: opening a chip on row A while row B's drawer is
+     * open must edit A, which is the order the two are closed in as well.
+     */
+    activeItem: function () {
+      if (this.rowMenu && this.rowMenu.open && this.rowMenu.item) return this.rowMenu.item;
+
+      return this.drawerItem || null;
+    },
+    /** The signed-in user, for the Subscribe button's face. Null if they are not a member. */
+    me: function () {
+      var id = String(this.currentUserId || '');
+      var members = this.vocab.members || [];
+
+      return members.filter(function (m) { return String(m.id) === id; })[0] || null;
+    },
+    /** That row's project vocabulary, or null on an ordinary single-project screen. */
+    activeProject: function () {
+      if (!this.projectsById) return null;
+      var it = this.activeItem;
+
+      return it && it.project_id ? (this.projectsById[String(it.project_id)] || null) : null;
+    },
+    /**
+     * The option lists the pickers read.
+     *
+     * One indirection so the ~14 places that offer a choice do not each have to know whether
+     * this screen is showing one project or several. On a single-project screen this is the
+     * component's own flat data, which is what it always was.
+     */
+    vocab: function () {
+      return this.activeProject || {
+        states: this.states,
+        labels: this.labels,
+        labelsEnabled: this.baseLabelsEnabled,
+        members: this.members,
+        cycles: this.cycles,
+        cyclesEnabled: this.baseCyclesEnabled,
+        modules: this.modules,
+        modulesEnabled: this.baseModulesEnabled,
+        epics: this.epics,
+        epicsEnabled: this.baseEpicsEnabled,
+        estimates: this.estimates,
+        estimatesEnabled: this.baseEstimatesEnabled
+      };
+    },
+    /**
+     * The endpoints every read and write uses.
+     *
+     * A computed rather than a data field, which is what lets all 26 `this.endpoints.X` call
+     * sites become project-aware without one of them changing: each already acts on the open
+     * row, and this resolves to that row's project.
+     */
+    endpoints: function () {
+      var p = this.activeProject;
+
+      return (p && p.endpoints) || this.baseEndpoints;
+    },
+    /*
+     * The feature switches, resolved the same way — a project with Cycles off must not offer
+     * the chip on its rows just because the project above it in the list has them on. Computed
+     * from `vocab`, so the ~20 template references throughout the drawer are unchanged.
+     */
+    labelsEnabled: function () { return this.vocab.labelsEnabled !== false; },
+    cyclesEnabled: function () { return !!this.vocab.cyclesEnabled; },
+    modulesEnabled: function () { return !!this.vocab.modulesEnabled; },
+    epicsEnabled: function () { return !!this.vocab.epicsEnabled; },
+    estimatesEnabled: function () { return !!this.vocab.estimatesEnabled; },
     // Tabulator group order: the project's states in their configured order, then a trailing
     // bucket for items whose state was deleted.
     statesById: function () {
@@ -695,13 +779,13 @@ var WorkItemsScreen = {
     formPriority: function () { return WI_PRI[this.form.priority] || WI_PRI.none; },
     filteredMembers: function () {
       var q = (this.memberQuery || '').toLowerCase();
-      return this.members.filter(function (m) {
+      return this.vocab.members.filter(function (m) {
         return !q || (m.name || '').toLowerCase().indexOf(q) > -1 || (m.email || '').toLowerCase().indexOf(q) > -1;
       });
     },
     filteredLabels: function () {
       var q = (this.labelQuery || '').toLowerCase();
-      return this.labels.filter(function (l) { return !q || (l.name || '').toLowerCase().indexOf(q) > -1; });
+      return this.vocab.labels.filter(function (l) { return !q || (l.name || '').toLowerCase().indexOf(q) > -1; });
     },
     // Parent candidates: any existing item in this project (a brand-new item cannot be its
     // own parent, so no self-exclusion is needed on create).
@@ -718,26 +802,26 @@ var WorkItemsScreen = {
     },
     selectedAssignees: function () {
       var ids = this.form.assignee_ids.map(String);
-      return this.members.filter(function (m) { return ids.indexOf(String(m.id)) > -1; });
+      return this.vocab.members.filter(function (m) { return ids.indexOf(String(m.id)) > -1; });
     },
     selectedEstimate: function () {
       var id = String(this.form.estimate_value_id || '');
-      return this.estimates.filter(function (e) { return String(e.id) === id; })[0] || null;
+      return this.vocab.estimates.filter(function (e) { return String(e.id) === id; })[0] || null;
     },
     /** §9: the picker searches epic names, and only this project's epics are in the list. */
     filteredEpics: function () {
       var q = (this.epicQuery || '').toLowerCase();
-      return this.epics.filter(function (e) {
+      return this.vocab.epics.filter(function (e) {
         return !q || (e.title || '').toLowerCase().indexOf(q) > -1 || String(e.identifier) === q;
       });
     },
     selectedEpic: function () {
       var id = String(this.form.epic_id || '');
-      return this.epics.filter(function (e) { return String(e.id) === id; })[0] || null;
+      return this.vocab.epics.filter(function (e) { return String(e.id) === id; })[0] || null;
     },
     selectedLabels: function () {
       var ids = this.form.label_ids.map(String);
-      return this.labels.filter(function (l) { return ids.indexOf(String(l.id)) > -1; });
+      return this.vocab.labels.filter(function (l) { return ids.indexOf(String(l.id)) > -1; });
     },
     totalCount: function () { return this.items.length; },
     /**
@@ -873,6 +957,45 @@ var WorkItemsScreen = {
     },
     // ---------- The list (wi-list) ----------
     /** A row chip was clicked: open that property's picker, anchored to the chip. */
+    // ---------- Detail toolbar: vote and subscribe (POC html/work-items.html) ----------
+    /**
+     * Vote, or take the vote back.
+     *
+     * Both endpoints toggle server-side and answer with the resulting counts, so nothing here
+     * predicts what the click did — a second tab open on the same item would make a different
+     * prediction, and one of them would be wrong until the next reload.
+     */
+    vote: async function (value) {
+      await this.react(this.endpoints.vote, { value: value });
+    },
+
+    toggleSubscribe: async function () {
+      var resp = await this.react(this.endpoints.subscribe, {});
+      if (resp) this.$pb.toast(resp.message);
+    },
+
+    /** POST, then paint the item from the response — in the list as well as the drawer. */
+    react: async function (endpoint, body) {
+      var item = this.drawerItem;
+      if (!item || !endpoint) return null;
+
+      try {
+        var resp = await this.$pb.api(this.$pb.withId(endpoint, item.id), { method: 'POST', body: body });
+        // Written onto the row in `items`, not onto the drawer's copy: the drawer reads from
+        // that array, and the row underneath has to agree with it when the drawer closes.
+        var row = this.items.filter(function (i) { return i.id === item.id; })[0] || item;
+        row.votes = resp.votes;
+        row.my_vote = resp.my_vote;
+        row.subscribed = resp.subscribed;
+
+        return resp;
+      } catch (e) {
+        this.$pb.toast(this.$pb.firstError(e, 'That did not go through.'), 'error');
+
+        return null;
+      }
+    },
+
     onChip: function (e) { this.openRowMenu(e.kind, e.item, e.el); },
     /** Ask the list to redraw after the items array was mutated in place. */
     refreshTable: function () { if (this.$refs.list) this.$refs.list.refresh(); },
@@ -897,13 +1020,13 @@ var WorkItemsScreen = {
     closeRowMenu: function () { this.rowMenu = { open: false, kind: '', item: null, style: {} }; },
     rowMembers: function () {
       var q = (this.rowQuery || '').toLowerCase();
-      return this.members.filter(function (m) {
+      return this.vocab.members.filter(function (m) {
         return !q || (m.name || '').toLowerCase().indexOf(q) > -1 || (m.email || '').toLowerCase().indexOf(q) > -1;
       });
     },
     rowLabels: function () {
       var q = (this.rowQuery || '').toLowerCase();
-      return this.labels.filter(function (l) { return !q || (l.name || '').toLowerCase().indexOf(q) > -1; });
+      return this.vocab.labels.filter(function (l) { return !q || (l.name || '').toLowerCase().indexOf(q) > -1; });
     },
     /** Palette offered when creating a label inline; the server picks one if none is set. */
     labelColors: function () {
@@ -912,14 +1035,14 @@ var WorkItemsScreen = {
     /** Is the typed name already a label? Then "create" would fork the vocabulary. */
     labelExists: function (name) {
       var q = (name || '').trim().toLowerCase();
-      return !!q && this.labels.some(function (l) { return (l.name || '').toLowerCase() === q; });
+      return !!q && this.vocab.labels.some(function (l) { return (l.name || '').toLowerCase() === q; });
     },
     startNewLabel: function () {
       this.newLabel = {
         open: true,
         // Whatever was typed into the search is almost always the label being looked for.
         name: (this.rowQuery || '').trim(),
-        color: this.labelColors()[this.labels.length % this.labelColors().length],
+        color: this.labelColors()[this.vocab.labels.length % this.labelColors().length],
         busy: false, error: ''
       };
     },
@@ -934,8 +1057,13 @@ var WorkItemsScreen = {
         var resp = await this.$pb.api(this.$pb.withId(this.endpoints.createLabel, item.id), {
           method: 'POST', body: { name: name, color: this.newLabel.color }
         });
-        // The project's vocabulary grew, so every picker on this screen should know.
-        this.labels = resp.labels || this.labels;
+        // The project's vocabulary grew, so every picker on this screen should know — into
+        // THAT project's list when the screen is showing several, or the label would appear
+        // under every project on a Your Work list rather than the one it was created in.
+        if (resp.labels) {
+          if (this.activeProject) this.activeProject.labels = resp.labels;
+          else this.labels = resp.labels;
+        }
         this.newLabel.open = false;
         this.rowQuery = '';
         // Applying it goes through the same PATCH as any other label change.
@@ -1003,7 +1131,7 @@ var WorkItemsScreen = {
     /** Cycles offered by the picker, filtered by the same search box the others use. */
     rowCycles: function () {
       var q = (this.rowQuery || '').toLowerCase();
-      return this.cycles.filter(function (c) { return !q || (c.name || '').toLowerCase().indexOf(q) > -1; });
+      return this.vocab.cycles.filter(function (c) { return !q || (c.name || '').toLowerCase().indexOf(q) > -1; });
     },
     /**
      * Set or clear a work item's estimate (§14/§15).
@@ -1021,7 +1149,7 @@ var WorkItemsScreen = {
     /** Epics offered by the picker, filtered by the same search box the others use. */
     rowEpics: function () {
       var q = (this.rowQuery || '').toLowerCase();
-      return this.epics.filter(function (e) {
+      return this.vocab.epics.filter(function (e) {
         return !q || (e.title || '').toLowerCase().indexOf(q) > -1 || String(e.identifier) === q;
       });
     },
@@ -1045,7 +1173,7 @@ var WorkItemsScreen = {
     /** Modules offered by the picker, filtered by the same search box the others use. */
     rowModules: function () {
       var q = (this.rowQuery || '').toLowerCase();
-      return this.modules.filter(function (m) { return !q || (m.title || '').toLowerCase().indexOf(q) > -1; });
+      return this.vocab.modules.filter(function (m) { return !q || (m.title || '').toLowerCase().indexOf(q) > -1; });
     },
     rowHasModule: function (m) {
       var it = this.rowMenu.item;
@@ -2098,13 +2226,29 @@ var WorkItemsScreen = {
 
     // ===== Grid (desktop) =====
     '<wi-list v-show="items.length" ref="list" class="flex-1 min-h-0 hidden sm:block" ' +
-    ':items="items" :states="states" :can-edit="canEdit" :can-add="canCreate" row-action="menu" ' +
-    ':labels-enabled="labelsEnabled" ' +
+    ':items="items" :states="states" :flat="!!projectsById" :can-edit="canEdit" :can-add="canCreate" row-action="menu" ' +
+    ':labels-enabled="baseLabelsEnabled" ' +
     '@open="openDrawer" @chip="onChip" @group-add="openCreate" />' +
 
     // ===== Cards (mobile) — same data, grouped by state =====
     '<div class="sm:hidden flex-1 overflow-y-auto">' +
-    '<template v-for="s in states" :key="s.id">' +
+    // Across projects there is no shared state order to group by, so the cards are one list —
+    // the same choice the grid makes in `flat` mode. Without this the mobile view rendered
+    // nothing at all, because it iterates the (empty) state list.
+    '<template v-if="projectsById">' +
+    '<div v-for="i in items" :key="i.id" @click="openDrawer(i)" class="border-b border-line px-4 py-3">' +
+    '<div class="flex items-center gap-2 text-[12px] text-sub">' +
+    '<span v-if="i.project" class="shrink-0">{{ (i.project.emoji || \'📁\') + \' \' + i.project.name }}</span>' +
+    '<span>{{ i.identifier }}</span></div>' +
+    '<div class="text-[14px] text-ink mt-0.5">{{ i.title }}</div>' +
+    '<div class="flex flex-wrap items-center gap-1.5 mt-2">' +
+    '<span class="inline-flex items-center gap-1.5 h-6 px-2 rounded border border-line bg-white text-[12px] text-ink">' +
+    '<span class="grid place-items-center" v-html="stateIcon(i.state)"></span>{{ i.state ? i.state.name : \'No state\' }}</span>' +
+    '<span class="inline-flex items-center gap-1.5 h-6 px-2 rounded border border-line bg-white text-[12px]" :class="priorityMeta(i.priority).cls">' +
+    '<span class="grid place-items-center" v-html="priorityMeta(i.priority).icon"></span>{{ priorityMeta(i.priority).label }}</span>' +
+    '</div></div>' +
+    '</template>' +
+    '<template v-else v-for="s in states" :key="s.id">' +
     '<div v-if="items.filter(i => i.state_id === s.id).length" class="flex items-center gap-2 h-9 px-4 border-b border-line" style="background:#f6f7f8">' +
     '<span class="grid place-items-center" v-html="stateIcon(s)"></span>' +
     '<span class="text-[13px] font-semibold text-head">{{ s.name }}</span>' +
@@ -2158,6 +2302,32 @@ var WorkItemsScreen = {
     '</div>' +
 
     '<div class="ml-auto flex items-center gap-1.5">' +
+
+    // Vote (POC toolbar). Available to anyone who can SEE the item, not only who can edit it:
+    // voting on a proposal is not changing it. The chosen side is filled rather than outlined,
+    // so "how does the team feel" and "what did I say" are both answerable at a glance.
+    '<div class="flex items-center gap-0.5">' +
+    '<button type="button" @click="vote(\'up\')" data-tip="Upvote" aria-label="Upvote" ' +
+    'class="inline-flex items-center gap-1 h-8 px-2 rounded-md text-[13px] hover:bg-hover" ' +
+    ':class="drawerItem.my_vote === \'up\' ? \'bg-sel text-brand\' : \'text-sub\'">' +
+    '' + wiIcon('arrow-up', 14) + '<span>{{ drawerItem.votes ? drawerItem.votes.up : 0 }}</span></button>' +
+    '<button type="button" @click="vote(\'down\')" data-tip="Downvote" aria-label="Downvote" ' +
+    'class="inline-flex items-center gap-1 h-8 px-2 rounded-md text-[13px] hover:bg-hover" ' +
+    ':class="drawerItem.my_vote === \'down\' ? \'bg-sel text-brand\' : \'text-sub\'">' +
+    '' + wiIcon('arrow-down', 14) + '<span>{{ drawerItem.votes ? drawerItem.votes.down : 0 }}</span></button>' +
+    '</div>' +
+
+    // Subscribe. Once following, the button wears your own face — the POC's way of saying
+    // "you are on this list", which a filled bell cannot.
+    '<button type="button" @click="toggleSubscribe" ' +
+    ':data-tip="drawerItem.subscribed ? \'Stop hearing about this work item\' : \'Hear about changes to this work item\'" ' +
+    'class="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-stroke text-[13px] text-ink hover:bg-hover">' +
+    '<span class="grid place-items-center">' +
+    '<wi-avatar v-if="drawerItem.subscribed && me" :person="me" :size="20" />' +
+    '<span v-else>' + wiIcon('user-thin', 14) + '</span>' +
+    '</span>' +
+    '<span>{{ drawerItem.subscribed ? \'Unsubscribe\' : \'Subscribe\' }}</span></button>' +
+
     '<button type="button" @click="drawerCopyLink" data-tip="Copy link" aria-label="Copy link" class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover">' +
     '' + wiIcon('link', 16) + '</button>' +
     '<button v-if="canEdit" type="button" @click="openRowMenu(\'menu\', drawerItem, $event.currentTarget)" data-tip="More" aria-label="More" class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover">' +
@@ -3083,7 +3253,7 @@ var WorkItemsScreen = {
     // -- State --
     '<template v-if="rowMenu.kind===\'state\'">' +
     '<div class="py-1">' +
-    '<button v-for="s in states" :key="s.id" type="button" @click="setRowState(s)" class="w-full text-left flex items-center gap-2 px-2.5 h-8 hover:bg-hover text-[13px] text-ink">' +
+    '<button v-for="s in vocab.states" :key="s.id" type="button" @click="setRowState(s)" class="w-full text-left flex items-center gap-2 px-2.5 h-8 hover:bg-hover text-[13px] text-ink">' +
     '<span class="grid place-items-center" v-html="stateIcon(s)"></span><span class="flex-1 truncate">{{ s.name }}</span>' +
     '<span v-if="rowMenu.item && rowMenu.item.state_id===s.id" class="text-brand shrink-0">' + wiIcon('check', 15) + '</span>' +
     '</button></div></template>' +

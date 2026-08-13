@@ -137,19 +137,26 @@ return [
      *
      * `status` here is the DEFAULT. Feature-gated tabs are resolved per project by
      * ProjectNavigation::tabs() — Cycles becomes functional where the project has the feature
-     * on and disappears where it does not (Cycles §3.2.3/§3.2.4). The rest render a Coming
-     * Soon page but stay visible so the information architecture is legible.
+     * on and disappears where it does not (Cycles §3.2.3/§3.2.4).
+     *
+     * Settings is deliberately NOT in this list. It is a dropdown rather than a page, and its
+     * route takes a `section`, so it is rendered directly by partials/project-tabs — every key
+     * here is resolved with `route('projects.'.$key, $project)`, which a section-less route
+     * name cannot satisfy.
      */
     'workspace_tabs' => [
-        ['key' => 'overview', 'label' => 'Overview', 'status' => 'soon'],
+        // Every tab links to a real screen. The four that used to carry `soon` — Epics,
+        // Cycles, Modules, Pages — have had their own controllers and routes for some time;
+        // the status was simply never updated, so the bar went on advertising built features
+        // as unfinished. Whether each one is AVAILABLE is a separate question, answered per
+        // project by ProjectNavigation::tabs() from the feature flags.
+        ['key' => 'overview', 'label' => 'Overview', 'status' => 'active'],
         ['key' => 'work-items', 'label' => 'Work items', 'status' => 'active'],
-        // Resolved per project — see ProjectNavigation::tabs().
-        ['key' => 'epics', 'label' => 'Epics', 'status' => 'soon'],
-        ['key' => 'cycles', 'label' => 'Cycles', 'status' => 'soon'],
-        ['key' => 'modules', 'label' => 'Modules', 'status' => 'soon'],
-        // Resolved per project, like Epics/Cycles/Modules/Pages — see ProjectNavigation::tabs().
+        ['key' => 'epics', 'label' => 'Epics', 'status' => 'active'],
+        ['key' => 'cycles', 'label' => 'Cycles', 'status' => 'active'],
+        ['key' => 'modules', 'label' => 'Modules', 'status' => 'active'],
         ['key' => 'views', 'label' => 'Views', 'status' => 'active'],
-        ['key' => 'pages', 'label' => 'Pages', 'status' => 'soon'],
+        ['key' => 'pages', 'label' => 'Pages', 'status' => 'active'],
     ],
 
     /**
@@ -183,6 +190,13 @@ return [
 
     /** Page size for the work item list. */
     'work_item_page_size' => 250,
+
+    /**
+     * How far back Your Work's Activity tab reads. Shorter than the work item page size on
+     * purpose: it is a record of what you have been doing lately, not an audit log — that
+     * lives on each work item, in full, and is never trimmed.
+     */
+    'your_work_activity_size' => 100,
 
     /**
      * Rows per request for a View's grid (Views §24).
@@ -277,6 +291,19 @@ return [
             'default' => false,
             'section' => 'views',
             'confirm_disable' => true,
+        ],
+        'milestones' => [
+            'label' => 'Milestones',
+            'singular' => 'Milestone',
+            'description' => 'Track dated checkpoints for this project and see them alongside the overview.',
+            'default' => false,
+            'section' => 'milestones',
+            'confirm_disable' => true,
+            // Unlike Cycles/Modules/Epics, whose records stay readable for historical
+            // reference when the feature is switched off, there is nothing yet to read — so
+            // the segment goes entirely rather than pointing at an empty screen. Same reason
+            // Pages carries this flag (Pages §5).
+            'hides_when_disabled' => true,
         ],
         'estimates' => [
             'label' => 'Estimation',

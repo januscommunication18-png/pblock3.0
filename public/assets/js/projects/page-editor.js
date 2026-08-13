@@ -52,7 +52,17 @@ var PgEditor = {
      * CSS from the app's: nothing in tailwind.css can reach inside and restyle a user's
      * document, and nothing the document carries can leak out onto the app.
      */
-    documentView: { type: Boolean, default: true }
+    documentView: { type: Boolean, default: true },
+    /**
+     * A trimmed toolbar, as Jodit's `buttons` string.
+     *
+     * Empty means Jodit's own full set, which is what Pages wants — a page is a document and
+     * gets the document's tools. A host embedding this as a FIELD rather than a surface (the
+     * draft description) passes a short list instead, so the control is the size of the job.
+     * Set for every breakpoint, because Jodit otherwise falls back to the full set as the
+     * viewport narrows and the toolbar grows rather than shrinks.
+     */
+    buttons: { type: String, default: '' }
   },
   emits: ['update:modelValue', 'blur'],
   data: function () {
@@ -84,6 +94,10 @@ var PgEditor = {
       defaultActionOnPaste: 'insert_clear_html',
       uploader: this.uploaderConfig()
     };
+
+    if (this.buttons) {
+      options.buttons = options.buttonsMD = options.buttonsSM = options.buttonsXS = this.buttons;
+    }
 
     if (this.documentView) {
       options.iframe = true;

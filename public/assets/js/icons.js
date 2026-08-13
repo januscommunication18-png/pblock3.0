@@ -352,6 +352,10 @@ var PB_ICONS = {
 "fa": "tag",
 "svg": "<path d=\"M3 12l7-7h7a2 2 0 012 2v7l-7 7-9-9z\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linejoin=\"round\"/><circle cx=\"14.5\" cy=\"9.5\" r=\"1.3\" fill=\"currentColor\"/>"
     },
+    "arrow-up-from-bracket": {
+"fa": "arrow-up-from-bracket",
+"svg": "<path d=\"M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3a2 2 0 002 2h12a2 2 0 002-2v-3\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>"
+    },
     "trash": {
 "fa": "trash",
 "svg": "<path d=\"M4 7h16M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2M6 7l1 13a1 1 0 001 1h8a1 1 0 001-1l1-13\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>"

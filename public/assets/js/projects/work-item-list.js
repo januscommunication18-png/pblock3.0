@@ -40,7 +40,21 @@ var WiList = {
      * When false the label chip leaves the row entirely — including its empty placeholder,
      * which would otherwise offer a field the project has turned off.
      */
-    labelsEnabled: { type: Boolean, default: true }
+    labelsEnabled: { type: Boolean, default: true },
+    /**
+     * One group holding everything, instead of one per state.
+     *
+     * For a list that spans projects (Your Work): two projects' "In Progress" are different
+     * state rows, so grouping by state would repeat the same heading once per project.
+     *
+     * This is a real mode rather than "what happens when `states` is empty", because empty
+     * states used to mean the grid rendered NOTHING: `groupValues` is Tabulator's whitelist of
+     * groups to draw, it was built from `states`, and with none of them every row belonged to
+     * a group that was not on the list.
+     */
+    flat: { type: Boolean, default: false },
+    /** The single group's heading in `flat` mode. */
+    flatLabel: { type: String, default: 'All work items' }
   },
   emits: ['open', 'chip', 'group-add', 'remove'],
   data: function () {
@@ -56,6 +70,8 @@ var WiList = {
   computed: {
     /** Group order: the project's own state order, with "no state" last. */
     groupValues: function () {
+      if (this.flat) return [WI_FLAT_GROUP];
+
       return this.states.map(function (s) { return String(s.id); }).concat([WI_NO_STATE]);
     },
     statesById: function () {
@@ -204,12 +220,21 @@ var WiList = {
 
     /** One card as the grid's row shape — the group key is derived, not stored. */
     row: function (i) {
+      if (this.flat) return Object.assign({}, i, { gkey: WI_FLAT_GROUP });
+
       var stateId = i.state_id || (i.state ? i.state.id : null);
 
       return Object.assign({}, i, { gkey: stateId ? String(stateId) : WI_NO_STATE });
     },
 
     groupHeader: function (value, count) {
+      if (this.flat) {
+        return '<span class="wi-chevron grid place-items-center" style="color:#9ca3af">' + wiIcon('chevron-right', 14) + '</span>' +
+          '<span class="grid place-items-center">' + wiStateIcon(null) + '</span>' +
+          '<span style="color:#23272f;font-weight:600">' + wiEsc(this.flatLabel) + '</span>' +
+          '<span style="color:#6b7280;font-weight:600">' + count + '</span>';
+      }
+
       var state = this.statesById[String(value)] || null;
       var add = this.canAdd
         // h-7 w-7 and rounded-md to match wiRowMenuButton exactly: this "+" and a row's ⋯ line

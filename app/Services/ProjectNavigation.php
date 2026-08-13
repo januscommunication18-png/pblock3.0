@@ -6,6 +6,7 @@ use App\Models\Project;
 use App\Models\ProjectMember;
 use App\Models\User;
 use App\Models\WorkspaceMembership;
+use Illuminate\Database\Eloquent\Builder;
 
 /**
  * The sidebar's project list (partials/app-sidebar).
@@ -80,17 +81,7 @@ class ProjectNavigation
      */
     public function sidebarProjects(User $user): array
     {
-        $role = $this->workspaceRole($user);
-
-        $query = Project::query()->where('status', Project::STATUS_ACTIVE)->latest();
-
-        // §38: only Workspace Owner/Admin see every project; everyone else sees exactly the
-        // projects they were explicitly added to. Public visibility no longer grants access.
-        if (! in_array($role, [WorkspaceMembership::ROLE_OWNER, 'admin'], true)) {
-            $query->whereIn('id', ProjectMember::query()->where('user_id', $user->id)->select('project_id'));
-        }
-
-        return $query->limit(50)->get()
+        return $this->visible($user)->limit(50)->get()
             ->map(fn (Project $p) => [
                 'id' => $p->id,
                 'name' => $p->name,
@@ -101,6 +92,30 @@ class ProjectNavigation
                 'work_items_url' => route('projects.work-items', $p->id),
             ])
             ->all();
+    }
+
+    /**
+     * The active projects this user may open, as a query.
+     *
+     * Extracted from sidebarProjects because "which projects can this person see" is now asked
+     * by more than the sidebar — Your Work lists work items ACROSS projects and has to draw the
+     * same line, or it would become a way to read items from a project the user was never
+     * added to. One definition, two callers.
+     *
+     * §38: only Workspace Owner/Admin see every project; everyone else sees exactly the ones
+     * they were explicitly added to. Public visibility no longer grants access.
+     *
+     * @return Builder<Project>
+     */
+    public function visible(User $user)
+    {
+        $query = Project::query()->where('status', Project::STATUS_ACTIVE)->latest();
+
+        if (! in_array($this->workspaceRole($user), [WorkspaceMembership::ROLE_OWNER, 'admin'], true)) {
+            $query->whereIn('id', ProjectMember::query()->where('user_id', $user->id)->select('project_id'));
+        }
+
+        return $query;
     }
 
     private function workspaceRole(User $user): ?string

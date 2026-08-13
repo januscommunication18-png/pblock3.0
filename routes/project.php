@@ -8,15 +8,16 @@ use App\Http\Controllers\Project\PageController;
 use App\Http\Controllers\Project\ProjectController;
 use App\Http\Controllers\Project\ProjectLabelController;
 use App\Http\Controllers\Project\ProjectMembersController;
+use App\Http\Controllers\Project\ProjectOverviewController;
 use App\Http\Controllers\Project\ProjectSettingsController;
 use App\Http\Controllers\Project\ProjectStateController;
 use App\Http\Controllers\Project\ProjectViewColumnController;
 use App\Http\Controllers\Project\ProjectViewController;
 use App\Http\Controllers\Project\ProjectViewGridController;
-use App\Http\Controllers\Project\ProjectWorkspaceController;
 use App\Http\Controllers\Project\WorkItemCollaborationController;
 use App\Http\Controllers\Project\WorkItemController;
 use App\Http\Controllers\Project\WorkItemMediaController;
+use App\Http\Controllers\Project\WorkItemReactionController;
 use App\Http\Controllers\Project\WorkItemStructureController;
 use App\Models\Project;
 use Illuminate\Support\Facades\Route;
@@ -124,10 +125,20 @@ Route::middleware(['auth', 'workspace.tenancy'])
 
         Route::get('/{project}/work-items/{workItem}/activity', [WorkItemController::class, 'activity'])
             ->whereNumber(['project', 'workItem'])->name('work-items.activity');
+        // Detail toolbar: vote and subscribe (POC html/work-items.html). Gated on VIEWING the
+        // item, not editing it — see WorkItemReactionController.
+        Route::post('/{project}/work-items/{workItem}/vote', [WorkItemReactionController::class, 'vote'])
+            ->whereNumber(['project', 'workItem'])->middleware('throttle:60,1')->name('work-items.vote');
+        Route::post('/{project}/work-items/{workItem}/subscribe', [WorkItemReactionController::class, 'subscribe'])
+            ->whereNumber(['project', 'workItem'])->middleware('throttle:60,1')->name('work-items.subscribe');
         // Row actions + inline chip edits (§4.2/§4.4). `show` is the stable per-item URL that
         // "Open in new tab" and "Copy link" resolve to.
         Route::get('/{project}/work-items/{workItem}', [WorkItemController::class, 'show'])
             ->whereNumber(['project', 'workItem'])->name('work-items.show');
+        // The same detail without the app chrome, for the slide-over panel the Views grid
+        // opens a work item into (Views §7.3). Same guard as `show`.
+        Route::get('/{project}/work-items/{workItem}/frame', [WorkItemController::class, 'frame'])
+            ->whereNumber(['project', 'workItem'])->name('work-items.frame');
         Route::patch('/{project}/work-items/{workItem}', [WorkItemController::class, 'update'])
             ->whereNumber(['project', 'workItem'])->name('work-items.update');
         Route::post('/{project}/work-items/{workItem}/archive', [WorkItemController::class, 'archive'])
@@ -277,10 +288,15 @@ Route::middleware(['auth', 'workspace.tenancy'])
         Route::delete('/{project}/views/{view}', [ProjectViewController::class, 'destroy'])
             ->whereNumber(['project', 'view'])->name('views.destroy');
 
-        Route::get('/{project}/{tab}', [ProjectWorkspaceController::class, 'tab'])
-            ->whereNumber('project')
-            ->whereIn('tab', ['overview'])
-            ->name('workspace.tab');
+        // ---- Overview + Milestones (Project Overview §1).
+        //      Overview was the last tab still resolving to Coming Soon through the catch-all
+        //      below; it has a real screen now, so it is routed ahead of it like every other
+        //      built tab. Milestones is the same screen's second segment and 404s while the
+        //      feature is off, so the URL and the segment agree.
+        Route::get('/{project}/overview', [ProjectOverviewController::class, 'show'])
+            ->whereNumber('project')->name('overview');
+        Route::get('/{project}/milestones', [ProjectOverviewController::class, 'milestones'])
+            ->whereNumber('project')->name('milestones');
 
         // ---- Estimation configuration (§10/§20-§23). Project Admin only; every action
         //      re-checks it, because the routes existing is not permission to use them.

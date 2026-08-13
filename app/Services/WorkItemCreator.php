@@ -6,6 +6,7 @@ use App\Models\Project;
 use App\Models\ProjectItemState;
 use App\Models\User;
 use App\Models\WorkItem;
+use App\Models\WorkItemMedia;
 use App\Models\WorkItemTransition;
 use App\Models\Workspace;
 use Illuminate\Support\Facades\DB;
@@ -104,6 +105,95 @@ class WorkItemCreator
 
             return $item;
         });
+    }
+
+    /**
+     * Turn a draft into a real work item (Drafts §5, decision D-D5).
+     *
+     * Deliberately here rather than in the drafts controller or a service of its own: this
+     * class owns the workspace ID counter, and gap-free numbering survives exactly as long as
+     * `nextNumber` has one caller holding one row lock. Publishing allocates the number the
+     * draft never took, fills in the three columns the draft left NULL, and clears the flag —
+     * after which the row is indistinguishable from one created directly.
+     *
+     * `created_by` is untouched: the person who wrote the draft is the creator, even if the
+     * clock says the item began today (§6).
+     *
+     * @param  array{state_id?:?int}  $data
+     */
+    public function publish(User $publisher, WorkItem $draft, Project $project, array $data = []): WorkItem
+    {
+        return DB::transaction(function () use ($publisher, $draft, $project, $data) {
+            $sequence = $this->nextNumber($project);
+
+            // The state is validated against the project by PublishDraftRequest; a draft has
+            // none of its own, because it had no project to take one from (D-D3).
+            $state = ! empty($data['state_id']) ? ProjectItemState::find($data['state_id']) : null;
+
+            $draft->forceFill([
+                'project_id' => $project->id,
+                'is_draft' => false,
+                'sequence_no' => $sequence,
+                'identifier' => (string) $sequence,
+                'state_id' => $state?->id,
+            ])->save();
+
+            $this->rehomeMedia($draft, $project);
+
+            // Inside the transaction, as in create(): the item's history begins the moment it
+            // became real, and a work item must never exist without its creation entry (§6).
+            $this->activity->created($draft, $publisher);
+
+            WorkItemTransition::create([
+                'project_id' => $draft->project_id,
+                'work_item_id' => $draft->id,
+                'from_state_id' => null,
+                'to_state_id' => $state?->id,
+                'from_state_name' => null,
+                'to_state_name' => $state?->name,
+                'actor_id' => $publisher->id,
+                'transitioned_at' => now(),
+            ]);
+
+            return $draft;
+        });
+    }
+
+    /**
+     * Give the draft's images the project the draft just got (Drafts §5).
+     *
+     * A draft's uploads are project-less and readable only by their uploader, which is right
+     * while the draft is private and wrong the moment it is not: published, the description is
+     * something colleagues read, and every image in it would be a broken box to all of them.
+     *
+     * Which images? The ones the description actually **references**. Read out of the markup
+     * rather than from a draft-to-media link, because the markup is the only record of what
+     * survived editing — an image inserted and then deleted again should not follow the item
+     * into a project it never appeared in. The URL is not rewritten: it was baked into the
+     * HTML at upload time, and DraftMediaController::show keeps answering for a re-homed row.
+     *
+     * Scoped to this uploader's own project-less rows, so a crafted description quoting
+     * somebody else's draft media id cannot annex it.
+     */
+    private function rehomeMedia(WorkItem $draft, Project $project): void
+    {
+        // Built from the route itself rather than a hand-written path, so a change to the URL
+        // cannot quietly stop images being re-homed. The token survives preg_quote untouched.
+        $pattern = '#'.str_replace(
+            '__ID__',
+            '(\d+)',
+            preg_quote(route('drafts.media.show', ['media' => '__ID__']), '#')
+        ).'#';
+
+        if (! preg_match_all($pattern, (string) $draft->description, $matches)) {
+            return;
+        }
+
+        WorkItemMedia::query()
+            ->whereNull('project_id')
+            ->where('uploaded_by', $draft->created_by)
+            ->whereIn('id', array_unique($matches[1]))
+            ->update(['project_id' => $project->id, 'work_item_id' => $draft->id]);
     }
 
     /**

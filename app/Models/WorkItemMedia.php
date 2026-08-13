@@ -51,12 +51,25 @@ class WorkItemMedia extends Model
         return $this->belongsTo(User::class, 'uploaded_by');
     }
 
-    /** The authorized URL the editor embeds — never a direct path to the file on disk. */
+    /**
+     * The authorized URL the editor embeds — never a direct path to the file on disk.
+     *
+     * Project-less rows are a draft's images (drafts.md): they have no project route to be
+     * served from, so they get the workspace-level one, which authorizes on the uploader
+     * instead. That URL is baked into the description HTML at upload time and must keep
+     * resolving after the draft is published — which is why the drafts route stays valid for a
+     * row that later acquires a project, rather than being retired with the draft.
+     */
     public function url(): string
     {
-        return route('projects.work-items.media.show', [
-            'project' => $this->project_id,
-            'media' => $this->id,
-        ]);
+        return $this->project_id
+            ? route('projects.work-items.media.show', ['project' => $this->project_id, 'media' => $this->id])
+            : route('drafts.media.show', ['media' => $this->id]);
+    }
+
+    /** Uploaded from a draft — no project until the draft is published into one. */
+    public function isDraftMedia(): bool
+    {
+        return $this->project_id === null;
     }
 }

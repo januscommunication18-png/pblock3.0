@@ -38,35 +38,10 @@
       <button class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover" title="Inbox">{!! pb_icon('inbox', 17) !!}</button>
       <button class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover" title="Help">{!! pb_icon('circle-question', 17) !!}</button>
       <!-- UserMenu -->
-      <div class="relative ml-1">
-        <button id="user-btn" class="h-7 w-7 rounded-full bg-emerald-500 grid place-items-center text-white text-[11px] font-bold ring-2 ring-transparent focus:outline-none">{{ $user->initial() }}</button>
+      {{-- Account menu — the shared partial. This screen renders its own header, so it
+           opts in here rather than inheriting partials.app-topbar. --}}
+      @include('partials.account-menu')
 
-        <div id="user-menu" class="hidden absolute right-0 top-full mt-2 w-64 bg-white border border-line rounded-xl shadow-lg z-50 p-1.5">
-          <div class="relative rounded-lg overflow-hidden px-4 pt-7 pb-4 text-center" style="background-color:#9ca3af;">
-            <span class="h-14 w-14 rounded-full bg-brand text-white grid place-items-center text-[20px] font-semibold mx-auto shadow-sm">{{ $user->initial() }}</span>
-            <div class="text-[14px] font-semibold text-white mt-2.5 drop-shadow-sm">{{ $user->displayName() }}</div>
-            <div class="text-[12px] text-white/90 drop-shadow-sm">{{ $user->email }}</div>
-          </div>
-          <div class="pt-1.5">
-            <a href="{{ route('projects.index') }}?create=1" class="w-full text-left flex items-center gap-2.5 px-2.5 h-9 rounded-lg text-[13px] text-ink hover:bg-hover">
-              {!! pb_icon('grid', 16, 'text-sub') !!}
-              New project
-            </a>
-            <a href="{{ route('workspaces.create') }}" class="w-full text-left flex items-center gap-2.5 px-2.5 h-9 rounded-lg text-[13px] text-ink hover:bg-hover">
-              {!! pb_icon('plus', 16, 'text-sub') !!}
-              Create workspace
-            </a>
-            <a href="{{ route('settings.general') }}" class="w-full text-left flex items-center gap-2.5 px-2.5 h-9 rounded-lg text-[13px] text-ink hover:bg-hover">
-              {!! pb_icon('gear-simple', 16, 'text-sub') !!}
-              Workspace settings
-            </a>
-            <button type="submit" form="logout-form" class="w-full text-left flex items-center gap-2.5 px-2.5 h-9 rounded-lg text-[13px] text-ink hover:bg-hover">
-              {!! pb_icon('right-from-bracket', 16, 'text-sub') !!}
-              Sign out
-            </button>
-          </div>
-        </div>
-      </div>
     </div>
   </header>
 

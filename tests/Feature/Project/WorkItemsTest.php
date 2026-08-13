@@ -61,15 +61,14 @@ class WorkItemsTest extends ProjectTestCase
         [$owner, $ws] = $this->owner();
         $project = $this->makeProject($owner, $ws, ['identifier' => 'TESTI']);
 
-        // Cycles, Modules, Epics, Pages and Views are deliberately not in this list: all five
-        // are built features with their own controllers, routed ahead of the Coming Soon
-        // catch-all. Overview is the last placeholder.
-        foreach (['overview'] as $tab) {
-            $this->actingAs($owner)
-                ->get(route('projects.workspace.tab', ['project' => $project->id, 'tab' => $tab]))
-                ->assertOk()
-                ->assertSee('coming soon', false);
-        }
+        // Every tab is a built feature now — Overview was the last placeholder and has its own
+        // screen, so the Coming Soon catch-all is gone entirely. What is left worth asserting
+        // is that each tab resolves to a real page rather than 404ing.
+        $this->actingAs($owner)
+            ->get(route('projects.overview', $project))
+            ->assertOk()
+            ->assertSee('Progress', false)
+            ->assertDontSee('coming soon', false);
 
         // The active tab must not resolve through the Coming Soon route.
         $this->actingAs($owner)
@@ -351,22 +350,31 @@ class WorkItemsTest extends ProjectTestCase
         [$owner, $ws] = $this->owner();
         $project = $this->makeProject($owner, $ws, ['identifier' => 'TESTI']);
 
-        // The ⋯ menu renders on every workspace tab, not just Work Items.
+        // The Settings menu renders on every workspace tab, not just Work Items. It replaced
+        // the ⋯ actions menu, whose only live item was this same link — the other three were
+        // Soon placeholders, so the control existed almost entirely to hide one link.
         foreach ([
             route('projects.work-items', $project),
-            route('projects.workspace.tab', ['project' => $project->id, 'tab' => 'overview']),
+            route('projects.overview', $project),
         ] as $url) {
-            $response = $this->actingAs($owner)->get($url)->assertOk()->assertSee('Project actions', false);
+            $response = $this->actingAs($owner)->get($url)->assertOk()->assertSee('Project settings', false);
 
-            foreach (['Add to favorites', 'Archives', 'Settings', 'Leave project'] as $item) {
+            // The four project actions the â¯ menu used to carry, moved intact.
+            foreach (['Project settings', 'Add to favourites', 'Leave project', 'Archive project'] as $item) {
                 $response->assertSee($item, false);
             }
 
-            // Settings is the one live action this phase.
+            // Project settings goes to Project > General.
             $response->assertSee(
                 'href="'.e(route('projects.settings', ['project' => $project->id, 'section' => 'general'])).'"',
                 false
             );
+
+            // Archive is the one live action beside it; the other two are marked Soon.
+            $response->assertSee('data-project-archive="'.e(route('projects.archive', $project->id)).'"', false);
+
+            // …and the ⋯ glyph it replaced is gone from beside the project name.
+            $response->assertDontSee('Project actions', false);
         }
     }
 
@@ -389,15 +397,25 @@ class WorkItemsTest extends ProjectTestCase
         // The tabs <nav> opening tag sits just before its aria-label.
         $navAt = (int) strrpos(substr($html, 0, $tabsAt), '<nav');
 
-        // The ⋯ menu is absolutely positioned below a 48px row. If that row scrolls it
+        // The Settings menu is absolutely positioned below a 48px row. If that row scrolls it
         // becomes a clipping container and the menu silently never appears — so the row must
-        // not scroll, and only the tab list may.
+        // not scroll, and only the tab list may. The menu therefore also sits OUTSIDE the
+        // scrolling <nav>, which this asserts by requiring it after the tab list closes.
+        // Asserted on the ROW'S OWN opening tag, not on everything between the row and the
+        // menu: the tab list in between legitimately scrolls, and now that the menu sits after
+        // it, a span-based check would read the nav's `overflow-x-auto` as the row's.
+        $rowTag = substr($html, $rowAt, (int) strpos($html, '>', $rowAt) - $rowAt);
         $this->assertStringNotContainsString(
             'overflow-x-auto',
-            substr($html, $rowAt, $detailsAt - $rowAt),
-            'The project header row must not be a scroll container — it would clip the ⋯ menu.'
+            $rowTag,
+            'The project header row must not be a scroll container — it would clip the Settings menu.'
         );
         $this->assertStringContainsString('overflow-x-auto', substr($html, $navAt, $tabsAt - $navAt));
+        $this->assertGreaterThan(
+            (int) strpos($html, '</nav>', $navAt),
+            $detailsAt,
+            'The Settings menu must sit outside the scrolling tab list, or the nav clips it.'
+        );
 
         // `display:grid` / `display:flex` on a <summary> stops WebKit toggling the disclosure.
         $summary = substr($html, $summaryAt, (int) strpos($html, '</summary>', $summaryAt) - $summaryAt);
@@ -672,7 +690,9 @@ class WorkItemsTest extends ProjectTestCase
         // link, and the settings screen rejects them anyway.
         $this->actingAs($member)->get(route('projects.work-items', $project))
             ->assertOk()
-            ->assertSee('Add to favorites', false)
+            // The whole Settings menu is absent, not merely its items: a menu that opens onto
+            // nothing you may use is worse than no menu.
+            ->assertDontSee('Project settings', false)
             ->assertDontSee(route('projects.settings', ['project' => $project->id, 'section' => 'general']), false);
 
         $this->actingAs($member)
@@ -1106,7 +1126,7 @@ class WorkItemsTest extends ProjectTestCase
         // 404, never 403: do not reveal that an inaccessible project exists (spec §12).
         $this->actingAs($outsider)->get(route('projects.work-items', $project))->assertNotFound();
         $this->actingAs($outsider)
-            ->get(route('projects.workspace.tab', ['project' => $project->id, 'tab' => 'overview']))
+            ->get(route('projects.overview', $project))
             ->assertNotFound();
     }
 }

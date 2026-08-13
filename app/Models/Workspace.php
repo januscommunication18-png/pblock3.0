@@ -41,6 +41,12 @@ class Workspace extends BaseTenant
             'created_by',
             // Counter behind the workspace-unique work item ID; allocated by WorkItemCreator.
             'work_item_sequence',
+            // Language & Time (Account §2). Declared here for the reason the docblock gives:
+            // left off this list, VirtualColumn would quietly fold them into `data` instead of
+            // the real columns the migration just added, and the columns would stay null.
+            'language',
+            'first_day_of_week',
+            'weekend_days',
         ];
     }
 
@@ -49,6 +55,9 @@ class Workspace extends BaseTenant
         return [
             'data' => 'array',
             'work_item_sequence' => 'integer',
+            // ISO-8601 day numbers, 1 = Monday … 7 = Sunday.
+            'weekend_days' => 'array',
+            'first_day_of_week' => 'integer',
         ];
     }
 

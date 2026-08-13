@@ -510,8 +510,16 @@
   }
 
   // ================= boot =================
-  function boot(name, component) {
-    var root = document.getElementById('settings-root');
+  /**
+   * Mount a screen component, with the shared components and $pb registered on it.
+   *
+   * `options.root` names the element to mount into, defaulting to the screen root. The account
+   * modal uses it: that dialog lives in the topbar, outside #settings-root, and its Preference
+   * tab needs <pb-combo> — which is registered here and nowhere else. Reaching it through this
+   * function is what stops a second searchable combobox being written for that one panel.
+   */
+  function boot(name, component, options) {
+    var root = document.getElementById((options && options.root) || 'settings-root');
     if (!root) return;
     if (!window.Vue) {
       // The Vue runtime failed to load (blocked CDN, offline, ad-blocker). Surface
@@ -524,12 +532,6 @@
     var bootstrap = {};
     try { bootstrap = JSON.parse(root.getAttribute('data-bootstrap') || '{}'); } catch (e) {}
     var app = Vue.createApp(component, { bootstrap: bootstrap });
-    // Web components are elements, not Vue components. Without this Vue tries to resolve
-    // <revo-grid> (the Views grid) as one, warns, and — more to the point — treats what it
-    // renders as its own, which fights the element's internal rendering.
-    app.config.compilerOptions.isCustomElement = function (tag) {
-      return tag.indexOf('revo-') === 0 || tag.indexOf('revogr-') === 0;
-    };
     app.config.globalProperties.$pb = { api: api, withId: withId, firstError: firstError, fieldErrors: fieldErrors, toast: toast };
     registerShared(app);
     tooltips();

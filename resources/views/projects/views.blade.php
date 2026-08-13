@@ -21,12 +21,14 @@
        places. Only the chips: the Views grid is RevoGrid, so Tabulator is not loaded here. --}}
   @include('partials.work-item-chips')
 
-  {{-- RevoGrid, vendored (see the vendor README for why the whole directory). A module, because
-       it is a Stencil build that lazily imports its own chunks relative to this URL. Nothing is
-       fetched at runtime from anywhere but this origin. --}}
-  <script type="module" src="{{ pb_asset('assets/vendor/revogrid/revo-grid.esm.js') }}"></script>
+  {{-- DataTables (v3, MIT, vendored — see the vendor README). Dependency-free: jQuery was only
+       required before v3. A plain script, not a module: it exposes `window.DataTable`. --}}
+  <link rel="stylesheet" href="{{ pb_asset('assets/vendor/datatables/datatables.min.css') }}" />
+  <script src="{{ pb_asset('assets/vendor/datatables/datatables.min.js') }}"></script>
 
-  {{-- Loaded AFTER work-items.css: it themes RevoGrid to match the app. --}}
+  {{-- AFTER datatables.min.css, so the grid skin wins on order rather than on specificity.
+       Loading these the other way round is the same trap that turned the Cycles group rows
+       grey, and a test asserts this order. --}}
   <link rel="stylesheet" href="{{ pb_asset('assets/css/views.css') }}" />
   <script defer src="{{ pb_asset('assets/js/projects/view-grid.js') }}"></script>
   <script defer src="{{ pb_asset('assets/js/projects/views.js') }}"></script>

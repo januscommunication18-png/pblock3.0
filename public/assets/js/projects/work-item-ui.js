@@ -49,6 +49,8 @@ var WI_PRI = {
 };
 var WI_CAL = '' + wiIcon('calendar', 13, 'text-faint') + '';
 var WI_NO_STATE = 'none';
+/** The single group key a <wi-list> in `flat` mode files every row under. */
+var WI_FLAT_GROUP = '__all__';
 
 // Escape user content before it reaches a Tabulator formatter (formatters return raw HTML).
 function wiEsc(s) {
@@ -133,15 +135,31 @@ function wiMetaCell(d, opts) {
       (shrinkable ? 'min-w-0' : 'shrink-0') + ' ' + (extra || 'text-ink') + '">' + inner + '</button>';
   };
 
-  var out = [
+  var out = [];
+
+  // Which project this row came from — only on a list that mixes them (Your Work). Never a
+  // button, whatever `edit` says: moving a work item between projects is not a chip's job,
+  // and the ID, the state and every label on the row belong to the project it is in.
+  //
+  // FIRST in the cluster and carrying the ml-auto, so it reads as the row's origin rather
+  // than as another editable property, and so the cluster still overflows rightward.
+  if (d.project) {
+    out.push(wiChip(
+      '<span class="shrink-0">' + (d.project.emoji || '📁') + '</span>' + wiEsc(d.project.name),
+      'text-sub ml-auto', 'Project: ' + d.project.name, true
+    ));
+  }
+
+  out.push(
     // ml-auto on the first chip rather than justify-end on the container: with justify-end an
     // over-full cluster overflows to the LEFT, so the state chip was the one sliced in half.
     // An auto margin collapses to 0 when there is no room, and the overflow goes right.
-    chip(wiStateIcon(d.state) + wiEsc(d.state ? d.state.name : 'No state'), 'state', 'text-ink ml-auto',
+    chip(wiStateIcon(d.state) + wiEsc(d.state ? d.state.name : 'No state'), 'state',
+      'text-ink' + (d.project ? '' : ' ml-auto'),
       (edit ? 'Change state — ' : 'State: ') + (d.state ? d.state.name : 'No state')),
     chip(pri.icon + pri.label, 'priority', pri.cls,
       (edit ? 'Change priority — ' : 'Priority: ') + pri.label)
-  ];
+  );
 
   // Dates: a set date shows its chip; an empty one shows a compact calendar button so it can
   // still be filled in from the row.
