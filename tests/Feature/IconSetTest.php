@@ -74,6 +74,58 @@ class IconSetTest extends TestCase
         $this->assertSame([], $unknown, "Icons used but not registered:\n".implode("\n", $unknown));
     }
 
+    public function test_the_generated_icon_script_matches_the_registry(): void
+    {
+        // public/assets/js/icons.js is GENERATED from the registry by `php artisan icons:build`,
+        // and every icon drawn by a Vue screen comes from it rather than from PHP. Adding an
+        // entry without regenerating leaves `wiIcon('name')` returning nothing, so the control
+        // renders with its label and no glyph — which is how the work item toolbar's vote
+        // arrows first shipped invisible. Blade is covered by the test above; this is the
+        // other half.
+        $script = (string) file_get_contents(public_path('assets/js/icons.js'));
+
+        $missing = [];
+        foreach (array_keys(IconRegistry::all()) as $name) {
+            if (! str_contains($script, '"'.$name.'"')) {
+                $missing[] = $name;
+            }
+        }
+
+        $this->assertSame([], $missing, "icons.js is stale — run `php artisan icons:build`. Missing:\n".implode("\n", $missing));
+    }
+
+    public function test_every_icon_used_by_a_vue_screen_is_registered(): void
+    {
+        $unknown = [];
+
+        foreach ($this->jsFiles() as $file) {
+            preg_match_all("/wiIcon\('([^']+)'/", (string) file_get_contents($file), $m);
+
+            foreach ($m[1] as $name) {
+                if (! IconRegistry::has($name)) {
+                    $unknown[] = str_replace(base_path().'/', '', $file)." → {$name}";
+                }
+            }
+        }
+
+        $this->assertSame([], $unknown, "Icons used but not registered:\n".implode("\n", $unknown));
+    }
+
+    /** @return array<int, string> */
+    private function jsFiles(): array
+    {
+        $files = [];
+        $dir = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(public_path('assets/js')));
+
+        foreach ($dir as $file) {
+            if ($file->isFile() && $file->getExtension() === 'js' && ! str_contains($file->getPathname(), '/vendor/')) {
+                $files[] = $file->getPathname();
+            }
+        }
+
+        return $files;
+    }
+
     public function test_an_unknown_icon_is_loud_in_development(): void
     {
         config()->set('app.debug', true);

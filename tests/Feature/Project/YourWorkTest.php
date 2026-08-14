@@ -2,8 +2,10 @@
 
 namespace Tests\Feature\Project;
 
+use App\Models\ProjectItemState;
 use App\Models\ProjectMember;
 use App\Models\WorkItem;
+use App\Services\ProjectItemStateProvisioner;
 use App\Services\WorkItemCreator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -40,13 +42,69 @@ class YourWorkTest extends ProjectTestCase
         }
     }
 
-    public function test_summary_is_marked_coming_soon_and_carries_no_list(): void
+    public function test_summary_carries_its_own_payload_and_no_list(): void
     {
         [$owner] = $this->owner();
 
         $this->actingAs($owner)->get(route('your-work'))
             ->assertOk()
-            ->assertViewHas('bootstrap', fn (array $b) => $b['tab'] === 'summary' && $b['workItems'] === null);
+            ->assertViewHas('bootstrap', fn (array $b) => $b['tab'] === 'summary'
+                && $b['workItems'] === null
+                && $b['summary'] !== null);
+    }
+
+    public function test_summary_counts_the_three_totals_and_breaks_down_assigned_work(): void
+    {
+        [$owner, $ws] = $this->owner();
+        $project = $this->makeProject($owner, $ws);
+        // States are provisioned on first use, so seed them before asking for one.
+        $state = $ws->run(function () use ($project) {
+            app(ProjectItemStateProvisioner::class)->for($project);
+
+            return ProjectItemState::where('project_id', $project->id)->where('group', 'started')->firstOrFail();
+        });
+
+        // Two assigned (one Working on, one with no state), one created for somebody else.
+        $this->makeItem($ws, $owner, $project, ['title' => 'A', 'assignee_ids' => [$owner->id], 'priority' => 'urgent', 'state_id' => $state->id]);
+        $this->makeItem($ws, $owner, $project, ['title' => 'B', 'assignee_ids' => [$owner->id], 'priority' => 'low']);
+        $this->makeItem($ws, $owner, $project, ['title' => 'C', 'priority' => 'urgent']);
+
+        $summary = $this->bootstrap($owner, 'summary')['summary'];
+
+        $this->assertSame(3, $summary['overview']['created']);
+        $this->assertSame(2, $summary['overview']['assigned']);
+        // Everything below Overview describes ASSIGNED work only (D-Y5), so the item created
+        // for somebody else is counted above and absent from both breakdowns.
+        $this->assertSame(2, $summary['total']);
+
+        $workload = collect($summary['workload'])->keyBy('key');
+        $this->assertSame(1, $workload['started']['count']);
+        $this->assertSame(1, $workload['backlog']['count'], 'An item with no state belongs in Backlog.');
+        $this->assertSame(0, $workload['completed']['count']);
+
+        $priority = collect($summary['byPriority'])->keyBy('key');
+        $this->assertSame(1, $priority['urgent']['count']);
+        $this->assertSame(1, $priority['low']['count']);
+        $this->assertSame(0, $priority['medium']['count']);
+    }
+
+    public function test_summary_keeps_every_slot_even_at_zero(): void
+    {
+        [$owner] = $this->owner();
+
+        $summary = $this->bootstrap($owner, 'summary')['summary'];
+
+        // A chart whose categories appear and vanish with the data cannot be compared with
+        // the same chart yesterday, so empty slots stay — with their label and colour.
+        $this->assertCount(5, $summary['workload']);
+        $this->assertCount(5, $summary['byPriority']);
+        $this->assertSame(0, $summary['total']);
+
+        foreach (array_merge($summary['workload'], $summary['byPriority']) as $slot) {
+            $this->assertSame(0, $slot['count']);
+            $this->assertNotEmpty($slot['label']);
+            $this->assertMatchesRegularExpression('/^#[0-9A-Fa-f]{6}$/', $slot['color']);
+        }
     }
 
     public function test_an_unknown_tab_is_not_found(): void

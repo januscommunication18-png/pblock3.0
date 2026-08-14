@@ -513,7 +513,8 @@ PB.boot('project-epics', {
     '<div class="p-4 sm:p-6 max-w-[820px] mx-auto w-full">' +
     '<p v-if="!activity.length" class="text-[13px] text-sub text-center py-10">Nothing has happened to this epic yet.</p>' +
     '<div v-for="a in activity" :key="a.id" class="flex items-start gap-3 py-2.5 border-b border-line last:border-0">' +
-    '<span class="h-6 w-6 rounded-full overflow-hidden grid place-items-center bg-slate-600 text-white text-[10px] font-bold shrink-0 mt-0.5">' +
+    '<span class="h-6 w-6 rounded-full overflow-hidden grid place-items-center text-white text-[10px] font-bold shrink-0 mt-0.5" ' +
+    ':style="{ background: $pb.avatarColor(a.actor) }">' +
     '<img v-if="a.actor && a.actor.avatar_url" :src="a.actor.avatar_url" alt="" class="h-full w-full object-cover" />' +
     '<span v-else>{{ a.actor ? a.actor.initial : \'?\' }}</span></span>' +
     '<div class="min-w-0 flex-1">' +
@@ -583,7 +584,7 @@ PB.boot('project-epics', {
     '<span class="flex-1 h-1.5 rounded-full bg-line overflow-hidden">' +
     '<span class="block h-full rounded-full" :style="{width: percent(e) + \'%\', background: \'#22c55e\'}"></span></span>' +
     '<span class="text-[11px] text-sub w-8 text-right">{{ percent(e) }}%</span></span>' +
-    '<span v-if="e.lead" class="h-6 w-6 rounded-full overflow-hidden grid place-items-center bg-slate-600 text-white text-[10px] font-bold shrink-0" ' +
+    '<span v-if="e.lead" :style="{ background: $pb.avatarColor(e.lead) }" class="h-6 w-6 rounded-full overflow-hidden grid place-items-center text-white text-[10px] font-bold shrink-0" ' +
     ':data-tip="\'Lead: \' + e.lead.name">' +
     '<img v-if="e.lead.avatar_url" :src="e.lead.avatar_url" alt="" class="h-full w-full object-cover" /><span v-else>{{ e.lead.initial }}</span></span>' +
     '<button v-if="canCreate" type="button" @click="openMenu(e, $event.currentTarget)" data-tip="More" aria-label="More" ' +

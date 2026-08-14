@@ -78,12 +78,12 @@ PB.boot('project-members', {
         return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
       });
     },
-    colorFor: function (seed) {
-      var colors = ['#334155', '#1b5f8a', '#7c3aed', '#0891b2', '#be123c', '#15803d', '#b45309', '#4338ca'];
-      var s = String(seed), h = 0;
-      for (var i = 0; i < s.length; i++) { h = (h * 31 + s.charCodeAt(i)) >>> 0; }
-      return colors[h % colors.length];
-    },
+    /*
+     * The shared helper, not a second palette. This screen had its own — same idea, different
+     * eight colours, three of which did not reach 4.5:1 against the white initial sitting on
+     * them — so the same person came out one colour here and another in a work item row.
+     */
+    colorFor: function (person) { return PB.avatarColor(person); },
     roleLabel: function (r) { return (this.roles[r] || {}).label || r || '—'; },
     workspaceRoleLabel: function (r) { return this.workspaceRoles[r] || r || '—'; },
 
@@ -122,7 +122,7 @@ PB.boot('project-members', {
     nameCell: function (d) {
       var lead = d.is_lead ? ' <span class="text-[10px] font-semibold uppercase tracking-wide text-brand">Lead</span>' : '';
       return '<span class="flex items-center gap-2.5">' +
-        '<span class="h-6 w-6 rounded-full text-white grid place-items-center text-[10px] font-bold shrink-0" style="background:' + this.colorFor(d.email || d.name || '') + '">' + this.escapeHtml(d.initial || '?') + '</span>' +
+        '<span class="h-6 w-6 rounded-full text-white grid place-items-center text-[10px] font-bold shrink-0" style="background:' + this.colorFor(d) + '">' + this.escapeHtml(d.initial || '?') + '</span>' +
         '<span class="text-ink whitespace-nowrap">' + this.escapeHtml(d.name || '') + lead + '</span></span>';
     },
     plainCell: function (text) {

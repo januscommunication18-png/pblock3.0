@@ -426,7 +426,7 @@ PB.boot('project-modules', {
     '<span class="flex-1 h-1.5 rounded-full bg-line overflow-hidden">' +
     '<span class="block h-full rounded-full" :style="{width: percent(m) + \'%\', background: \'#22c55e\'}"></span></span>' +
     '<span class="text-[11px] text-sub w-8 text-right">{{ percent(m) }}%</span></span>' +
-    '<span v-if="m.lead" class="h-6 w-6 rounded-full overflow-hidden grid place-items-center bg-slate-600 text-white text-[10px] font-bold shrink-0" ' +
+    '<span v-if="m.lead" :style="{ background: $pb.avatarColor(m.lead) }" class="h-6 w-6 rounded-full overflow-hidden grid place-items-center text-white text-[10px] font-bold shrink-0" ' +
     ':data-tip="\'Lead: \' + m.lead.name">' +
     '<img v-if="m.lead.avatar_url" :src="m.lead.avatar_url" alt="" class="h-full w-full object-cover" /><span v-else>{{ m.lead.initial }}</span></span>' +
     '<button v-if="canCreate" type="button" @click="openMenu(m, $event.currentTarget)" data-tip="More" aria-label="More" ' +

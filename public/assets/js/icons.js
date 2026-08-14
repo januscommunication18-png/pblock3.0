@@ -368,6 +368,14 @@ var PB_ICONS = {
 "fa": "triangle-exclamation",
 "svg": "<path d=\"M12 4l8 14H4z\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linejoin=\"round\"/><path d=\"M12 10v3M12 15.5v.5\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\"/>"
     },
+    "arrow-up": {
+"fa": "arrow-up",
+"svg": "<path d=\"M12 19V5M6 11l6-6 6 6\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>"
+    },
+    "arrow-down": {
+"fa": "arrow-down",
+"svg": "<path d=\"M12 5v14M6 13l6 6 6-6\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>"
+    },
     "user-thin": {
 "fa": "user",
 "svg": "<circle cx=\"12\" cy=\"8\" r=\"3\" stroke=\"currentColor\" stroke-width=\"1.7\"/><path d=\"M5 20a7 7 0 0114 0\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\"/>"

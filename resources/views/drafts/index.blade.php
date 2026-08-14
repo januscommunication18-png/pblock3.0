@@ -17,21 +17,8 @@
   {{-- The shared Vue runtime: PB.boot, the toast, <pb-modal>, <pb-confirm>, <pb-empty>,
        and <pb-combo> — the searchable combobox every picker on this screen uses. --}}
   <script defer src="{{ pb_asset('assets/js/settings/app.js') }}"></script>
-  {{-- The description editor. <pg-editor> (Jodit) is the one the Pages screen uses, and the
-       one this screen prefers: its template is a bare <textarea> with no reactive bindings, so
-       Vue renders it once and never patches the DOM the editor owns — which is what Quill
-       could not survive here (see drafts.md, "Two rules for driving the editor").
-       Conditional exactly as Pages has it, so a checkout without the licensed package still
-       gets an editor. --}}
-  @if (file_exists(public_path('assets/vendor/jodit/jodit.fat.min.js')))
-    <link rel="stylesheet" href="{{ pb_asset('assets/vendor/jodit/jodit.fat.min.css') }}" />
-    <script src="{{ pb_asset('assets/vendor/jodit/jodit.fat.min.js') }}"></script>
-  @endif
-  {{-- Quill and <wi-editor> stay as the fallback for that case, on the same terms Pages keeps
-       them. work-items.css also carries the rich-text read styles the list excerpts render
-       with, so it is loaded either way. --}}
-  <link rel="stylesheet" href="{{ pb_asset('assets/vendor/quill/quill.snow.css') }}" />
-  <script src="{{ pb_asset('assets/vendor/quill/quill.js') }}"></script>
+  {{-- The description editor, from the shared partial — Jodit with a Quill fallback. --}}
+  @include('partials.rich-editor')
   <link rel="stylesheet" href="{{ pb_asset('assets/css/work-items.css') }}" />
   {{-- The work item row vocabulary: WI_PRI's priority icons and wiStateIcon's state glyphs.
        A draft's priority must read the same as a work item's, and it does because it is the
@@ -46,8 +33,6 @@
        data-screen, so it does not mount over the drafts root. Same arrangement Pages uses. --}}
   <script defer src="{{ pb_asset('assets/js/projects/work-item-list.js') }}"></script>
   <script defer src="{{ pb_asset('assets/js/projects/work-items.js') }}"></script>
-  {{-- <pg-editor> + pgJoditReady(), which decides which of the two the screen mounts. --}}
-  <script defer src="{{ pb_asset('assets/js/projects/page-editor.js') }}"></script>
   <script defer src="{{ pb_asset('assets/js/drafts.js') }}"></script>
 </head>
 <body class="bg-white text-ink h-screen flex flex-col overflow-hidden text-[13px]">

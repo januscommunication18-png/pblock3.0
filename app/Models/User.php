@@ -165,6 +165,35 @@ class User extends Authenticatable
             .'?v='.substr(md5($value), 0, 10);
     }
 
+    /**
+     * The fallback avatar background — this person's own colour.
+     *
+     * The PHP twin of `PB.avatarColor()`: same palette (`projects.avatar_colors`), same rule,
+     * same key (the user id), so a badge rendered by Blade in the topbar and one rendered by
+     * Vue in a work item row are the same colour for the same person. A test pins the two
+     * implementations together.
+     */
+    public function avatarColor(): string
+    {
+        $palette = array_values(config('projects.avatar_colors'));
+        $key = (string) $this->id;
+
+        // A numeric id walks the palette; see PB.avatarColor for why it is not hashed.
+        if (ctype_digit($key)) {
+            return $palette[(int) $key % count($palette)];
+        }
+
+        $hash = 5381;
+        for ($i = 0; $i < strlen($key); $i++) {
+            // & 0xFFFFFFFF keeps this inside 32 bits, which is where JavaScript's >>> 0 leaves
+            // it — without that, PHP's wider integers diverge from the browser after a few
+            // characters and the same person gets two different colours.
+            $hash = (($hash * 33) ^ ord($key[$i])) & 0xFFFFFFFF;
+        }
+
+        return $palette[$hash % count($palette)];
+    }
+
     public function initial(): string
     {
         $source = $this->displayName() ?: $this->email;

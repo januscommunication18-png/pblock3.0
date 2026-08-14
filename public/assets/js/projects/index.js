@@ -607,12 +607,12 @@ PB.boot('projects-index', {
     // Lead chip — sits directly under the @mention line
     '<div class="mt-2.5">' +
     '<button v-if="p.can_manage" type="button" @click.stop.prevent="openLeadMenu(p, $event)" class="inline-flex items-center gap-1.5 h-8 pl-1.5 pr-2 rounded-md border border-stroke text-[12px] text-ink hover:bg-hover max-w-full min-w-0">' +
-    '<template v-if="p.lead"><span class="h-5 w-5 rounded-full bg-brand text-white grid place-items-center text-[9px] font-bold shrink-0">{{ p.lead.initial }}</span><span class="truncate">{{ p.lead.name }}</span></template>' +
+    '<template v-if="p.lead"><span :style="{ background: $pb.avatarColor(p.lead) }" class="h-5 w-5 rounded-full text-white grid place-items-center text-[9px] font-bold shrink-0">{{ p.lead.initial }}</span><span class="truncate">{{ p.lead.name }}</span></template>' +
     '<template v-else>' + wiIcon('user', 15, 'text-faint shrink-0') + '<span class="text-sub">No lead</span></template>' +
     '' + wiIcon('chevron-down', 12, 'text-faint shrink-0') + '' +
     '</button>' +
     '<span v-else class="inline-flex items-center gap-1.5 h-8 pl-1.5 pr-2 rounded-md border border-stroke text-[12px] text-ink max-w-full min-w-0">' +
-    '<template v-if="p.lead"><span class="h-5 w-5 rounded-full bg-brand text-white grid place-items-center text-[9px] font-bold shrink-0">{{ p.lead.initial }}</span><span class="truncate">{{ p.lead.name }}</span></template>' +
+    '<template v-if="p.lead"><span :style="{ background: $pb.avatarColor(p.lead) }" class="h-5 w-5 rounded-full text-white grid place-items-center text-[9px] font-bold shrink-0">{{ p.lead.initial }}</span><span class="truncate">{{ p.lead.name }}</span></template>' +
     '<template v-else>' + wiIcon('user', 15, 'text-faint shrink-0') + '<span class="text-sub">No lead</span></template>' +
     '</span>' +
     '</div>' +
@@ -790,7 +790,7 @@ PB.boot('projects-index', {
     '<button type="button" @click="setLead(leadMenuProject, null)" class="w-full text-left flex items-center gap-2.5 px-2 h-9 rounded-md hover:bg-hover text-[13px] text-ink">' +
     '<span class="grid place-items-center text-faint" v-html="personIcon"></span><span>No lead</span></button>' +
     '<button v-for="m in leadMenuMembers" :key="m.id" type="button" @click="setLead(leadMenuProject, m)" class="w-full text-left flex items-center gap-2.5 px-2 h-9 rounded-md hover:bg-hover text-[13px] text-ink">' +
-    '<span class="h-6 w-6 rounded-full bg-brand text-white grid place-items-center text-[10px] font-bold shrink-0">{{ m.initial }}</span><span class="flex-1 truncate">{{ m.name }}</span>' +
+    '<span :style="{ background: $pb.avatarColor(m) }" class="h-6 w-6 rounded-full text-white grid place-items-center text-[10px] font-bold shrink-0">{{ m.initial }}</span><span class="flex-1 truncate">{{ m.name }}</span>' +
     '<span v-if="leadMenuProject && leadMenuProject.lead && leadMenuProject.lead.id===m.id" class="text-brand shrink-0">' + wiIcon('check', 15) + '</span>' +
     '</button>' +
     '<div v-if="!leadMenuMembers.length" class="px-2 py-3 text-[13px] text-sub text-center">No members found</div>' +
@@ -853,7 +853,7 @@ PB.boot('projects-index', {
     // Lead chip
     '<div class="relative">' +
     '<button type="button" @click.stop="openLead" class="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-stroke text-[12px] text-ink hover:bg-hover">' +
-    '<span v-if="leadSelected" class="h-5 w-5 rounded-full bg-brand text-white grid place-items-center text-[9px] font-bold">{{ leadSelected.initial }}</span>' +
+    '<span v-if="leadSelected" :style="{ background: $pb.avatarColor(leadSelected) }" class="h-5 w-5 rounded-full text-white grid place-items-center text-[9px] font-bold">{{ leadSelected.initial }}</span>' +
     '<span v-else class="grid place-items-center text-sub" v-html="personIcon"></span>' +
     '<span>{{ leadSelected ? leadSelected.name : \'Lead\' }}</span>' +
     '</button>' +
@@ -867,7 +867,7 @@ PB.boot('projects-index', {
     '<button type="button" @click="form.lead_user_id=\'\'; leadOpen=false" class="w-full text-left flex items-center gap-2.5 px-2 h-9 rounded-md hover:bg-hover text-[13px] text-ink">' +
     '<span class="grid place-items-center text-faint" v-html="personIcon"></span><span>No lead</span></button>' +
     '<button v-for="m in filteredMembers" :key="m.id" type="button" @click="form.lead_user_id=String(m.id); leadOpen=false" class="w-full text-left flex items-center gap-2.5 px-2 h-9 rounded-md hover:bg-hover text-[13px] text-ink">' +
-    '<span class="h-6 w-6 rounded-full bg-brand text-white grid place-items-center text-[10px] font-bold shrink-0">{{ m.initial }}</span><span class="truncate">{{ m.name }}</span></button>' +
+    '<span :style="{ background: $pb.avatarColor(m) }" class="h-6 w-6 rounded-full text-white grid place-items-center text-[10px] font-bold shrink-0">{{ m.initial }}</span><span class="truncate">{{ m.name }}</span></button>' +
     '<div v-if="!filteredMembers.length" class="px-2 py-3 text-[13px] text-sub text-center">No members found</div>' +
     '</div>' +
     '</div>' +

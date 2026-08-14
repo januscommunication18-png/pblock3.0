@@ -32,6 +32,21 @@ class YourWorkController extends Controller
     /** In tab-bar order. `summary` leads because it is the landing tab. */
     private const TABS = ['summary', 'assigned', 'created', 'subscribed', 'activity'];
 
+    /**
+     * The priority swatches, matching WI_PRI's glyphs in work-item-ui.js — the same colours a
+     * priority already wears on every row, so the chart and the list agree.
+     *
+     * An ORDINAL scale (urgent → none), not a categorical one: the order is the severity, so
+     * the bars stay in this sequence whatever the counts are.
+     */
+    private const PRIORITY_COLORS = [
+        'urgent' => '#EF4444',
+        'high' => '#F97316',
+        'medium' => '#F59E0B',
+        'low' => '#3B82F6',
+        'none' => '#9CA3AF',
+    ];
+
     public function __construct(
         private readonly ProjectNavigation $navigation,
         private readonly WorkItemScreenPayload $payload,
@@ -60,6 +75,7 @@ class YourWorkController extends Controller
                 'workItems' => $this->isListTab($tab) ? $this->listPayload($tab, $user, $projects) : null,
                 'activity' => $tab === 'activity' ? $this->activity($user, $projects) : [],
                 'counts' => $this->counts($user, $projects),
+                'summary' => $tab === 'summary' ? $this->summary($user, $projects) : null,
             ],
         ]);
     }
@@ -135,6 +151,58 @@ class YourWorkController extends Controller
     {
         return collect(['assigned', 'created', 'subscribed'])
             ->mapWithKeys(fn (string $tab) => [$tab => $this->scope($tab, $user, $projects)->count()])
+            ->all();
+    }
+
+    /**
+     * The Summary tab: three totals, then the shape of the work behind one of them.
+     *
+     * Overview counts all three tabs. Everything below it describes **assigned** work only —
+     * the workload tiles and both charts. "What am I carrying, and what shape is it in" is the
+     * question this tab answers, and items you opened for somebody else or a project you
+     * merely follow are not that (D-Y5).
+     *
+     * @param  Collection<int, Project>  $projects
+     * @return array<string, mixed>
+     */
+    private function summary($user, Collection $projects): array
+    {
+        $assigned = $this->scope('assigned', $user, $projects)
+            ->with('state:id,group')
+            ->get(['id', 'priority', 'state_id']);
+
+        return [
+            'overview' => $this->counts($user, $projects),
+            // Both breakdowns come off the SAME rows, so the two charts can never disagree
+            // about how much work there is — they are two views of one set, not two queries.
+            'workload' => $this->breakdown(
+                config('projects.state_groups'),
+                $assigned->countBy(fn (WorkItem $i) => $i->state?->group ?? 'backlog'),
+            ),
+            'byPriority' => $this->breakdown(
+                collect(config('projects.work_item_priorities'))
+                    ->map(fn (string $label, string $key) => [
+                        'key' => $key, 'label' => $label, 'color' => self::PRIORITY_COLORS[$key],
+                    ])->values()->all(),
+                $assigned->countBy('priority'),
+            ),
+            'total' => $assigned->count(),
+        ];
+    }
+
+    /**
+     * Fill a fixed vocabulary with counts, keeping every slot.
+     *
+     * Zeroes are kept deliberately: "Cancelled 0" is an answer, and a chart whose categories
+     * appear and vanish with the data cannot be compared with the same chart yesterday.
+     *
+     * @param  array<int, array<string, string>>  $slots
+     * @return array<int, array<string, mixed>>
+     */
+    private function breakdown(array $slots, $counts): array
+    {
+        return collect($slots)
+            ->map(fn (array $slot) => $slot + ['count' => (int) ($counts[$slot['key']] ?? 0)])
             ->all();
     }
 

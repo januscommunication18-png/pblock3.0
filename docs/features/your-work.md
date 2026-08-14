@@ -12,7 +12,7 @@ A workspace-level screen at `/your-work/{tab?}` with five tabs:
 
 | Tab | What it is |
 |---|---|
-| **Summary** | Coming soon. The landing tab, and it says so rather than showing an empty panel. |
+| **Summary** | Three totals, then the shape of your assigned work: a workload split by state group, a priority bar chart and a state donut. |
 | **Assigned** | Work items you are an assignee of. |
 | **Created** | Work items you opened. |
 | **Subscribed** | Work items in projects you subscribe to. |
@@ -64,7 +64,7 @@ list, where every row shares one, and load-bearing here.
 ## Acceptance Criteria
 
 - **YW-01** The sidebar link opens the screen, and all five tabs render.
-- **YW-02** Summary carries no list and is marked coming soon.
+- **YW-02** Summary carries its own payload and no list.
 - **YW-03** An unknown tab 404s.
 - **YW-04** Assigned lists what you are assigned to; Created lists what you opened; the two are
   different questions and give different answers.
@@ -77,6 +77,9 @@ list, where every row shares one, and load-bearing here.
 - **YW-09** Activity is your own actions, each linked back to the item it happened to.
 - **YW-10** Someone who cannot open a project sees none of its activity.
 - **YW-11** Tab counts match the length of the list behind them.
+- **YW-12** Summary's Overview counts all three tabs; the workload and both breakdowns count
+  assigned work only.
+- **YW-13** Every breakdown slot survives at zero, with its label and a valid hex colour.
 
 ## UI Requirements
 
@@ -113,6 +116,8 @@ are audited by the same code that audits them on a project's list, because it is
 | D-Y2 | What is "Activity"? | **Your own actions**, not what happened to your items. "Your work" is a record of the work; a feed of other people's edits to your items is an inbox, which is a different feature with a different name. Also the owner's call. |
 | D-Y3 | Are the chips editable across projects? | **Yes** — the owner chose the larger option over a read-only list. See below for what that took. |
 | D-Y4 | Grouping | **Flat**, one "All work items" list, per the supplied screenshot. State grouping is project-scoped: two projects' "In Progress" are different rows, so a grouped cross-project list would repeat the same heading once per project. |
+| D-Y5 | What does Summary summarise? | Overview counts all three tabs; **everything below it is assigned work only**. Mixing sets under one heading would make the Workload tiles and the two charts uncomparable with each other — and "Created 153" is a number about your history, not about what you are carrying now. |
+| D-Y6 | Chart library | **None.** Both charts are hand-rolled SVG/CSS, like `cy-ring` on the Cycles screen. Two five-category charts do not justify a dependency, and the app has no charting library to be consistent with. |
 
 ### Making one screen serve several projects
 
@@ -151,11 +156,52 @@ Two references deliberately did **not** move to `vocab`: the `states` that drive
 the mobile cards, and the create modal's state picker. Grouping must not change when a picker
 opens on a row, and nothing is created from this screen anyway.
 
+### The Summary tab
+
+**Overview** counts all three list tabs. **Everything below it describes assigned work only**
+(D-Y5) — the workload tiles, the priority bars and the state donut. "What am I carrying, and
+what shape is it in" is the question this tab answers; items you opened for somebody else, or
+that sit in a project you merely follow, are not that. Both breakdowns come off the **same
+rows**, so the two charts can never disagree about how much work there is.
+
+Empty slots are kept at zero rather than dropped. "Cancelled 0" is an answer, and a chart whose
+categories appear and vanish with the data cannot be compared with the same chart yesterday.
+
+#### Colour, measured rather than judged
+
+These are a **status palette** — they mean a state of work, they are the ones `wiStateIcon`
+already draws with, and they are never reused as "series 4". Every mark that carries one also
+carries its label and its count, so identity is never colour alone.
+
+Run through the palette validator (OKLab ΔE ×100, light surface), the app's own five group
+colours came back with two real problems:
+
+| Check | Result |
+|---|---|
+| Chroma floor | **FAIL** — `backlog` #9CA3AF *and* `unstarted` #6B7280 both read as grey (chroma 0.019 / 0.023) |
+| CVD separation | **FAIL** — `started` #F59E0B ↔ `completed` #22C55E, ΔE **5.7** under protanopia |
+| Normal vision | PASS (worst adjacent 16.3) |
+| Contrast vs surface | WARN — obligates visible labels, which every mark has |
+
+**Fixed:** `unstarted` is blue #3B82F6 on this screen, which is also what the supplied design
+drew. Two greys a lightness step apart are unreadable as 12px swatches; blue takes the worst
+adjacent pair to ΔE 19.2.
+
+**Found, reported, deliberately not fixed here:** the amber/green pair is below even the 6–8
+floor for protanopia. Stepping the green to **#059669** clears it (ΔE 9.6, verified) — but
+#22C55E is the app's green in every state icon and every progress ring, so changing it is a
+design-system decision, not this screen's to take unilaterally. Until it is taken, the labels
+and counts beside every swatch are what carry the distinction. Flagged for the product owner.
+
 ### Not built
 
-Summary. The view-mode switcher, filter and Display controls in the screenshot's top-right —
-those are the project list's own toolbar and belong to a later slice. Per-work-item
-subscription (D-Y1).
+The right-hand profile rail in the screenshot — the avatar, joined-on/timezone, and the
+per-project progress accordion. It is its own panel rather than part of the Summary, and it
+appears on every tab in the supplied designs, so it is a separate slice.
+
+The view-mode switcher, filter and Display controls in the top-right — those are the project
+list's own toolbar. Per-work-item subscription for the Subscribed tab (D-Y1); note that
+per-item subscription now exists, see [work-item-toolbar.md](work-item-toolbar.md).
 
 ## Files Changed
 
@@ -170,6 +216,9 @@ project), `app/Services/ProjectNavigation.php` (`visible()` extracted)
 
 **Views** — `resources/views/your-work/index.blade.php` *(new)*,
 `resources/views/partials/app-sidebar.blade.php` (the link)
+
+**Config** — `config/projects.php` (`state_groups`: the five groups' reading names and status
+colours, in one place)
 
 **JS** — `public/assets/js/your-work.js` *(new)*,
 `public/assets/js/projects/work-items.js` (multi-project resolution),

@@ -469,7 +469,7 @@ PB.boot('project-cycles', {
     '' + wiIcon('calendar', 13) + '{{ fmtRange(c) }}</span>' +
     '<span class="text-[12px] text-faint">{{ daysLabel(c) }}</span>' +
     '<div class="ml-auto flex items-center gap-2">' +
-    '<span v-if="c.created_by" class="h-6 w-6 rounded-full overflow-hidden grid place-items-center bg-slate-600 text-white text-[10px] font-bold" :data-tip="\'Created by \' + c.created_by.name">' +
+    '<span v-if="c.created_by" :style="{ background: $pb.avatarColor(c.created_by) }" class="h-6 w-6 rounded-full overflow-hidden grid place-items-center text-white text-[10px] font-bold" :data-tip="\'Created by \' + c.created_by.name">' +
     '<img v-if="c.created_by.avatar_url" :src="c.created_by.avatar_url" alt="" class="h-full w-full object-cover" /><span v-else>{{ c.created_by.initial }}</span></span>' +
     '<button v-if="canCreate" type="button" @click="openMenu(c, $event.currentTarget)" data-tip="More" ' +
     'class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover border border-stroke">' +
@@ -505,7 +505,7 @@ PB.boot('project-cycles', {
     '<a :href="cycleUrl(c)" class="text-[14px] text-ink truncate flex-1 hover:text-brand">{{ c.name }}</a>' +
     '<span class="text-[12px] text-sub whitespace-nowrap hidden sm:inline">{{ fmtRange(c) }}</span>' +
     '<span class="inline-flex items-center h-6 px-2.5 rounded-md text-[12px] font-medium whitespace-nowrap" :style="{color: statusMeta(c.status).color, background: statusMeta(c.status).bg}">{{ statusMeta(c.status).label }}</span>' +
-    '<span v-if="c.created_by" class="h-6 w-6 rounded-full overflow-hidden grid place-items-center bg-slate-600 text-white text-[10px] font-bold shrink-0" :data-tip="\'Created by \' + c.created_by.name">' +
+    '<span v-if="c.created_by" :style="{ background: $pb.avatarColor(c.created_by) }" class="h-6 w-6 rounded-full overflow-hidden grid place-items-center text-white text-[10px] font-bold shrink-0" :data-tip="\'Created by \' + c.created_by.name">' +
     '<img v-if="c.created_by.avatar_url" :src="c.created_by.avatar_url" alt="" class="h-full w-full object-cover" /><span v-else>{{ c.created_by.initial }}</span></span>' +
     '<button v-if="canCreate" type="button" @click="openMenu(c, $event.currentTarget)" data-tip="More" aria-label="More" ' +
     'class="h-7 w-7 grid place-items-center rounded hover:bg-line text-faint opacity-0 group-hover:opacity-100 shrink-0">' +

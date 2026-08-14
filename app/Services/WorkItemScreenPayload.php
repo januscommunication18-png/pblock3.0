@@ -81,6 +81,8 @@ class WorkItemScreenPayload
             'canCreate' => $canCreate,
             'canEdit' => $canCreate, // §34: whoever may create may also edit and delete.
             'mediaMaxKb' => (int) config('projects.media.max_kb'),
+            // The Jodit Pro licence the description editor runs under, same source as Pages.
+            'editorLicense' => (string) config('projects.jodit_license'),
             'timeTracking' => true,
             'currentUserId' => Auth::id(),
             // Set only on the per-item URL: render the detail as a page, not a drawer.
@@ -129,6 +131,7 @@ class WorkItemScreenPayload
                 ->map(fn ($label, $key) => ['key' => $key, 'label' => $label])->values()->all(),
             'currentUserId' => Auth::id(),
             'mediaMaxKb' => (int) config('projects.media.max_kb'),
+            'editorLicense' => (string) config('projects.jodit_license'),
             'timeTracking' => true,
             // Nothing is created from this screen: "add a work item" has to be asked inside a
             // project, because that is where the state and the ID come from.

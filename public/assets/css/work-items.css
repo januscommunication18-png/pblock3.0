@@ -101,6 +101,49 @@
 .wi-rich th { background: #f8f9fa; font-weight: 600; }
 
 /* ---------------------------------------------------------------------------
+   Rich-text editor (Jodit, inline)
+
+   <pg-editor> with `document-view="false"` — the work item description, the comment
+   composer, the reply/edit modal and the status update. There is no iframe in that
+   mode, so Jodit's own `iframeStyle` never applies and the editing surface inherits
+   the app's page styles, where Tailwind's preflight has already stripped heading
+   sizes and list markers.
+
+   Without these the format-block and font-size menus appear to do nothing: the
+   markup changes, `<h1>` is really there and the READ view renders it large, but the
+   editor shows it at body size — so the control looks broken while working.
+
+   Deliberately the same values as `.wi-rich` above. What you are typing into and what
+   you get back have to be the same size, or WYSIWYG is a claim rather than a feature.
+   Scoped to `.pg-editor` so the Pages screen, which styles its own surface under
+   `.pb-page-jodit`, is untouched.
+   --------------------------------------------------------------------------- */
+.pg-editor .jodit-wysiwyg > *:first-child { margin-top: 0; }
+.pg-editor .jodit-wysiwyg p { margin: 0 0 10px; }
+.pg-editor .jodit-wysiwyg h1, .pg-editor .jodit-wysiwyg h2, .pg-editor .jodit-wysiwyg h3,
+.pg-editor .jodit-wysiwyg h4, .pg-editor .jodit-wysiwyg h5, .pg-editor .jodit-wysiwyg h6 {
+  font-weight: 600; color: #0f0f10; margin: 18px 0 8px; line-height: 1.3;
+}
+.pg-editor .jodit-wysiwyg h1 { font-size: 20px; }
+.pg-editor .jodit-wysiwyg h2 { font-size: 17px; }
+.pg-editor .jodit-wysiwyg h3 { font-size: 15px; }
+.pg-editor .jodit-wysiwyg h4, .pg-editor .jodit-wysiwyg h5, .pg-editor .jodit-wysiwyg h6 { font-size: 14px; }
+.pg-editor .jodit-wysiwyg ul, .pg-editor .jodit-wysiwyg ol { margin: 0 0 10px; padding-left: 22px; }
+.pg-editor .jodit-wysiwyg ul { list-style: disc; }
+.pg-editor .jodit-wysiwyg ol { list-style: decimal; }
+.pg-editor .jodit-wysiwyg li { margin: 3px 0; }
+.pg-editor .jodit-wysiwyg a { color: #1b5f8a; text-decoration: underline; }
+.pg-editor .jodit-wysiwyg blockquote { margin: 10px 0; padding: 2px 0 2px 12px; border-left: 3px solid #e5e7eb; color: #6b7280; }
+.pg-editor .jodit-wysiwyg hr { margin: 14px 0; border: 0; border-top: 1px solid #e5e7eb; }
+.pg-editor .jodit-wysiwyg pre { background: #f6f7f8; border: 1px solid #e5e7eb; border-radius: 6px; padding: 10px 12px; overflow-x: auto; }
+.pg-editor .jodit-wysiwyg code { background: #f3f4f6; border-radius: 4px; padding: 1px 4px; font-size: 12.5px; }
+.pg-editor .jodit-wysiwyg pre code { background: none; padding: 0; }
+.pg-editor .jodit-wysiwyg img { max-width: 100%; height: auto; border-radius: 6px; }
+.pg-editor .jodit-wysiwyg table { border-collapse: collapse; margin: 10px 0; width: 100%; }
+.pg-editor .jodit-wysiwyg th, .pg-editor .jodit-wysiwyg td { border: 1px solid #e5e7eb; padding: 6px 8px; text-align: left; }
+.pg-editor .jodit-wysiwyg th { background: #f8f9fa; font-weight: 600; }
+
+/* ---------------------------------------------------------------------------
    Rich-text editor (Quill, snow theme)
 
    Quill's own stylesheet only styles content INSIDE `.ql-editor`, and Tailwind's
@@ -232,7 +275,11 @@
    pushing the sub-tasks, dependencies and conversation off the screen. The fade
    says there is more below without needing a second control to explain it. */
 .wi-desc-clamp {
-  max-height: 200px;
+  /* 120px ≈ five lines at 14px/1.6.
+     It was 200px, which on a wide drawer is nine or ten lines — more than a typical
+     one-paragraph description, so nothing was ever hidden and the Show more control
+     correctly never appeared. The clamp only earns its place if it actually clamps. */
+  max-height: 120px;
   overflow: hidden;
   -webkit-mask-image: linear-gradient(to bottom, #000 72%, transparent 100%);
   mask-image: linear-gradient(to bottom, #000 72%, transparent 100%);

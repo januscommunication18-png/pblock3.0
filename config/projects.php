@@ -173,6 +173,59 @@ return [
     ],
 
     /**
+     * The background behind someone's initial when they have not uploaded a photo.
+     *
+     * ONE list, because the same person has to be the same colour in a work item row, a member
+     * table, a comment and the topbar — and this screen's badge is drawn by PHP while that
+     * one's is drawn by Vue. `User::avatarColor()` and `PB.avatarColor()` both read this order
+     * and both hash the user's ID with djb2, so the two agree by construction; the JS copy is
+     * pinned to this array by a test.
+     *
+     * Every colour clears **4.5:1 against white text** (WCAG AA for small text) — checked, not
+     * assumed. The obvious mid-tone picks do not: Tailwind's orange-600 (3.56:1), emerald-600
+     * (3.77:1) and teal-600 (3.74:1) all failed and were stepped to their 700s. The worst
+     * survivor is pink at 4.60:1.
+     *
+     * Keyed on the ID rather than the name or email, so renaming yourself — or changing your
+     * address — does not repaint you.
+     */
+    'avatar_colors' => [
+        '#2563EB', '#DB2777', '#047857', '#7C3AED', '#C2410C', '#0E7490',
+        '#C026D3', '#B45309', '#4F46E5', '#E11D48', '#0F766E', '#475569',
+    ],
+
+    /**
+     * The five state GROUPS, for anything that summarises work rather than listing it
+     * (Your Work → Summary). A state's name is user-editable per project; its group is not,
+     * so a group is the only thing that can be counted across projects.
+     *
+     * The labels are the reading names — "Not started", "Working on" — rather than the stable
+     * keys, which are internal vocabulary and should not surface in a legend.
+     *
+     * COLOURS are a status palette, not a categorical one: they mean a state of work, they are
+     * the same ones `wiStateIcon` draws with, and they are never reused for "series 4". Every
+     * mark that carries one also carries its label and its count, so identity is never colour
+     * alone — which is what the swatches, the donut legend and the tiles all do.
+     *
+     * `unstarted` is blue rather than the seeded grey of the "Todo" state: against Backlog's
+     * grey the two were a lightness step apart and both read as grey (measured — OKLCh chroma
+     * 0.019 and 0.023, under the floor), which is unreadable in a row of 12px swatches.
+     *
+     * KNOWN, MEASURED, NOT FIXED HERE: `started` #F59E0B and `completed` #22C55E sit ΔE 5.7
+     * apart under protanopia — below the ≥8 target. Stepping the green to #059669 clears it
+     * (ΔE 9.6), but #22C55E is the app's green in every state icon and progress ring, so that
+     * is a design-system change rather than this screen's to make. Until then the labels are
+     * what carry the distinction. See docs/features/your-work.md.
+     */
+    'state_groups' => [
+        ['key' => 'backlog', 'label' => 'Backlog', 'color' => '#9CA3AF'],
+        ['key' => 'unstarted', 'label' => 'Not started', 'color' => '#3B82F6'],
+        ['key' => 'started', 'label' => 'Working on', 'color' => '#F59E0B'],
+        ['key' => 'completed', 'label' => 'Completed', 'color' => '#22C55E'],
+        ['key' => 'cancelled', 'label' => 'Cancelled', 'color' => '#EF4444'],
+    ],
+
+    /**
      * Work-item priorities (spec §4.3). A fixed vocabulary stored as a string column — these
      * are not the workspace-configurable `project_priorities` used by project cards.
      */

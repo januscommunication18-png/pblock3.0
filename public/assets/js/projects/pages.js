@@ -359,7 +359,7 @@ PB.boot('project-pages', {
     '<template v-else-if="dirty">Unsaved changes</template>' +
     '<template v-else-if="savedAt">Saved {{ fmtWhen(savedAt) }}</template>' +
     '</span>' +
-    '<span v-if="page.updated_by" class="h-6 w-6 rounded-full overflow-hidden grid place-items-center bg-slate-600 text-white text-[10px] font-bold shrink-0" ' +
+    '<span v-if="page.updated_by" :style="{ background: $pb.avatarColor(page.updated_by) }" class="h-6 w-6 rounded-full overflow-hidden grid place-items-center text-white text-[10px] font-bold shrink-0" ' +
     ':data-tip="\'Last updated by \' + page.updated_by.name">' +
     '<img v-if="page.updated_by.avatar_url" :src="page.updated_by.avatar_url" alt="" class="h-full w-full object-cover" />' +
     '<span v-else>{{ page.updated_by.initial }}</span></span>' +
@@ -449,7 +449,7 @@ PB.boot('project-pages', {
     '<span v-if="p.parent" class="hidden lg:inline text-[11px] text-faint truncate max-w-[160px]" ' +
     ':data-tip="\'In \' + p.parent.title">{{ p.parent.title }}</span>' +
     '<span class="hidden md:inline text-[12px] text-sub whitespace-nowrap">{{ fmtWhen(p.updated_at) }}</span>' +
-    '<span v-if="p.updated_by" class="h-6 w-6 rounded-full overflow-hidden grid place-items-center bg-slate-600 text-white text-[10px] font-bold shrink-0" ' +
+    '<span v-if="p.updated_by" :style="{ background: $pb.avatarColor(p.updated_by) }" class="h-6 w-6 rounded-full overflow-hidden grid place-items-center text-white text-[10px] font-bold shrink-0" ' +
     ':data-tip="\'Last updated by \' + p.updated_by.name">' +
     '<img v-if="p.updated_by.avatar_url" :src="p.updated_by.avatar_url" alt="" class="h-full w-full object-cover" />' +
     '<span v-else>{{ p.updated_by.initial }}</span></span>' +
@@ -479,7 +479,8 @@ PB.boot('project-pages', {
     '<p v-else-if="!versions.length" class="text-[13px] text-sub py-6 text-center">No versions yet.</p>' +
     '<div v-else class="divide-y divide-line -my-1">' +
     '<div v-for="v in versions" :key="v.id" class="flex items-center gap-3 py-2.5">' +
-    '<span class="h-6 w-6 rounded-full overflow-hidden grid place-items-center bg-slate-600 text-white text-[10px] font-bold shrink-0">' +
+    '<span class="h-6 w-6 rounded-full overflow-hidden grid place-items-center text-white text-[10px] font-bold shrink-0" ' +
+    ':style="{ background: $pb.avatarColor(v.edited_by) }">' +
     '<img v-if="v.edited_by && v.edited_by.avatar_url" :src="v.edited_by.avatar_url" alt="" class="h-full w-full object-cover" />' +
     '<span v-else>{{ v.edited_by ? v.edited_by.initial : \'?\' }}</span></span>' +
     '<div class="min-w-0 flex-1">' +

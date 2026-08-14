@@ -91,7 +91,8 @@ function wiAvatar(person, px) {
       'style="' + box + '" class="rounded-full shrink-0 object-cover border border-line" />';
   }
 
-  return '<span style="' + box + '" class="rounded-full shrink-0 bg-brand text-white grid place-items-center text-[10px] font-bold" ' +
+  // A colour per person, so a row of unphotographed people is still scannable.
+  return '<span style="' + box + ';background:' + PB.avatarColor(person) + '" class="rounded-full shrink-0 text-white grid place-items-center text-[10px] font-bold" ' +
     'data-tip="' + title + '" aria-label="' + title + '">' + wiEsc(person.initial || '?') + '</span>';
 }
 

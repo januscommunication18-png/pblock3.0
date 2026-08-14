@@ -33,15 +33,17 @@
 
 <div class="relative ml-1">
   <button id="user-btn"
-          class="h-7 w-7 rounded-full bg-emerald-500 grid place-items-center text-white text-[11px] font-bold ring-2 ring-transparent focus:outline-none bg-cover bg-center"
-          @if ($__accountProfile['avatar_url']) style="background-image:url('{{ $__accountProfile['avatar_url'] }}')" @endif
+          class="h-7 w-7 rounded-full grid place-items-center text-white text-[11px] font-bold ring-2 ring-transparent focus:outline-none bg-cover bg-center"
+          @if ($__accountProfile['avatar_url']) style="background-image:url('{{ $__accountProfile['avatar_url'] }}')"
+          @else style="background:{{ $__acct->avatarColor() }}" @endif
           aria-label="Account menu">{{ $__accountProfile['avatar_url'] ? '' : $__acct->initial() }}</button>
 
   <div id="user-menu" class="hidden absolute right-0 top-full mt-2 w-64 bg-white border border-line rounded-xl shadow-lg z-50 p-1.5">
     <div id="user-menu-cover" class="relative rounded-lg overflow-hidden px-4 pt-7 pb-4 text-center" style="{{ $__acctCover }}">
       <span id="user-menu-avatar"
-            class="h-14 w-14 rounded-full bg-brand text-white grid place-items-center text-[20px] font-semibold mx-auto shadow-sm bg-cover bg-center ring-2 ring-white/70"
-            @if ($__accountProfile['avatar_url']) style="background-image:url('{{ $__accountProfile['avatar_url'] }}')" @endif
+            class="h-14 w-14 rounded-full text-white grid place-items-center text-[20px] font-semibold mx-auto shadow-sm bg-cover bg-center ring-2 ring-white/70"
+            @if ($__accountProfile['avatar_url']) style="background-image:url('{{ $__accountProfile['avatar_url'] }}')"
+            @else style="background:{{ $__acct->avatarColor() }}" @endif
       >{{ $__accountProfile['avatar_url'] ? '' : $__acct->initial() }}</span>
       <div id="user-menu-name" class="text-[14px] font-semibold text-white mt-2.5 drop-shadow-sm">{{ $__acct->displayName() }}</div>
       <div class="text-[12px] text-white/90 drop-shadow-sm">{{ $__acct->email }}</div>

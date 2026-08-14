@@ -185,7 +185,7 @@ PB.boot('project-general', {
     '<div v-if="subscriberChips.length" class="flex flex-wrap gap-1.5 mt-2">' +
     '<span v-for="m in subscriberChips" :key="m.id" class="inline-flex items-center gap-1.5 h-7 pl-1 pr-1.5 rounded-full border border-line text-[12px] text-ink">' +
     '<img v-if="m.avatar_url" :src="m.avatar_url" alt="" class="h-5 w-5 rounded-full object-cover" />' +
-    '<span v-else class="h-5 w-5 rounded-full bg-brand text-white grid place-items-center text-[10px] font-bold">{{ m.initial }}</span>' +
+    '<span v-else :style="{ background: $pb.avatarColor(m) }" class="h-5 w-5 rounded-full text-white grid place-items-center text-[10px] font-bold">{{ m.initial }}</span>' +
     '{{ m.name }}' +
     '<button type="button" @click="toggleSubscriber(m)" :data-tip="\'Remove \' + m.name" :aria-label="\'Remove \' + m.name" ' +
     'class="h-5 w-5 grid place-items-center rounded-full text-faint hover:text-danger hover:bg-hover">' +

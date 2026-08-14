@@ -30,6 +30,50 @@
   // Replace the '__ID__' placeholder in a templated endpoint with a real id.
   function withId(url, id) { return String(url).replace('__ID__', encodeURIComponent(id)); }
 
+  // ---- Avatar fallback colour ----------------------------------------------------------
+  /*
+   * The background behind someone's initial when they have not uploaded a photo.
+   *
+   * Everyone used to get the same brand blue (or the same slate, depending which screen you
+   * were on), which made a row of five unphotographed people a row of five identical discs —
+   * the initial was doing all the work at 10px. A colour per person makes them scannable
+   * before you have read anything.
+   *
+   * Keyed on the user's ID, never their name: the colour has to follow the PERSON, so it is
+   * the same in a work item row, a member list and a comment, and renaming yourself does not
+   * repaint you. Falls back to hashing the name only when a payload carries no id.
+   *
+   * Every colour clears 4.5:1 against white text (WCAG AA for small text) — verified, since
+   * these are 10px bold and the usual mid-tone palette does not: Tailwind's orange-600,
+   * emerald-600 and teal-600 all land near 3.6:1 and were stepped to their 700s.
+   */
+  var AVATAR_COLORS = [
+    '#2563EB', '#DB2777', '#047857', '#7C3AED', '#C2410C', '#0E7490',
+    '#C026D3', '#B45309', '#4F46E5', '#E11D48', '#0F766E', '#475569'
+  ];
+
+  function avatarColor(person) {
+    if (!person) return AVATAR_COLORS[0];
+
+    var key = (person.id !== undefined && person.id !== null && person.id !== '')
+      ? String(person.id)
+      : String(person.email || person.name || person.label || person.initial || '');
+
+    // A numeric id WALKS the palette instead of being hashed into it.
+    //
+    // djb2 was the first attempt and it collided badly on short keys: ids 1–12 produced only
+    // eight distinct colours, so a team invited one after another — the common case — had
+    // people sharing. The remainder is perfect for consecutive integers, which is exactly
+    // what user ids are.
+    if (/^\d+$/.test(key)) return AVATAR_COLORS[parseInt(key, 10) % AVATAR_COLORS.length];
+
+    // Anything else (a payload with no id) still needs spreading, and djb2 is fine there.
+    var hash = 5381;
+    for (var i = 0; i < key.length; i++) hash = ((hash * 33) ^ key.charCodeAt(i)) >>> 0;
+
+    return AVATAR_COLORS[hash % AVATAR_COLORS.length];
+  }
+
   // First validation message from a 422 response, else a generic message.
   function firstError(err, fallback) {
     var d = err && err.data;
@@ -278,7 +322,7 @@
         '<button type="button" class="pb-input pb-combo-btn" :class="[{\'is-error\': invalid}, dense ? \'!h-9\' : \'\']" @click.stop="toggle">' +
         '<span class="flex items-center gap-2 min-w-0">' +
         '<img v-if="chosenOption && chosenOption.avatar" :src="chosenOption.avatar" alt="" class="h-5 w-5 rounded-full object-cover shrink-0" />' +
-        '<span v-else-if="chosenOption && chosenOption.initial" class="h-5 w-5 rounded-full bg-brand text-white grid place-items-center text-[10px] font-bold shrink-0">{{ chosenOption.initial }}</span>' +
+        '<span v-else-if="chosenOption && chosenOption.initial" :style="{ background: $pb.avatarColor(chosenOption) }" class="h-5 w-5 rounded-full text-white grid place-items-center text-[10px] font-bold shrink-0">{{ chosenOption.initial }}</span>' +
         '<span v-else-if="chosenOption && chosenOption.icon" class="grid place-items-center shrink-0" v-html="chosenOption.icon"></span>' +
         '<span class="truncate" :class="selected.length ? \'text-ink\' : \'text-faint\'">{{ display }}</span></span>' +
         '' + wiIcon('chevron-down', 16, 'text-faint shrink-0 ml-1.5') + '' +
@@ -291,7 +335,7 @@
         '<ul class="max-h-56 overflow-y-auto py-1">' +
         '<li v-for="o in filtered" :key="o.value" @click.stop="choose(o)" :class="[\'px-3 flex gap-2 text-[13px] cursor-pointer hover:bg-hover\', o.desc ? \'py-2 items-start\' : \'h-9 items-center\', isChosen(o) ? \'text-brand\' : \'text-ink\']">' +
         '<img v-if="o.avatar" :src="o.avatar" alt="" class="h-6 w-6 rounded-full object-cover shrink-0" :class="o.desc ? \'mt-0.5\' : \'\'" />' +
-        '<span v-else-if="o.initial" class="h-6 w-6 rounded-full bg-brand text-white grid place-items-center text-[10px] font-bold shrink-0" :class="o.desc ? \'mt-0.5\' : \'\'">{{ o.initial }}</span>' +
+        '<span v-else-if="o.initial" :style="{ background: $pb.avatarColor(o) }" class="h-6 w-6 rounded-full text-white grid place-items-center text-[10px] font-bold shrink-0" :class="o.desc ? \'mt-0.5\' : \'\'">{{ o.initial }}</span>' +
         // `icon` is raw markup, in the same slot as the avatar: the option's own glyph, the
         // way the work item pickers show a state or priority. Author-supplied, never user
         // input — the option list is always built by the screen, not typed.
@@ -532,12 +576,12 @@
     var bootstrap = {};
     try { bootstrap = JSON.parse(root.getAttribute('data-bootstrap') || '{}'); } catch (e) {}
     var app = Vue.createApp(component, { bootstrap: bootstrap });
-    app.config.globalProperties.$pb = { api: api, withId: withId, firstError: firstError, fieldErrors: fieldErrors, toast: toast };
+    app.config.globalProperties.$pb = { api: api, withId: withId, firstError: firstError, fieldErrors: fieldErrors, toast: toast, avatarColor: avatarColor };
     registerShared(app);
     tooltips();
     root.innerHTML = '';
     app.mount(root);
   }
 
-  window.PB = { api: api, withId: withId, firstError: firstError, fieldErrors: fieldErrors, toast: toast, boot: boot, tooltips: tooltips };
+  window.PB = { api: api, withId: withId, firstError: firstError, fieldErrors: fieldErrors, toast: toast, boot: boot, tooltips: tooltips, avatarColor: avatarColor };
 })();

@@ -28,3 +28,8 @@
 
 {{-- The <wi-list> grid itself. --}}
 <script defer src="{{ pb_asset('assets/js/projects/work-item-list.js') }}"></script>
+
+{{-- The description editor. Here rather than on each screen for the same reason the grid's
+     assets are: the pair has a load order, and one page getting it wrong is a screen with no
+     editor. --}}
+@include('partials.rich-editor')
