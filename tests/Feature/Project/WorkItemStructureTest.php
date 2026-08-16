@@ -501,13 +501,13 @@ class WorkItemStructureTest extends ProjectTestCase
         )->assertOk();
 
         // §58: the two people who have to act on it.
-        Mail::assertQueued(WorkItemBlockedMail::class, fn ($mail) => $mail->hasTo('lead@example.com')
+        Mail::assertSent(WorkItemBlockedMail::class, fn ($mail) => $mail->hasTo('lead@example.com')
             && $mail->identifier === $blocked['identifier']
             && $mail->blockers[0]['identifier'] === $blocker['identifier']);
-        Mail::assertQueued(WorkItemBlockedMail::class, fn ($mail) => $mail->hasTo('assignee@example.com'));
+        Mail::assertSent(WorkItemBlockedMail::class, fn ($mail) => $mail->hasTo('assignee@example.com'));
 
         // The owner did it, so the owner is not told about it.
-        Mail::assertNotQueued(WorkItemBlockedMail::class, fn ($mail) => $mail->hasTo($owner->email));
+        Mail::assertNotSent(WorkItemBlockedMail::class, fn ($mail) => $mail->hasTo($owner->email));
     }
 
     public function test_the_blocking_side_and_plain_relations_send_no_blocked_email(): void
@@ -528,7 +528,7 @@ class WorkItemStructureTest extends ProjectTestCase
             ['relation_type' => 'related', 'work_item_ids' => [$b['id']]],
         )->assertOk();
 
-        Mail::assertNotQueued(WorkItemBlockedMail::class);
+        Mail::assertNotSent(WorkItemBlockedMail::class);
     }
 
     public function test_relations_reject_self_and_contradictory_pairs_and_ignore_duplicates(): void

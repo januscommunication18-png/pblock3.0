@@ -80,6 +80,8 @@ class WorkItemScreenPayload
             'defaultStateId' => $this->states->defaultState($project)?->id,
             'canCreate' => $canCreate,
             'canEdit' => $canCreate, // §34: whoever may create may also edit and delete.
+            // Runs the project — may log time on behalf of an assignee (§9.4).
+            'canManageProject' => Auth::user()?->can('manage', $project) ?? false,
             'mediaMaxKb' => (int) config('projects.media.max_kb'),
             // The Jodit Pro licence the description editor runs under, same source as Pages.
             'editorLicense' => (string) config('projects.jodit_license'),
@@ -212,6 +214,9 @@ class WorkItemScreenPayload
             'pageSearch' => $withId('projects.work-items.pages.search'),
             'pages' => $withId('projects.work-items.pages.store'),
             'createLabel' => $withId('projects.work-items.labels.store'),
+            // The `@` autocomplete's source (mentions §5). Project-scoped, because who may
+            // be mentioned is a question about a project (§16).
+            'mentionUsers' => route('projects.mentionable-users', $project),
             'mediaUpload' => route('projects.work-items.media.store', $project),
             'mediaGallery' => route('projects.work-items.media.index', $project),
         ];

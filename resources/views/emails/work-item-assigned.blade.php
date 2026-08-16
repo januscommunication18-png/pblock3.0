@@ -18,6 +18,16 @@
           </p>
         </td></tr>
 
+        @if (!empty($description))
+          {{-- What the work IS, not just what it is called: an assignment email carrying only
+               a title makes everybody open the app to find out whether it is urgent. --}}
+          <tr><td style="padding:0 32px 16px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8f9fa;border-left:3px solid #1b5f8a;border-radius:0 8px 8px 0;">
+              <tr><td style="padding:14px 16px;font-size:14px;color:#23272f;line-height:1.55;">{{ $description }}</td></tr>
+            </table>
+          </td></tr>
+        @endif
+
         <tr><td style="padding:0 32px;">
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8f9fa;border:1px solid #e5e7eb;border-radius:10px;">
             <tr><td style="padding:12px 16px 4px;font-size:13px;font-weight:600;color:#23272f;">Updates</td></tr>

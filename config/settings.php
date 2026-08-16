@@ -21,6 +21,8 @@ return [
         'Administration' => [
             ['key' => 'general', 'label' => 'General', 'status' => 'active'],
             ['key' => 'members', 'label' => 'Members', 'status' => 'active'],
+            ['key' => 'security', 'label' => 'Security', 'status' => 'active'],
+            ['key' => 'work-capacity', 'label' => 'Work Capacity', 'status' => 'active'],
             ['key' => 'billing', 'label' => 'Billing and plans', 'status' => 'placeholder'],
             ['key' => 'imports', 'label' => 'Imports', 'status' => 'placeholder'],
             ['key' => 'exports', 'label' => 'Exports', 'status' => 'placeholder'],
@@ -43,6 +45,55 @@ return [
             ['key' => 'webhooks', 'label' => 'Webhooks', 'status' => 'placeholder'],
             ['key' => 'tokens', 'label' => 'Access Tokens', 'status' => 'placeholder'],
         ],
+    ],
+
+    /**
+     * Administration > Security (docs/features/session-timeout.md).
+     *
+     * `timeout_default` is used when a workspace has not chosen one. `timeout_options` is the
+     * whitelist — enforced server-side, so a crafted request cannot set a 10-day session.
+     */
+    'security' => [
+        'timeout_default' => 30,
+        'timeout_options' => [15, 30, 60, 120, 240, 480],
+
+        // How long before expiry the warning appears (SES-005). Halved automatically when it
+        // would otherwise cover most of the session.
+        'warning_minutes' => 5,
+
+        // Floor between two client "I am still here" pings. The timer only needs to know
+        // whether somebody is present, not how fast they type.
+        'ping_seconds' => 60,
+
+        // How long a snapshot of unsaved text is worth offering back (SES-009).
+        'draft_ttl_hours' => 24,
+    ],
+
+    /**
+     * Work Capacity (docs/features/work-capacity.md).
+     *
+     * Defaults for a workspace that has switched capacity tracking on without changing
+     * anything else. `working_days` is ISO-8601 (1 = Monday), so Mon–Fri is 1..5.
+     */
+    'capacity' => [
+        'hours_per_day' => 8,
+        'working_days' => [1, 2, 3, 4, 5],
+
+        // §13's recommended validation. Half an hour is the smallest working day worth
+        // modelling; a day cannot be longer than one.
+        'min_hours_per_day' => 0.5,
+        'max_hours_per_day' => 24,
+
+        // §29. Percentages: 90 means 90% of available capacity.
+        'thresholds' => [
+            'near' => 90,
+            'over' => 100,
+            'high' => 110,
+        ],
+
+        // §30 — how many consecutive weeks above the high threshold raise Sustained Workload
+        // Risk. Read in phase 4; declared here so the number lives with the others it belongs to.
+        'sustained_weeks' => 3,
     ],
 
     /**

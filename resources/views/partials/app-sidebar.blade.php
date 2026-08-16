@@ -63,6 +63,9 @@
          Hidden for Viewers/Guests, who cannot create work items (§7). --}}
     @if ($__canCreate)
       @php($__wiTarget = $__projects[0]['work_items_url'] ?? null)
+      {{-- Opens the quick-create modal in place (docs/features/quick-create.md). The href is
+           kept as the no-JavaScript fallback and as what the Work Items screen's own richer
+           modal falls back to — it navigates with ?create=1, which auto-opens the modal there. --}}
       <a id="new-work-item-btn"
          href="{{ $__wiTarget ? $__wiTarget.'?create=1' : route('projects.index').'?create=1' }}"
          class="w-full flex items-center justify-center gap-2 px-2 h-9 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold mb-2 transition-colors">
@@ -71,6 +74,15 @@
       </a>
     @endif
     <a href="{{ route('welcome') }}" class="flex items-center gap-2 px-2 h-8 rounded-md text-ink hover:bg-hover">{!! pb_icon('house', 15) !!}Home</a>
+    {{-- Inbox (§2), with §26's combined unread count. Resolved here rather than passed, so the
+         badge is right on every screen that renders the sidebar. --}}
+    @php($__inbox = auth()->check() ? \App\Models\InboxNotification::query()->for(auth()->id())->unread()->count() : 0)
+    <a href="{{ route('inbox.index') }}"
+       class="flex items-center gap-2 px-2 h-8 rounded-md text-ink hover:bg-hover {{ request()->routeIs('inbox.*') ? 'bg-sel text-brand' : '' }}">{!! pb_icon('inbox', 15) !!}Inbox
+      @if ($__inbox)
+        <span class="ml-auto text-[11px] font-semibold rounded-full px-1.5 py-0.5 bg-brand text-white">{{ $__inbox }}</span>
+      @endif
+    </a>
     @if ($__canDraft)
       <a href="{{ route('drafts.index') }}"
          class="flex items-center gap-2 px-2 h-8 rounded-md text-ink hover:bg-hover {{ request()->routeIs('drafts.*') ? 'bg-sel text-brand' : '' }}">{!! pb_icon('pen', 15) !!}Drafts</a>
@@ -135,6 +147,14 @@
   <style>details[open] > summary .pb-chev { transform: rotate(180deg); }</style>
   <div class="px-4 py-2 border-t border-line text-[12px] text-sub shrink-0">Business trial ends in 13d</div>
 </aside>
+
+{{-- The quick-create modal's Vue root. Here because the sidebar is on every authenticated
+     screen and owns the button that opens it; the modal itself teleports to <body>, so this
+     element only has to exist, not to be anywhere in particular. --}}
+@if ($__canCreate)
+  <div id="work-item-create-root"></div>
+  <script defer src="{{ pb_asset('assets/js/work-item-create.js') }}"></script>
+@endif
 
 <script>
   (function () {

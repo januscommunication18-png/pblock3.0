@@ -8,6 +8,13 @@
         <testsuite name="Unit">
             <directory>tests/Unit</directory>
         </testsuite>
+        <!-- Browser tests are a suite of their own and are NOT in the default run: they need
+             Playwright plus a downloaded browser, so a fresh checkout would fail on a missing
+             Chromium rather than on anything about this application.
+             Run them with: ./vendor/bin/pest [dash][dash]testsuite=Browser -->
+        <testsuite name="Browser">
+            <directory>tests/Browser</directory>
+        </testsuite>
         <testsuite name="Feature">
             <directory>tests/Feature</directory>
         </testsuite>

@@ -29,6 +29,13 @@ class WorkspaceSettings extends Model
         'teamspaces_locked_at',
         'wiki_description',
         'wiki_docs_url',
+        'session_timeout_minutes',
+        'capacity_enabled',
+        'capacity_hours_per_day',
+        'capacity_working_days',
+        'capacity_near_threshold',
+        'capacity_over_threshold',
+        'capacity_high_threshold',
     ];
 
     protected function casts(): array
@@ -41,6 +48,12 @@ class WorkspaceSettings extends Model
             'customers_enabled' => 'boolean',
             'wiki_enabled' => 'boolean',
             'teamspaces_locked_at' => 'datetime',
+            'capacity_enabled' => 'boolean',
+            'capacity_hours_per_day' => 'decimal:2',
+            'capacity_working_days' => 'array',
+            'capacity_near_threshold' => 'integer',
+            'capacity_over_threshold' => 'integer',
+            'capacity_high_threshold' => 'integer',
         ];
     }
 

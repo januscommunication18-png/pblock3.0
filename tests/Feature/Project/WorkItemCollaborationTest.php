@@ -29,11 +29,29 @@ class WorkItemCollaborationTest extends ProjectTestCase
         return $user;
     }
 
-    private function makeItem($owner, $project, string $title = 'Work'): array
+    /**
+     * @param  array<int, int>  $assignees  who the item is assigned to; empty leaves it unassigned
+     */
+    private function makeItem($owner, $project, string $title = 'Work', array $assignees = []): array
     {
         return $this->actingAs($owner)
-            ->postJson(route('projects.work-items.store', $project), ['title' => $title])
+            ->postJson(route('projects.work-items.store', $project), array_filter([
+                'title' => $title,
+                'assignee_ids' => $assignees ?: null,
+            ]))
             ->assertStatus(201)->json('item');
+    }
+
+    /**
+     * An item assigned to its creator, for the worklog tests.
+     *
+     * Time can only be logged against an assignee (§9.4), so an unassigned item is the one
+     * shape those tests cannot use. Kept separate from makeItem() because other tests here
+     * depend on an item starting with nobody on it.
+     */
+    private function makeAssignedItem($owner, $project, string $title = 'Work'): array
+    {
+        return $this->makeItem($owner, $project, $title, [$owner->id]);
     }
 
     private function url(string $name, $project, array $item, array $extra = []): string
@@ -183,7 +201,7 @@ class WorkItemCollaborationTest extends ProjectTestCase
         [$owner, $ws] = $this->owner();
         $project = $this->makeProject($owner, $ws, ['identifier' => 'TESTI']);
         $this->actingAs($owner)->get(route('projects.work-items', $project));
-        $item = $this->makeItem($owner, $project);
+        $item = $this->makeAssignedItem($owner, $project);
         $store = $this->url('projects.work-items.worklogs.store', $project, $item);
 
         // §9.5: zero duration is not a record of anything.
@@ -224,7 +242,7 @@ class WorkItemCollaborationTest extends ProjectTestCase
         [$owner, $ws] = $this->owner();
         $project = $this->makeProject($owner, $ws, ['identifier' => 'TESTI']);
         $this->actingAs($owner)->get(route('projects.work-items', $project));
-        $item = $this->makeItem($owner, $project);
+        $item = $this->makeAssignedItem($owner, $project);
 
         $mate = $this->projectMember($ws, $project, 'member', 'mate@example.com');
 

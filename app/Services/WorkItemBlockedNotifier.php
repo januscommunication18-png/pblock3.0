@@ -23,6 +23,11 @@ use Illuminate\Support\Facades\Mail;
  *
  * Registered with `DB::afterCommit`, because relations are written inside a transaction: if
  * it rolls back, nothing is blocked and no mail should claim otherwise.
+ *
+ * Sent IMMEDIATELY (`sendNow`) rather than queued, by product decision — a departure from
+ * CLAUDE.md §11, taken for every work item alert together. Queued, the mail waits for a
+ * worker and never arrives where none is running; not queued, the request that created the
+ * dependency waits for the SMTP round-trip.
  */
 class WorkItemBlockedNotifier
 {
@@ -73,7 +78,7 @@ class WorkItemBlockedNotifier
         DB::afterCommit(function () use ($emails, $mail, $item) {
             foreach ($emails as $email) {
                 try {
-                    Mail::to($email)->queue($mail);
+                    Mail::to($email)->sendNow($mail);
                 } catch (\Throwable $e) {
                     Log::error('work_item.blocked.email_failed', [
                         'work_item_id' => $item->id,

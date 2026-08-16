@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Mention;
 use App\Models\Project;
 use App\Models\ProjectItemState;
 use App\Models\User;
@@ -31,6 +32,9 @@ class WorkItemCreator
     public function __construct(
         private readonly WorkItemActivityRecorder $activity,
         private readonly WorkItemAssignmentNotifier $assignments,
+        private readonly MentionSync $mentions,
+        private readonly MentionNotifier $mentionNotifier,
+        private readonly InboxNotifier $inbox,
     ) {}
 
     /**
@@ -75,6 +79,7 @@ class WorkItemCreator
                 // terms as a later assignment (§4.3).
                 foreach (User::whereIn('id', $assigneeIds)->get() as $assignee) {
                     $this->assignments->assigned($item, $assignee, $creator);
+                    $this->inbox->assigned($item, $assignee, $creator);
                 }
             }
             if (! empty($data['label_ids'])) {
@@ -84,6 +89,14 @@ class WorkItemCreator
             if (! empty($data['module_ids'])) {
                 $item->modules()->sync(array_values(array_unique($data['module_ids'])));
             }
+
+            // §10: mentions are processed only once the item exists and its description is
+            // stored — never while somebody is still typing. Inside the transaction, so a
+            // failed create leaves no mention records behind; the mail waits for the commit.
+            $this->mentionNotifier->mentioned(
+                $this->mentions->sync(Mention::SOURCE_WORK_ITEM, $item->id, $item->description, $project, $item, $creator),
+                $item, $creator, Mention::SOURCE_WORK_ITEM, $item->description,
+            );
 
             // Inside the transaction: a work item must never exist without its creation
             // entry, and activity cannot be reconstructed after the fact (§6).

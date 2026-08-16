@@ -3,6 +3,7 @@
 use App\Http\Controllers\Project\CycleController;
 use App\Http\Controllers\Project\EpicController;
 use App\Http\Controllers\Project\EstimationController;
+use App\Http\Controllers\Project\MentionController;
 use App\Http\Controllers\Project\ModuleController;
 use App\Http\Controllers\Project\PageController;
 use App\Http\Controllers\Project\ProjectController;
@@ -19,6 +20,7 @@ use App\Http\Controllers\Project\WorkItemController;
 use App\Http\Controllers\Project\WorkItemMediaController;
 use App\Http\Controllers\Project\WorkItemReactionController;
 use App\Http\Controllers\Project\WorkItemStructureController;
+use App\Http\Controllers\WorkItemQuickCreateController;
 use App\Models\Project;
 use Illuminate\Support\Facades\Route;
 
@@ -67,6 +69,16 @@ Route::middleware(['auth', 'workspace.tenancy'])
             ->whereNumber('project')->name('work-items.media.index');
         Route::get('/{project}/work-items/media/{media}', [WorkItemMediaController::class, 'show'])
             ->whereNumber(['project', 'media'])->name('work-items.media.show');
+
+        // The quick-create modal's pickers for one project. Above the /{workItem} routes so
+        // "options" is never read as a work item id.
+        Route::get('/{project}/work-items/options', [WorkItemQuickCreateController::class, 'options'])
+            ->whereNumber('project')->name('work-items.options');
+
+        // Who the editor may offer when somebody types `@` (mentions §5). Above the
+        // /{workItem} routes so "mentionable-users" is never read as a work item id.
+        Route::get('/{project}/mentionable-users', [MentionController::class, 'index'])
+            ->whereNumber('project')->name('mentionable-users');
 
         // Structure: sub-tasks, dependencies, relations, links (Collaboration §19-§41).
         Route::get('/{project}/work-items/{workItem}/structure', [WorkItemStructureController::class, 'show'])

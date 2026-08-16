@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Project;
 use App\Models\EstimateValue;
 use App\Models\Project;
 use App\Models\ProjectEstimation;
+use App\Services\Capacity\CapacitySettings;
+use App\Services\Capacity\CapacitySnapshotWriter;
 use App\Services\EstimationConfigurator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -61,6 +63,7 @@ class EstimationController extends ManagesProjectController
             'label' => ['required', 'string', 'max:'.config('projects.estimate_label_max')],
             'numeric_value' => ['nullable', 'numeric'],
             'duration_minutes' => ['nullable', 'integer', 'min:1'],
+            'capacity_hours' => ['nullable', 'numeric', 'min:0', 'max:9999'],
         ]);
 
         $this->configurator->addValue($estimation, $data);
@@ -83,9 +86,19 @@ class EstimationController extends ManagesProjectController
             'label' => ['sometimes', 'required', 'string', 'max:'.config('projects.estimate_label_max')],
             'numeric_value' => ['sometimes', 'nullable', 'numeric'],
             'duration_minutes' => ['sometimes', 'nullable', 'integer', 'min:1'],
+            // Nullable is the point: clearing the field means "not mapped", which capacity
+            // treats as unestimated rather than as zero hours (CAP-D2).
+            'capacity_hours' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:9999'],
         ]);
 
         $this->configurator->renameValue($value, $data);
+
+        // Open work items carrying this value are re-planned with the new figure; completed
+        // ones keep what they were planned with, so last quarter's report does not move
+        // (CAP-D3 / §47).
+        if (array_key_exists('capacity_hours', $data)) {
+            app(CapacitySnapshotWriter::class)->afterValueChanged($value->fresh());
+        }
 
         return response()->json([
             'ok' => true,
@@ -185,6 +198,11 @@ class EstimationController extends ManagesProjectController
                             )),
                         ])->values()->all(),
                 ])->values()->all(),
+            // Work Capacity context (docs/features/work-capacity.md §7). Sent whether or not
+            // capacity is on, because the screen has to know which of the two it is: with it
+            // off there is nothing to map estimates INTO, and an hours column would be asking
+            // for a number that feeds nothing.
+            'capacity' => self::capacityContext(),
             'labelMax' => (int) config('projects.estimate_label_max'),
             'valuesMax' => (int) config('projects.estimate_values_max'),
             'endpoints' => [
@@ -217,11 +235,39 @@ class EstimationController extends ManagesProjectController
                 'label' => $v->label,
                 'numeric_value' => $v->numeric_value !== null ? (float) $v->numeric_value : null,
                 'duration_minutes' => $v->duration_minutes,
+                // What the row shows in its hours field. `capacity_hours` is what is STORED
+                // and editable; `hours` is what this value is actually worth — the two differ
+                // for a time estimate, which derives its hours from its own duration.
+                'capacity_hours' => $v->capacity_hours !== null ? (float) $v->capacity_hours : null,
+                'hours' => $v->capacityHours(),
                 'sort_order' => $v->sort_order,
                 'active' => $v->active,
                 // §21's warning has to name a number before anything is removed.
                 'in_use' => $v->workItems()->count(),
             ])->values()->all(),
+        ];
+    }
+
+    /**
+     * The workspace's working week, for the header on this screen.
+     *
+     * Read through CapacitySettings rather than the settings row, so the day and week totals
+     * here are produced by the same code the Team Capacity report reads — a screen that says
+     * "40h/week" while the report measures against something else is worse than one that says
+     * nothing.
+     *
+     * @return array<string, mixed>
+     */
+    private static function capacityContext(): array
+    {
+        $capacity = app(CapacitySettings::class);
+
+        return [
+            'enabled' => $capacity->enabled(),
+            'hoursPerDay' => $capacity->hoursPerDay(),
+            'weeklyHours' => $capacity->weeklyHours(),
+            'workingDays' => count($capacity->workingDays()),
+            'settingsUrl' => route('settings.work-capacity'),
         ];
     }
 

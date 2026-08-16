@@ -12,6 +12,13 @@
    ------------------------------------------------------------------ */
 
 /** Is the Jodit package actually loaded? The Pro build is licensed and not vendored by default. */
+/** Escape before building menu/chip markup by hand — names and emails are user content. */
+function pgEsc(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 function pgJoditReady() {
   return typeof window !== 'undefined' && typeof window.Jodit !== 'undefined';
 }
@@ -62,7 +69,15 @@ var PgEditor = {
      * Set for every breakpoint, because Jodit otherwise falls back to the full set as the
      * viewport narrows and the toolbar grows rather than shrinks.
      */
-    buttons: { type: String, default: '' }
+    buttons: { type: String, default: '' },
+    /**
+     * The endpoint the `@` autocomplete asks for people (mentions §5).
+     *
+     * Empty means no mentions — which is what a project-less surface gets, because "who may
+     * be mentioned" is a question about a project (§16) and there is nobody to answer it for
+     * a draft. The `@` key is then just a character.
+     */
+    mentionUrl: { type: String, default: '' }
   },
   emits: ['update:modelValue', 'blur'],
   data: function () {
@@ -127,6 +142,7 @@ var PgEditor = {
 
     this.applyOurIcons();
     this.relocateToolbar();
+    this.attachMentions();
 
     // Content LAST, after the listeners — the same ordering lesson <wi-editor> records: a
     // throw while parsing must not cost the editor its wiring.
@@ -134,6 +150,12 @@ var PgEditor = {
   },
   beforeUnmount: function () {
     clearTimeout(this._syncTimer);
+    clearTimeout(this._mentionTimer);
+    try {
+      // Tribute appends its menu to <body>, so it outlives the editor unless detached.
+      if (this._tribute && this.jodit && this.jodit.editor) this._tribute.detach(this.jodit.editor);
+    } catch (e) { /* the editor is going away regardless */ }
+    this._tribute = null;
     try {
       if (this.jodit && this.jodit.destruct) this.jodit.destruct();
     } catch (e) { /* already torn down */ }
@@ -220,6 +242,94 @@ var PgEditor = {
         'th,td{border:1px solid #e5e7eb;padding:8px 10px;text-align:left;vertical-align:top;}',
         'th{background:#f6f7f8;font-weight:600;}'
       ].join('');
+    },
+
+    /**
+     * Wire the `@` autocomplete onto this editor (mentions §1-§7, §26-§29).
+     *
+     * TributeJS attached directly to `jodit.editor`, rather than through the
+     * `jodit-tributejs` package the requirement names. That package is pinned to Jodit ^3 and
+     * registers through the Jodit 3 plugin API; the vendored build is 4.13.37, so it does not
+     * attach at all — see public/assets/vendor/tribute/README.md. Its entire job was these
+     * few lines, and doing them HERE is what §21/§22 asks for anyway: one central editor
+     * configuration, so no form wires mentions up for itself.
+     */
+    attachMentions: function () {
+      if (!this.mentionUrl || typeof window.Tribute === 'undefined' || !this.jodit || !this.jodit.editor) {
+        return;
+      }
+
+      var self = this;
+
+      this._tribute = new window.Tribute({
+        trigger: '@',
+        // Matched server-side, so nothing is filtered twice with two different rules.
+        lookup: 'name',
+        fillAttr: 'name',
+        // §28: nothing is fetched until there is something to search for, and the request is
+        // debounced — a workspace of two thousand people must not be downloaded because
+        // somebody typed `@`.
+        values: function (text, done) { self.searchMembers(text, done); },
+        // §6: [avatar] name / email. The avatar falls back to the person's own colour, the
+        // same one their disc wears everywhere else in the app.
+        menuItemTemplate: function (item) {
+          var u = item.original;
+          var face = u.avatar_url
+            ? '<img src="' + pgEsc(u.avatar_url) + '" alt="" class="pb-mention-face" />'
+            : '<span class="pb-mention-face" style="background:' + pgEsc(u.avatar_color || '#475569') + '">'
+              + pgEsc(u.initial || '?') + '</span>';
+
+          return face + '<span class="pb-mention-who"><span class="pb-mention-name">' + pgEsc(u.name)
+            + '</span><span class="pb-mention-email">' + pgEsc(u.email || '') + '</span></span>';
+        },
+        // §7/§8: the id is what is stored. The name is only what it reads as, so renaming
+        // somebody later cannot break a mention that already exists.
+        selectTemplate: function (item) {
+          if (!item) return '';
+          var u = item.original;
+
+          return '<span class="pb-mention" data-mention-type="user" data-user-id="' + pgEsc(String(u.id))
+            + '">@' + pgEsc(u.name) + '</span>&nbsp;';
+        },
+        // §29: the three things the popup can have to say.
+        noMatchTemplate: function () {
+          return '<span class="pb-mention-empty">' + (self._mentionFailed ? 'Unable to load members. Try again.' : 'No members found') + '</span>';
+        },
+        allowSpaces: false,
+        menuItemLimit: 8,
+        selectClass: 'pb-mention-active'
+      });
+
+      this._tribute.attach(this.jodit.editor);
+
+      // Enter belongs to the menu while it is open, or picking somebody also breaks the
+      // paragraph. Capture phase, ahead of Jodit's own Enter handling.
+      this.jodit.editor.addEventListener('keydown', function (e) {
+        if (self._tribute && self._tribute.isActive && (e.key === 'Enter' || e.key === 'Tab')) {
+          e.stopPropagation();
+        }
+      }, true);
+    },
+
+    /**
+     * Ask the server who matches, debounced (§28).
+     *
+     * A lookup that fails must not stop somebody writing (§29), so the callback is always
+     * called — with an empty list — and the popup says so rather than hanging on "Searching".
+     */
+    searchMembers: function (text, done) {
+      var self = this;
+      clearTimeout(this._mentionTimer);
+
+      this._mentionTimer = setTimeout(function () {
+        var url = self.mentionUrl + (self.mentionUrl.indexOf('?') > -1 ? '&' : '?')
+          + 'search=' + encodeURIComponent(text || '');
+
+        fetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' })
+          .then(function (r) { return r.ok ? r.json() : Promise.reject(new Error(String(r.status))); })
+          .then(function (data) { self._mentionFailed = false; done(data.users || []); })
+          .catch(function () { self._mentionFailed = true; done([]); });
+      }, 250);
     },
 
     /** Move the built toolbar into the host, if one was named. */

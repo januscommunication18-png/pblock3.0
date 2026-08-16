@@ -72,7 +72,10 @@ class EstimationConfigurator
     /** Rename a value, or change what it is worth (§20). */
     public function renameValue(EstimateValue $value, array $changes): EstimateValue
     {
-        $value->fill(array_intersect_key($changes, array_flip(['label', 'numeric_value', 'duration_minutes'])))->save();
+        $value->fill(array_intersect_key(
+            $changes,
+            array_flip(['label', 'numeric_value', 'duration_minutes', 'capacity_hours']),
+        ))->save();
 
         return $value->fresh();
     }
@@ -165,6 +168,12 @@ class EstimationConfigurator
             'duration_minutes' => $estimation->type === ProjectEstimation::TYPE_TIME
                 ? ($value['duration_minutes'] ?? null)
                 : null,
+            // What this estimate is worth in working hours (work-capacity CAP-D1). Points and
+            // categories carry it; a time value derives its own from duration_minutes, so
+            // storing a second figure beside it would be a second answer to one question.
+            'capacity_hours' => $estimation->type === ProjectEstimation::TYPE_TIME
+                ? null
+                : ($value['capacity_hours'] ?? null),
             'sort_order' => $sortOrder,
             'active' => true,
         ]);

@@ -25,6 +25,7 @@ class EstimateValue extends Model
         'label',
         'numeric_value',
         'duration_minutes',
+        'capacity_hours',
         'sort_order',
         'active',
     ];
@@ -34,6 +35,7 @@ class EstimateValue extends Model
         return [
             'numeric_value' => 'decimal:2',
             'duration_minutes' => 'integer',
+            'capacity_hours' => 'decimal:2',
             'sort_order' => 'integer',
             'active' => 'boolean',
         ];
@@ -61,6 +63,34 @@ class EstimateValue extends Model
      * handle null rather than treating the absence as zero, which would silently report a
      * category project as having estimated nothing.
      */
+    /**
+     * The working hours this estimate is worth, or null when it has none
+     * (docs/features/work-capacity.md, CAP-D1/CAP-D2).
+     *
+     * A `time` value already IS hours, so it reads `duration_minutes` and ignores any
+     * configured `capacity_hours` — asking for the figure twice is asking for two answers that
+     * are free to disagree. Points and categories have no inherent duration and use the
+     * configured column.
+     *
+     * Null means UNMAPPED, and every caller must carry it as such rather than as zero: an
+     * unmapped estimate is work whose size nobody has stated, which is not the same as work
+     * that takes no time.
+     */
+    public function capacityHours(): ?float
+    {
+        if ($this->duration_minutes !== null) {
+            return round($this->duration_minutes / 60, 2);
+        }
+
+        return $this->capacity_hours !== null ? (float) $this->capacity_hours : null;
+    }
+
+    /** Whether this value needs a capacity figure configured before it can be planned with. */
+    public function needsCapacityMapping(): bool
+    {
+        return $this->duration_minutes === null && $this->capacity_hours === null;
+    }
+
     public function rollupValue(): ?float
     {
         if ($this->numeric_value !== null) {

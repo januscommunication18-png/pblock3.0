@@ -9,6 +9,12 @@
      Include AFTER assets/js/icons.js (the toolbar borrows the app's own icons) and BEFORE the
      screen script. --}}
 
+{{-- TributeJS — the `@` mention engine, attached to Jodit by <pg-editor> (mentions §1).
+     Before Jodit, so `window.Tribute` exists by the time an editor mounts. See
+     public/assets/vendor/tribute/README.md for why the jodit-tributejs package is not used. --}}
+<link rel="stylesheet" href="{{ pb_asset('assets/vendor/tribute/tribute.css') }}" />
+<script src="{{ pb_asset('assets/vendor/tribute/tribute.min.js') }}"></script>
+
 @if (file_exists(public_path('assets/vendor/jodit/jodit.fat.min.js')))
   <link rel="stylesheet" href="{{ pb_asset('assets/vendor/jodit/jodit.fat.min.css') }}" />
   <script src="{{ pb_asset('assets/vendor/jodit/jodit.fat.min.js') }}"></script>

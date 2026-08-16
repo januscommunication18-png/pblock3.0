@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Cycle;
 use App\Models\Epic;
 use App\Models\EstimateValue;
+use App\Models\Mention;
 use App\Models\Module;
 use App\Models\ProjectItemLabel;
 use App\Models\ProjectItemState;
@@ -30,6 +31,10 @@ class WorkItemUpdater
     public function __construct(
         private readonly WorkItemActivityRecorder $activity,
         private readonly WorkItemAssignmentNotifier $assignments,
+        private readonly WorkItemStatusNotifier $statusNotifier,
+        private readonly MentionSync $mentions,
+        private readonly MentionNotifier $mentionNotifier,
+        private readonly InboxNotifier $inbox,
         private readonly RichTextSanitizer $richText,
     ) {}
 
@@ -63,10 +68,24 @@ class WorkItemUpdater
                 // transition, in the same transaction as the change itself.
                 if ($field === 'state_id') {
                     $this->recordTransition($item, $actor, $old, $new);
+                    // …and tells whoever subscribed. Registered inside the transaction but
+                    // sent after it commits, so a rolled-back edit sends nothing.
+                    $this->statusNotifier->statusChanged($item, $actor, $old ? (int) $old : null, $new ? (int) $new : null);
                 }
             }
 
             $item->save();
+
+            // §11: a diff, not a resend — only people newly named in the new text are told.
+            if (array_key_exists('description', $data)) {
+                $item->loadMissing('project');
+                if ($item->project) {
+                    $this->mentionNotifier->mentioned(
+                        $this->mentions->sync(Mention::SOURCE_WORK_ITEM, $item->id, $item->description, $item->project, $item, $actor),
+                        $item, $actor, Mention::SOURCE_WORK_ITEM, $item->description,
+                    );
+                }
+            }
 
             if (array_key_exists('assignee_ids', $data)) {
                 $this->syncRelation($item, $actor, 'assignees', $data['assignee_ids']);
@@ -283,6 +302,11 @@ class WorkItemUpdater
      */
     private function notifyNewAssignees(WorkItem $item, User $actor, array $before, array $after): void
     {
+        // §29's two halves, from one diff. Removing somebody clears the unread entry that
+        // asked them to review an assignment they no longer have (§28); adding somebody
+        // gives them theirs.
+        $this->inbox->unassigned($item, array_values(array_diff($before, $after)));
+
         $added = array_values(array_diff($after, $before));
         if ($added === []) {
             return;
@@ -290,6 +314,7 @@ class WorkItemUpdater
 
         foreach (User::whereIn('id', $added)->get() as $assignee) {
             $this->assignments->assigned($item, $assignee, $actor);
+            $this->inbox->assigned($item, $assignee, $actor);
         }
     }
 }

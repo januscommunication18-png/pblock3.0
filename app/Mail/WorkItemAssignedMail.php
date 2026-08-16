@@ -32,6 +32,14 @@ class WorkItemAssignedMail extends Mailable implements ShouldQueue
         public readonly string $assignerName,
         public readonly string $assigneeName,
         public readonly string $url,
+        /**
+         * What the work is, not just what it is called.
+         *
+         * An assignment email that carries only a title makes everybody open the app to find
+         * out whether it is urgent. Plain text rather than the stored markup: mail clients
+         * render HTML unevenly, and this is context, not the document.
+         */
+        public readonly ?string $description = null,
     ) {}
 
     public function envelope(): Envelope

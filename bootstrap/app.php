@@ -1,6 +1,8 @@
 <?php
 
+use App\Http\Middleware\EnforceIdleTimeout;
 use App\Http\Middleware\InitializeWorkspaceTenancy;
+use App\Http\Middleware\InjectSessionGuard;
 use App\Http\Middleware\RequireAccessCode;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -27,6 +29,15 @@ return Application::configure(basePath: dirname(__DIR__))
         // route added later cannot quietly be reachable. Inert in production and wherever
         // the module is switched off — see App\Services\AccessGate.
         $middleware->web(append: RequireAccessCode::class);
+
+        // Idle-timeout enforcement + the guard markup that warns before it fires
+        // (docs/features/session-timeout.md). On the whole web group, not on the authenticated
+        // routes, so a route added later cannot quietly opt out of the timeout. Both are inert
+        // for guests.
+        $middleware->web(append: [
+            EnforceIdleTimeout::class,
+            InjectSessionGuard::class,
+        ]);
 
         // Tenancy MUST initialize before route-model binding so that bindings of
         // tenant-scoped models (project states, labels, invitations, …) are confined to

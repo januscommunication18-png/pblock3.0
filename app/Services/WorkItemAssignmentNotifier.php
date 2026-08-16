@@ -20,6 +20,11 @@ use Illuminate\Support\Facades\Mail;
  * updater's transaction: if that transaction rolls back, the assignment never happened and
  * the mail must not go out. Delivery problems are logged, never thrown — a mail server being
  * down must not fail the edit that triggered it.
+ *
+ * Sent IMMEDIATELY (`sendNow`) rather than queued, by product decision — a departure from
+ * CLAUDE.md §11. Queued, the mail waits for a worker and never arrives at all where none is
+ * running; the price of not queueing is that the assigning request waits for the SMTP
+ * round-trip.
  */
 class WorkItemAssignmentNotifier
 {
@@ -46,13 +51,17 @@ class WorkItemAssignmentNotifier
                 'project' => $project->id,
                 'workItem' => $item->id,
             ]),
+            description: app(RichTextSanitizer::class)->excerpt(
+                $item->description,
+                (int) config('projects.excerpt.email'),
+            ),
         );
 
         $email = $assignee->email;
 
         DB::afterCommit(function () use ($email, $mail, $item, $assignee) {
             try {
-                Mail::to($email)->queue($mail);
+                Mail::to($email)->sendNow($mail);
             } catch (\Throwable $e) {
                 Log::error('work_item.assignment.email_failed', [
                     'work_item_id' => $item->id,

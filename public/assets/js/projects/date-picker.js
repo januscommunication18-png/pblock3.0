@@ -72,7 +72,19 @@ var WiCalendar = {
    * selectable in them are removed from the two dropdowns and the arrows stop at the edge,
    * so a due-date picker only ever offers dates forward of the start date.
    */
-  props: { value: String, after: String, before: String },
+  props: {
+    value: String, after: String, before: String,
+    /**
+     * Which day-offset shortcuts to offer, as an array of numbers.
+     *
+     * The default is the forward-looking set the date CHIPS want — a start or due date is
+     * nearly always today or soon. A form recording work that has already happened wants a
+     * shorter list (Log work passes [0, 1]), because "Next 5 days" is not a day anybody
+     * logged work on. The list is a prop rather than a second component so there stays one
+     * calendar in this app.
+     */
+    quick: { type: Array, default: function () { return [0, 1, 3, 5]; } }
+  },
   emits: ['pick', 'clear'],
   data: function () {
     var after = wiParseISO(this.after), before = wiParseISO(this.before);
@@ -84,7 +96,31 @@ var WiCalendar = {
       else if (before) seed = new Date(before.getFullYear(), before.getMonth(), before.getDate() - 1);
       else seed = new Date();
     }
-    return { mode: 'quick', vy: seed.getFullYear(), vm: seed.getMonth(), monthOpen: false, yearOpen: false };
+    // `dropUp` starts true because upward is what every caller got before this was dynamic,
+    // and the first paint happens before anything can be measured. placeSelf() corrects it on
+    // the next tick, which is one frame — not something an eye catches.
+    return { mode: 'quick', vy: seed.getFullYear(), vm: seed.getMonth(), monthOpen: false, yearOpen: false, dropUp: true };
+  },
+
+  mounted: function () {
+    this.$nextTick(this.placeSelf);
+
+    // The popover is only ever as tall as the mode it is in, and re-measuring on resize is
+    // cheap next to a calendar hanging off the bottom of the window.
+    this._replace = this.placeSelf.bind(this);
+    window.addEventListener('resize', this._replace);
+    window.addEventListener('scroll', this._replace, true);
+  },
+
+  beforeUnmount: function () {
+    window.removeEventListener('resize', this._replace);
+    window.removeEventListener('scroll', this._replace, true);
+  },
+
+  watch: {
+    // Quick options are a short list; the month grid is roughly twice the height. What fitted
+    // below a moment ago may not fit now.
+    mode: function () { this.$nextTick(this.placeSelf); }
   },
   computed: {
     selected: function () { return wiParseISO(this.value); },
@@ -126,6 +162,32 @@ var WiCalendar = {
     }
   },
   methods: {
+    /**
+     * Open downward when there is room, upward when there is not.
+     *
+     * Measured against the ANCHOR — the positioned wrapper holding the trigger — rather than
+     * against the popover itself, which is out of flow and so contributes nothing to its
+     * parent's box. Absolutely positioned children never do, which is what makes this safe.
+     *
+     * When neither side fits, the roomier one wins: a calendar clipped a little beats one
+     * clipped a lot, and there is nowhere else for it to go.
+     */
+    placeSelf: function () {
+      try {
+        var anchor = this.$el && this.$el.parentElement;
+        if (!anchor) return;
+
+        var rect = anchor.getBoundingClientRect();
+        var height = this.$el.offsetHeight || 0;
+        var GAP = 8;
+
+        var below = window.innerHeight - rect.bottom - GAP;
+        var above = rect.top - GAP;
+
+        this.dropUp = below < height && above > below;
+      } catch (e) { /* an unplaceable calendar still opens, upward */ }
+    },
+
     addDays: function (n) { var d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + n); return d; },
     /** Exclusive on both sides — the bounding day itself is not selectable. */
     outOfRange: function (d) {
@@ -133,6 +195,13 @@ var WiCalendar = {
       return !!((b.after && d <= b.after) || (b.before && d >= b.before));
     },
     quickDisabled: function (n) { return this.outOfRange(this.addDays(n)); },
+    quickLabel: function (n) {
+      if (n === 0) return 'Today';
+      if (n === 1) return 'Tomorrow';
+      if (n === -1) return 'Yesterday';
+
+      return (n > 0 ? 'Next ' : 'Last ') + Math.abs(n) + ' days';
+    },
     quickPick: function (n) { if (!this.quickDisabled(n)) this.$emit('pick', wiISO(this.addDays(n))); },
     custom: function () {
       if (this.selected) { this.vy = this.selected.getFullYear(); this.vm = this.selected.getMonth(); }
@@ -179,15 +248,14 @@ var WiCalendar = {
     }
   },
   template:
-    '<div class="absolute left-0 bottom-full mb-1 w-[300px] rounded-lg bg-white p-2 shadow-lg outline outline-1 outline-black/5 z-50" @click.stop>' +
+    '<div :class="[\'absolute left-0 w-[300px] rounded-lg bg-white p-2 shadow-lg outline outline-1 outline-black/5 z-50\', ' +
+    'dropUp ? \'bottom-full mb-1\' : \'top-full mt-1\']" @click.stop>' +
 
     // -- Quick options --
     '<template v-if="mode===\'quick\'">' +
-    '<button type="button" :disabled="quickDisabled(0)" @click="quickPick(0)" :class="quickClass(0)"><span v-html="calIcon"></span>Today</button>' +
-    '<button type="button" :disabled="quickDisabled(1)" @click="quickPick(1)" :class="quickClass(1)"><span v-html="calIcon"></span>Tomorrow</button>' +
-    '<button type="button" :disabled="quickDisabled(3)" @click="quickPick(3)" :class="quickClass(3)"><span v-html="calIcon"></span>Next 3 days</button>' +
-    '<button type="button" :disabled="quickDisabled(5)" @click="quickPick(5)" :class="quickClass(5)"><span v-html="calIcon"></span>Next 5 days</button>' +
-    '<div class="my-1 border-t border-line"></div>' +
+    '<button v-for="n in quick" :key="n" type="button" :disabled="quickDisabled(n)" @click="quickPick(n)" ' +
+    ':class="quickClass(n)"><span v-html="calIcon"></span>{{ quickLabel(n) }}</button>' +
+    '<div v-if="quick.length" class="my-1 border-t border-line"></div>' +
     '<button type="button" @click="custom" class="w-full text-left flex items-center gap-2.5 px-2 h-9 rounded-md text-[13px] text-ink hover:bg-hover"><span v-html="calIcon"></span>Custom Date</button>' +
     '<template v-if="selected">' +
     '<div class="my-1 border-t border-line"></div>' +

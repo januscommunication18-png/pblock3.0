@@ -5,6 +5,8 @@
 @php($__u = $user ?? auth()->user())
 @php($__ws = $workspace ?? optional($__u)->currentWorkspace)
 
+@include('partials.realtime')
+
 {{-- Hidden sign-out form (POST /logout) triggered from the account menu. --}}
 <form method="POST" action="{{ route('logout') }}" id="logout-form" class="hidden">@csrf</form>
 
@@ -41,7 +43,13 @@
       {!! pb_icon('grid', 15) !!}
       Workspace
     </a>
-    <button class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover" title="Inbox">{!! pb_icon('inbox', 17) !!}</button>
+    <a href="{{ route('inbox.index') }}" class="relative h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover" title="Inbox" aria-label="Inbox">{!! pb_icon('inbox', 17) !!}
+      @php($__inboxCount = auth()->check() ? \App\Models\InboxNotification::query()->for(auth()->id())->unread()->count() : 0)
+      {{-- Rendered server-side and then kept current over the socket (§26/§27): the count has
+           to move when somebody assigns you something while you are on another screen. --}}
+      <span data-inbox-count
+            class="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 grid place-items-center rounded-full bg-brand text-white text-[10px] font-bold {{ $__inboxCount ? '' : 'hidden' }}">{{ $__inboxCount }}</span>
+    </a>
     <button class="h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover" title="Help">{!! pb_icon('circle-question', 17) !!}</button>
 
     {{-- Account menu — one partial, shared with app/projects and app/welcome, which

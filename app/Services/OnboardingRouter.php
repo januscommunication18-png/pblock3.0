@@ -30,6 +30,20 @@ class OnboardingRouter
     }
 
     /**
+     * The URL a completed sign-in should land on, honouring a pending return target (SES-008).
+     *
+     * The return target is only honoured once onboarding is FINISHED. Somebody who expired
+     * mid-flow and signs back in has to resume the flow — dropping them on the work item they
+     * were reading would skip the steps that make the rest of the app work.
+     */
+    public function landingFor(User $user, ?string $returnTo = null): string
+    {
+        $route = $this->destinationFor($user);
+
+        return ($returnTo && $route === 'welcome') ? url($returnTo) : route($route);
+    }
+
+    /**
      * After personalization (profile/role/goals) is complete, route by workspace state
      * (LOGIN-005 / spec §3, §9):
      *   - invitation waiting        -> join the inviting workspace

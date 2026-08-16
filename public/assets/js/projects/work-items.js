@@ -605,6 +605,7 @@ var WorkItemsScreen = {
       defaultStateId: b.defaultStateId || '',
       canCreate: !!b.canCreate,
       canEdit: !!b.canEdit,
+      canManageProject: !!b.canManageProject,
       /*
        * MULTI-PROJECT MODE (Your Work).
        *
@@ -653,7 +654,7 @@ var WorkItemsScreen = {
       composer: { content: '', busy: false },
       commentModal: { open: false, mode: 'reply', target: null, content: '', busy: false },
       updateForm: { open: false, id: null, status: 'on_track', content: '', busy: false },
-      worklogForm: { open: false, id: null, date: '', hours: '', minutes: '', description: '', busy: false, error: '' },
+      worklogForm: { open: false, id: null, userId: null, date: '', dateOpen: false, hours: '', minutes: '', description: '', busy: false, error: '' },
       // The shared work-item picker behind "add sub-task" and every relation type.
       picker: { open: false, mode: '', type: '', title: '', query: '', allProjects: false, results: [], selected: [], busy: false },
       // Add / edit an external link (§38).
@@ -709,6 +710,60 @@ var WorkItemsScreen = {
     };
   },
   computed: {
+    /**
+     * Total time logged against the open item (§9.8).
+     *
+     * Read from the feed the server already sends — it recalculates from the rows rather than
+     * keeping a running total that can drift, so summing again here would be a second answer
+     * free to disagree with the Worklogs tab.
+     */
+    /**
+     * The lower bound for a worklog date: nothing before the item's start date.
+     *
+     * <wi-calendar>'s `after` is EXCLUSIVE — it was built for "a due date must fall strictly
+     * after the start date" — so the bound handed to it is the day BEFORE the start date.
+     * Work done on day one is ordinary, and excluding it would be the off-by-one this
+     * conversion exists to avoid.
+     */
+    /** Assignees of the open item — the only people time can be logged against (§9.4). */
+    worklogPeople: function () {
+      return (this.drawerItem && this.drawerItem.assignees) || [];
+    },
+
+    /**
+     * May the signed-in person log time here at all?
+     *
+     * An assignee logs their own; a project lead logs on anyone's behalf. Nobody logs against
+     * an unassigned item — there is no one for the hours to belong to.
+     */
+    canLogWork: function () {
+      if (!this.canEdit || !this.worklogPeople.length) return false;
+      if (this.canManageProject) return true;
+
+      var me = String(this.currentUserId || '');
+
+      return this.worklogPeople.some(function (p) { return String(p.id) === me; });
+    },
+
+    worklogMinDate: function () {
+      var start = this.drawerItem && this.drawerItem.start_date;
+      if (!start) return '';
+
+      var d = wiParseISO(start);
+      if (!d) return '';
+
+      d.setDate(d.getDate() - 1);
+
+      return wiISO(d);
+    },
+
+    loggedMinutes: function () {
+      return (this.feed && this.feed.worklogs && this.feed.worklogs.total_minutes) || 0;
+    },
+    loggedLabel: function () {
+      return (this.feed && this.feed.worklogs && this.feed.worklogs.total_label) || '';
+    },
+
     /**
      * The row every picker and every endpoint is currently about.
      *
@@ -977,6 +1032,9 @@ var WorkItemsScreen = {
       var self = this;
       var handler = function (e) { e.preventDefault(); self.openCreate(''); };
       el.addEventListener('click', handler);
+      // Tells the global quick-create modal to stay out of the way: this screen's own create
+      // modal is the richer one (parent search, cycles, modules, epics, estimates).
+      el.setAttribute('data-create-bound', '1');
       this._globalCreate = { el: el, handler: handler };
     },
     // ---------- The list (wi-list) ----------
@@ -1469,13 +1527,41 @@ var WorkItemsScreen = {
       var iso = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
       this.worklogForm = {
         open: true, id: log ? log.id : null,
+        // Whose time this is. Defaults to yourself when you are an assignee; a project lead
+        // who is not on the item has to pick somebody, so it opens on the first assignee
+        // rather than on a person the hours cannot belong to.
+        userId: log ? log.user_id : this.defaultWorklogUserId(),
         date: log ? log.work_date : iso,
+        dateOpen: false,
         hours: log ? Math.floor(log.minutes / 60) : '',
         minutes: log ? log.minutes % 60 : '',
         description: log ? (log.description || '') : '',
         busy: false, error: ''
       };
     },
+    /* The worklog date goes through the shared <wi-calendar>, like every other date in the
+       app. It has its own open flag rather than the `menu` one the edit-form chips share:
+       the two forms can be on screen together, and a single flag would have opening one
+       close the other. */
+    defaultWorklogUserId: function () {
+      var me = String(this.currentUserId || '');
+      var mine = this.worklogPeople.filter(function (p) { return String(p.id) === me; })[0];
+
+      return mine ? mine.id : (this.worklogPeople[0] ? this.worklogPeople[0].id : null);
+    },
+
+    toggleWorklogDate: function () {
+      this.worklogForm.dateOpen = ! this.worklogForm.dateOpen;
+    },
+    pickWorklogDate: function (iso) {
+      this.worklogForm.date = iso;
+      this.worklogForm.dateOpen = false;
+    },
+    clearWorklogDate: function () {
+      this.worklogForm.date = '';
+      this.worklogForm.dateOpen = false;
+    },
+
     saveWorklog: async function () {
       if (this.worklogForm.busy) return;
       var total = (parseInt(this.worklogForm.hours || 0, 10) * 60) + parseInt(this.worklogForm.minutes || 0, 10);
@@ -1488,6 +1574,7 @@ var WorkItemsScreen = {
           method: this.worklogForm.id ? 'PATCH' : 'POST',
           body: {
             work_date: this.worklogForm.date,
+            user_id: this.worklogForm.userId,
             hours: parseInt(this.worklogForm.hours || 0, 10),
             minutes: parseInt(this.worklogForm.minutes || 0, 10),
             description: this.worklogForm.description
@@ -2412,7 +2499,7 @@ var WorkItemsScreen = {
     // everywhere here for a checkout without the licensed package.
     '<pg-editor v-if="useJodit" ref="descriptionEditor" v-model="draft.description" min-height="180px" ' +
     ':document-view="false" :buttons="editorButtons" :license="editorLicense" ' +
-    ':media-upload="endpoints.mediaUpload" />' +
+    ':media-upload="endpoints.mediaUpload" :mention-url="endpoints.mentionUsers" />' +
     '<wi-editor v-else ref="descriptionEditor" v-model="draft.description" min-height="180px" class="block" ' +
     ':media-upload="endpoints.mediaUpload" :media-gallery="endpoints.mediaGallery" :media-max-bytes="mediaMaxBytes" />' +
     '<div class="flex justify-end gap-2 mt-2">' +
@@ -2693,10 +2780,12 @@ var WorkItemsScreen = {
 
     // ===== Comment composer — on All and Comments (§5.3/§7.3) =====
     '<div v-if="canEdit && (tab === \'all\' || tab === \'comments\')" class="mb-5">' +
+    // 200px: a comment box the size of a single-line field invites single-line comments, and
+    // this one carries a toolbar with headings and lists in it.
     '<pg-editor v-if="useJodit" ref="commentEditor" v-model="composer.content" placeholder="Add comment" ' +
-    'min-height="90px" :document-view="false" :buttons="editorButtons" :license="editorLicense" ' +
-    ':media-upload="endpoints.mediaUpload" />' +
-    '<wi-editor v-else ref="commentEditor" v-model="composer.content" placeholder="Add comment" min-height="90px" class="block" ' +
+    'min-height="200px" :document-view="false" :buttons="editorButtons" :license="editorLicense" ' +
+    ':media-upload="endpoints.mediaUpload" :mention-url="endpoints.mentionUsers" />' +
+    '<wi-editor v-else ref="commentEditor" v-model="composer.content" placeholder="Add comment" min-height="200px" class="block" ' +
     ':media-upload="endpoints.mediaUpload" :media-gallery="endpoints.mediaGallery" :media-max-bytes="mediaMaxBytes" />' +
     '<div class="flex items-center mt-2">' +
     '<button type="button" @click="postComment" :disabled="composer.busy || !hasText(composer.content)" ' +
@@ -2838,16 +2927,45 @@ var WorkItemsScreen = {
 
     // ===== Worklogs (§9) =====
     '<div v-else-if="tab === \'worklogs\'">' +
-    '<div v-if="canEdit" class="flex justify-end mb-3">' +
-    '<button type="button" @click="openWorklogForm(null)" class="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-stroke text-[13px] font-semibold text-ink hover:bg-hover">' +
+    '<div class="flex items-center justify-end gap-3 mb-3">' +
+    // Silence would read as a missing feature. Say which of the two reasons it is.
+    '<span v-if="canEdit && !canLogWork" class="text-[12px] text-sub">' +
+    '<template v-if="!worklogPeople.length">Assign this work item before logging time against it.</template>' +
+    '<template v-else>Only an assignee can log time on this work item.</template>' +
+    '</span>' +
+    '<button v-if="canLogWork" type="button" @click="openWorklogForm(null)" class="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-stroke text-[13px] font-semibold text-ink hover:bg-hover">' +
     '' + wiIcon('plus', 14) + 'Log work</button></div>' +
 
     '<div v-if="worklogForm.open" class="mb-4 rounded-lg border border-line p-3">' +
     '<div v-if="worklogForm.error" class="mb-2 rounded-md border border-danger/40 bg-danger/5 px-3 py-2 text-[12px] text-danger">{{ worklogForm.error }}</div>' +
     '<div class="flex flex-wrap items-end gap-3">' +
-    '<div><label class="block text-[12px] text-sub mb-1">Date</label><input v-model="worklogForm.date" type="date" class="pb-input h-9 w-40" /></div>' +
-    '<div><label class="block text-[12px] text-sub mb-1">Hours</label><input v-model="worklogForm.hours" type="number" min="0" max="99" class="pb-input h-9 w-20" /></div>' +
-    '<div><label class="block text-[12px] text-sub mb-1">Minutes</label><input v-model="worklogForm.minutes" type="number" min="0" max="59" class="pb-input h-9 w-20" /></div>' +
+    // Date — the shared picker, not the browser's native control: a native date input looks
+    // and behaves differently in every browser, and nothing else in this app uses one.
+    '<div class="relative">' +
+    '<label class="block text-[12px] text-sub mb-1">Date</label>' +
+    '<button type="button" @click.stop="toggleWorklogDate" ' +
+    'class="inline-flex items-center gap-1.5 h-9 px-2.5 rounded-md border border-stroke text-[13px] text-ink ' +
+    'hover:bg-hover whitespace-nowrap min-w-[150px]">' +
+    '' + wiIcon('calendar', 14, 'text-faint') + '' +
+    '{{ worklogForm.date ? fmtDate(worklogForm.date) : \'Pick a date\' }}</button>' +
+    '<div v-if="worklogForm.dateOpen" class="fixed inset-0 z-40" @click="worklogForm.dateOpen = false"></div>' +
+    // Opens UPWARD, the component's default. Downward put the calendar through the bottom of
+    // the viewport on a work item with any real content above the form — the panel scrolls,
+    // so there is always room above the field and rarely below it.
+    //
+    // Today / Tomorrow / Custom only. The default list runs forward to "Next 5 days", which
+    // are days nobody has logged work on yet — a shortcut to a date the form cannot mean.
+    '<wi-calendar v-if="worklogForm.dateOpen" ' +
+    ':quick="[0, 1]" :after="worklogMinDate" :value="worklogForm.date" ' +
+    '@pick="pickWorklogDate" @clear="clearWorklogDate" />' +
+    '</div>' +
+    '<div><label class="block text-[12px] text-sub mb-1">Hours</label><input v-model="worklogForm.hours" type="number" min="0" max="99" class="pb-input !h-9 !w-20" /></div>' +
+    '<div><label class="block text-[12px] text-sub mb-1">Minutes</label><input v-model="worklogForm.minutes" type="number" min="0" max="59" class="pb-input !h-9 !w-20" /></div>' +
+    '<div v-if="canManageProject && worklogPeople.length > 1"><label class="block text-[12px] text-sub mb-1">Member</label>' +
+    '<select v-model="worklogForm.userId" class="pb-input !h-9 !w-44">' +
+    '<option v-for="p in worklogPeople" :key="p.id" :value="p.id">{{ p.name }}</option>' +
+    '</select></div>' +
+
     '<div class="flex-1 min-w-[180px]"><label class="block text-[12px] text-sub mb-1">Description</label>' +
     '<input v-model="worklogForm.description" type="text" placeholder="What did you complete?" class="pb-input h-9" /></div>' +
     '</div>' +
@@ -2859,11 +2977,19 @@ var WorkItemsScreen = {
     '<li v-for="w in feed.worklogs.entries" :key="w.id" class="flex items-start gap-2.5 rounded-lg border border-line p-3">' +
     '<wi-avatar :person="w.user" :size="28" />' +
     '<div class="min-w-0 flex-1"><div class="flex items-center gap-2">' +
-    '<span class="text-[13px] text-ink"><span class="font-medium">{{ w.user ? w.user.name : \'Someone\' }}</span> logged <span class="font-semibold">{{ w.duration }}</span></span>' +
+    '<span class="text-[13px] text-ink"><span class="font-medium">{{ w.user ? w.user.name : \'Someone\' }}</span> logged</span>' +
+    // The duration is the fact this row exists to report, so it is a badge rather than another
+    // run of bold text in a sentence — square-cornered, to read as a quantity and not as the
+    // pill-shaped status chips used elsewhere for state.
+    '<span class="inline-flex items-center justify-center h-5 min-w-[2rem] px-1.5 rounded bg-brand/10 ' +
+    'text-brand text-[12px] font-semibold tabular-nums">{{ w.duration }}</span>' +
     '<span class="text-[12px] text-faint">{{ fmtDate(w.work_date) }}</span>' +
-    '<span v-if="canEdit && String(w.user_id) === String(currentUserId)" class="ml-auto flex items-center gap-2">' +
-    '<button type="button" @click="openWorklogForm(w)" class="text-[12px] text-sub hover:underline">Edit</button>' +
-    '<button type="button" @click="deleteWorklog(w)" class="text-[12px] text-danger hover:underline">Delete</button></span></div>' +
+    '<span v-if="canEdit && String(w.user_id) === String(currentUserId)" class="ml-auto flex items-center gap-1">' +
+    '<button type="button" @click="openWorklogForm(w)" data-tip="Edit" aria-label="Edit worklog" ' +
+    'class="h-7 w-7 grid place-items-center rounded text-sub hover:bg-hover">' + wiIcon('pen', 14) + '</button>' +
+    '<button type="button" @click="deleteWorklog(w)" data-tip="Delete" aria-label="Delete worklog" ' +
+    'class="h-7 w-7 grid place-items-center rounded text-sub hover:bg-hover hover:text-danger">' +
+    wiIcon('trash', 14) + '</button></span></div>' +
     '<div v-if="w.description" class="text-[13px] text-sub mt-1">{{ w.description }}</div></div></li>' +
     '<li v-if="!feed.worklogs.entries.length" class="py-8 text-center"><div class="text-[13px] font-semibold text-head">No work logged yet</div>' +
     '<div class="text-[13px] text-sub mt-1">Track time spent working on this item.</div></li>' +
@@ -2924,6 +3050,18 @@ var WorkItemsScreen = {
     // ---- Properties. Each control opens the SAME picker the grid row uses, so there is one
     //      implementation of "change a property" and one PATCH path behind it. ----
     '<aside class="w-full lg:w-[340px] shrink-0 border-t lg:border-t-0 lg:border-l border-line px-5 sm:px-6 py-6 lg:overflow-y-auto">' +
+
+    // Time logged, above the properties rather than buried in a tab. Someone reading this
+    // panel is answering "where is this item?", and how long it has already taken is part of
+    // that answer — the Worklogs tab only tells you once you go looking. Hidden entirely at
+    // zero: an empty "0h" is noise on every item nobody has tracked time against.
+    '<div v-if="loggedMinutes" class="mb-4 flex items-center gap-2.5 rounded-lg border border-line bg-hover px-3 py-2.5">' +
+    '<span class="grid place-items-center text-faint shrink-0">' + wiIcon('clock', 15) + '</span>' +
+    '<span class="text-[12px] text-sub">Time logged</span>' +
+    '<span class="ml-auto inline-flex items-center justify-center h-6 min-w-[2.25rem] px-1.5 rounded-md ' +
+    'bg-brand text-white text-[12px] font-semibold tabular-nums">{{ loggedLabel }}</span>' +
+    '</div>' +
+
     '<h3 class="text-[15px] font-semibold text-head">Properties</h3>' +
     '<div class="mt-4 grid grid-cols-2 gap-x-4 gap-y-4">' +
 
@@ -3173,7 +3311,7 @@ var WorkItemsScreen = {
     '<pg-editor v-if="useJodit" ref="commentModalEditor" v-model="commentModal.content" ' +
     ':placeholder="commentModal.mode === \'edit\' ? \'Edit your comment\' : \'Write a reply\'" ' +
     'min-height="120px" :document-view="false" :buttons="editorButtons" :license="editorLicense" ' +
-    ':media-upload="endpoints.mediaUpload" />' +
+    ':media-upload="endpoints.mediaUpload" :mention-url="endpoints.mentionUsers" />' +
     '<wi-editor v-else ref="commentModalEditor" v-model="commentModal.content" :placeholder="commentModal.mode === \'edit\' ? \'Edit your comment\' : \'Write a reply\'" ' +
     'min-height="120px" class="block" ' +
     ':media-upload="endpoints.mediaUpload" :media-gallery="endpoints.mediaGallery" :media-max-bytes="mediaMaxBytes" />' +

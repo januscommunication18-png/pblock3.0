@@ -22,6 +22,18 @@
       <h1 class="text-[24px] font-bold text-head leading-tight">Work in all dimensions.</h1>
       <p class="text-[18px] text-sub mb-7">Welcome back to Project Block.</p>
 
+      {{-- Why they are looking at this page rather than the one they were on (SES-007).
+           Without it, an expiry reads as the app having logged them out at random. --}}
+      @if (!empty($sessionExpired))
+        <div class="mb-4 rounded-lg border border-line bg-hover px-3.5 py-3">
+          <p class="text-[13px] font-semibold text-head">Your session has expired</p>
+          <p class="text-[13px] text-sub mt-0.5">
+            For your security, you were signed out because your session was inactive.
+            Sign in again to continue.
+          </p>
+        </div>
+      @endif
+
       @if ($errors->any())
         <div class="mb-4 rounded-lg border border-danger/40 bg-danger/5 px-3.5 py-2.5 text-[13px] text-danger">{{ $errors->first() }}</div>
       @endif

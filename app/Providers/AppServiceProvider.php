@@ -2,7 +2,10 @@
 
 namespace App\Providers;
 
+use App\Services\OnboardingRouter;
 use App\Services\WorkspaceSwitcher;
+use Illuminate\Auth\Middleware\RedirectIfAuthenticated;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
@@ -22,6 +25,21 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        /*
+         * Where an already-signed-in visitor goes when they open a guest page.
+         *
+         * Laravel's default walks to `/` when no `dashboard` or `home` route exists — and in
+         * this application `/` IS a guest route (`signup`). So the default sent a signed-in
+         * person from /signin to / to / … until the browser gave up, and any guest URL opened
+         * while signed in was an infinite redirect rather than a page.
+         *
+         * OnboardingRouter already knows where somebody belongs, including mid-onboarding, so
+         * this asks it rather than naming a route that is only right for finished accounts.
+         */
+        RedirectIfAuthenticated::redirectUsing(
+            fn (Request $request) => app(OnboardingRouter::class)->landingFor($request->user()),
+        );
+
         // The workspace switcher rides along with the shared topbar on every screen, so its
         // data is bound to the partial rather than passed by each controller — otherwise
         // every page that shows the topbar would have to remember to supply it.

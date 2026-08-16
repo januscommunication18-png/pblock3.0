@@ -45,6 +45,9 @@ class EagerLoadColumnsTest extends TestCase
         'user' => 'users',
         // Your Work's Activity tab loads the item each entry happened to, for the line's link.
         'workItem' => 'work_items',
+        // Capacity reads only the ids off the assignee pivot — it splits an item's hours between
+        // people (§22) and never shows their names.
+        'assignees' => 'users',
     ];
 
     public function test_every_constrained_eager_load_names_real_columns(): void

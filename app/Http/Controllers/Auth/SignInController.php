@@ -8,7 +8,9 @@ use App\Models\EmailVerificationCode;
 use App\Models\User;
 use App\Services\AuthCodeService;
 use App\Services\OnboardingRouter;
+use App\Support\SessionReturnTarget;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\View\View;
@@ -21,9 +23,16 @@ class SignInController extends Controller
     ) {}
 
     /** GET /signin */
-    public function show(): View
+    public function show(Request $request): View
     {
-        return view('auth.signin');
+        // `?next=` is how the browser hands back the page somebody was on when a fetch came
+        // back 401 — at that point the session is already gone, so it cannot be passed in it.
+        // Sanitized on the way in and again on the way out (SES-008).
+        SessionReturnTarget::remember($request, $request->query('next'));
+
+        return view('auth.signin', [
+            'sessionExpired' => (bool) $request->session()->get('session_expired'),
+        ]);
     }
 
     /**
@@ -58,9 +67,14 @@ class SignInController extends Controller
                 ->withErrors(['email' => 'Those credentials do not match our records.']);
         }
 
+        // Read BEFORE regenerating: regeneration is what carries the session forward, and
+        // pulling afterwards works today only because Laravel migrates the data — reading
+        // first makes the intent explicit rather than incidental.
+        $returnTo = SessionReturnTarget::pull($request);
+
         Auth::login($user, remember: true);
         $request->session()->regenerate();
 
-        return redirect()->route($this->router->destinationFor($user));
+        return redirect()->to($this->router->landingFor($user, $returnTo));
     }
 }

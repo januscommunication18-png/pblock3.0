@@ -49,7 +49,7 @@ class InvitationAcceptTest extends TestCase
         ])->assertRedirect(route('welcome'));
 
         $token = null;
-        Mail::assertQueued(WorkspaceInvitationMail::class, function (WorkspaceInvitationMail $mail) use (&$token, $email) {
+        Mail::assertSent(WorkspaceInvitationMail::class, function (WorkspaceInvitationMail $mail) use (&$token, $email) {
             if ($mail->invitedEmail !== $email) {
                 return false;
             }

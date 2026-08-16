@@ -241,6 +241,30 @@ return [
 
     'work_item_description_max' => 20000,
 
+    /**
+     * How many people the `@` autocomplete answers with (mentions §28). Small on purpose: the
+     * popup is a shortlist you pick from after typing a character or two, not a directory.
+     */
+    'mention_results' => 8,
+
+    /**
+     * How many Inbox rows one request returns (inbox §42, which recommends 25-50). The list is
+     * "what still needs me" rather than an archive, so a page that fills the panel is enough.
+     */
+    'inbox_page_size' => 40,
+
+    /**
+     * How much of a description or comment travels with a notification.
+     *
+     * `email` is generous — a notification you can act on without opening the app is the
+     * point, and an email is where there is room for it. `inbox` is a single row in a list,
+     * so it gets a line.
+     */
+    'excerpt' => [
+        'email' => 600,
+        'inbox' => 200,
+    ],
+
     /** Page size for the work item list. */
     'work_item_page_size' => 250,
 

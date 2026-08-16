@@ -49,7 +49,7 @@ return [
         'wiki' => [
             'label' => 'Wiki',
             'description' => 'Create internal documentation, knowledge bases, guides, policies, SOPs, and shared team knowledge.',
-            'available' => false,
+            'available' => true,
         ],
         'helpdesk' => [
             'label' => 'Help Desk',

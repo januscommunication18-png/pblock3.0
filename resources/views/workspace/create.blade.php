@@ -37,7 +37,7 @@
           <button type="button" id="range-btn" aria-haspopup="listbox" aria-expanded="false" class="pb-input text-left cursor-pointer">
             <span class="flex items-center justify-between h-full">
               <span id="range-value" class="text-faint truncate">Select a range</span>
-              {!! pb_icon('sort', 16, 'text-faint shrink-0 ml-2') !!}
+              {!! pb_icon('chevron-down', 16, 'text-faint shrink-0 ml-2') !!}
             </span>
           </button>
           <ul id="range-list" role="listbox" class="hidden absolute z-30 mt-1 w-full max-h-60 overflow-auto rounded-md bg-white py-1 shadow-lg outline outline-1 outline-black/5"></ul>
@@ -77,6 +77,12 @@
             @endif
           @endforeach
         </div>
+        @error('view_type') <p class="text-[12px] text-danger mt-1.5">{{ $message }}</p> @enderror
+
+        {{-- Enable apps (multi-select). Projects is on today; the rest are Coming Soon. --}}
+        <label class="block text-[13px] font-medium text-ink mb-1.5 mt-6">Enable apps <span class="text-danger">*</span></label>
+        <p class="text-[12px] text-sub mb-3">Choose what this workspace can do. You can turn more on later as they launch.</p>
+        @include('partials.workspace-apps')
         @error('view_type') <p class="text-[12px] text-danger mt-1.5">{{ $message }}</p> @enderror
 
         {{-- Enable apps (multi-select). Projects is on today; the rest are Coming Soon. --}}

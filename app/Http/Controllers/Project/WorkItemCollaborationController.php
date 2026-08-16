@@ -3,12 +3,16 @@
 namespace App\Http\Controllers\Project;
 
 use App\Http\Controllers\Controller;
+use App\Models\Mention;
 use App\Models\Project;
 use App\Models\WorkItem;
 use App\Models\WorkItemActivity;
 use App\Models\WorkItemComment;
 use App\Models\WorkItemUpdate;
 use App\Models\WorkItemWorklog;
+use App\Services\InboxNotifier;
+use App\Services\MentionNotifier;
+use App\Services\MentionSync;
 use App\Services\RichTextSanitizer;
 use App\Services\WorkItemActivityRecorder;
 use App\Services\WorkItemFeedBuilder;
@@ -37,6 +41,8 @@ class WorkItemCollaborationController extends Controller
         private readonly WorkItemFeedBuilder $feed,
         private readonly RichTextSanitizer $richText,
         private readonly WorkItemActivityRecorder $activity,
+        private readonly MentionSync $mentions,
+        private readonly MentionNotifier $mentionNotifier,
     ) {}
 
     /** GET /projects/{project}/work-items/{workItem}/feed */
@@ -67,7 +73,8 @@ class WorkItemCollaborationController extends Controller
         $parentId = $this->resolveParent($workItem, $data['parent_comment_id'] ?? null);
 
         DB::transaction(function () use ($workItem, $content, $parentId) {
-            WorkItemComment::create([
+            /** @var WorkItemComment $comment */
+            $comment = WorkItemComment::create([
                 'project_id' => $workItem->project_id,
                 'work_item_id' => $workItem->id,
                 'parent_comment_id' => $parentId,
@@ -80,6 +87,17 @@ class WorkItemCollaborationController extends Controller
             $this->activity->record($workItem, Auth::user(), WorkItemActivity::EVENT_UPDATED, [
                 'field' => $parentId ? 'comment_reply' : 'comment',
             ]);
+
+            // §9: mentions are processed after the comment is saved and has an id — the
+            // notification needs somewhere to point. Inside the transaction, so a failed
+            // comment leaves no mention records; the mail waits for the commit.
+            $workItem->loadMissing('project');
+            if ($workItem->project) {
+                $this->mentionNotifier->mentioned(
+                    $this->mentions->sync(Mention::SOURCE_COMMENT, $comment->id, $content, $workItem->project, $workItem, Auth::user()),
+                    $workItem, Auth::user(), Mention::SOURCE_COMMENT, $content, $comment->id, $comment,
+                );
+            }
         });
 
         return $this->payload($workItem, 'Comment added.');
@@ -97,6 +115,16 @@ class WorkItemCollaborationController extends Controller
 
         $comment->forceFill(['content' => $content, 'edited_at' => now()])->save();
 
+        // §12: editing tells only the people newly named — whoever was already mentioned has
+        // already heard, and telling them again on every edit is how a mention becomes noise.
+        $workItem->loadMissing('project');
+        if ($workItem->project) {
+            $this->mentionNotifier->mentioned(
+                $this->mentions->sync(Mention::SOURCE_COMMENT, $comment->id, $content, $workItem->project, $workItem, Auth::user()),
+                $workItem, Auth::user(), Mention::SOURCE_COMMENT, $content, $comment->id, $comment,
+            );
+        }
+
         return $this->payload($workItem, 'Comment updated.');
     }
 
@@ -104,6 +132,10 @@ class WorkItemCollaborationController extends Controller
     {
         $this->guard($project, $workItem, 'update');
         $this->guardComment($workItem, $comment, owner: false);
+
+        // Inbox §19: the unread notifications that pointed into this comment go with it —
+        // there is nothing left to open. Read ones stay: they are a record of what happened.
+        app(InboxNotifier::class)->commentDeleted($comment);
 
         // Soft delete (§7.7): the conversation loses it, the audit trail keeps it.
         $comment->delete();
@@ -194,6 +226,8 @@ class WorkItemCollaborationController extends Controller
         $this->guard($project, $workItem, 'update');
 
         $data = $this->validateWorklog($request);
+        $this->assertMayLogWork($workItem, $data['user_id']);
+        $this->assertDateWithinItem($workItem, $data['work_date']);
 
         DB::transaction(function () use ($workItem, $data) {
             $log = WorkItemWorklog::create([
@@ -222,6 +256,7 @@ class WorkItemCollaborationController extends Controller
         abort_unless($this->ownsOrManages($worklog->user_id, $workItem), 403);
 
         $data = $this->validateWorklog($request);
+        $this->assertDateWithinItem($workItem, $data['work_date']);
 
         $worklog->forceFill([
             'work_date' => $data['work_date'],
@@ -274,11 +309,13 @@ class WorkItemCollaborationController extends Controller
             'work_date' => $data['work_date'],
             'minutes' => $total,
             'description' => $data['description'] ?? null,
-            // Logging on someone else's behalf is a manager action (§9.4); everyone else
-            // logs their own time whatever the request says.
-            'user_id' => ($data['user_id'] ?? null) && Auth::user()->can('manage', $request->route('project'))
-                ? (int) $data['user_id']
-                : (int) Auth::id(),
+            // Taken at face value, and judged by assertMayLogWork.
+            //
+            // This used to silently rewrite a non-manager's `user_id` to their own, so asking
+            // to log Sarah's time quietly recorded YOURS instead — a 200, a row against the
+            // wrong person, and nothing anywhere saying so. One place decides who time may be
+            // logged against; this one only reports what was asked for.
+            'user_id' => (int) ($data['user_id'] ?? Auth::id()),
         ];
     }
 
@@ -314,6 +351,62 @@ class WorkItemCollaborationController extends Controller
         }
 
         abort_unless($this->ownsOrManages($comment->author_id, $item), 403);
+    }
+
+    /**
+     * Who may put hours on this work item (§9.4).
+     *
+     * Time is a record of who did the work, so it can only be logged against somebody the work
+     * is actually assigned to — otherwise a capacity report reads hours against people who were
+     * never on the item, and "who is overloaded?" stops meaning anything.
+     *
+     * Two ways through: you are that assignee, or you run the project and are recording it on
+     * their behalf. Enforced HERE rather than by hiding the button, because the endpoint is
+     * reachable without it.
+     */
+    private function assertMayLogWork(WorkItem $item, int $targetUserId): void
+    {
+        $assignees = $item->assignees()->pluck('users.id')->map(fn ($id) => (int) $id)->all();
+
+        abort_if(
+            $assignees === [],
+            422,
+            'Assign this work item before logging time against it.',
+        );
+
+        abort_unless(
+            in_array($targetUserId, $assignees, true),
+            403,
+            'Time can only be logged against someone this work item is assigned to.',
+        );
+
+        abort_unless(
+            $targetUserId === (int) Auth::id() || Auth::user()->can('manage', $item->project),
+            403,
+            'Only a project lead can log time on behalf of someone else.',
+        );
+    }
+
+    /**
+     * A worklog cannot predate the work item's own start date.
+     *
+     * Enforced here and not only in the picker: a date restriction that lives in the calendar
+     * is one `curl` away from being ignored, and the hours would land in a week the item did
+     * not exist in — which is exactly the sort of figure a capacity report cannot explain.
+     *
+     * Inclusive of the start date itself: work done on day one is ordinary.
+     */
+    private function assertDateWithinItem(WorkItem $item, string $workDate): void
+    {
+        if (! $item->start_date) {
+            return;
+        }
+
+        abort_if(
+            $workDate < $item->start_date->format('Y-m-d'),
+            422,
+            'Work cannot be logged before this work item starts ('.$item->start_date->format('M j, Y').').',
+        );
     }
 
     private function ownsOrManages(?int $authorId, WorkItem $item): bool

@@ -45,7 +45,7 @@
             <button type="button" data-goal="{{ $key }}"
               class="option w-full flex items-center gap-3 h-12 px-4 rounded-lg border text-left text-[14px] border-stroke text-ink hover:bg-hover">
               <span class="box h-5 w-5 rounded border border-stroke shrink-0 grid place-items-center">
-                {!! pb_icon('check-on-brand', 12, 'tick hidden') !!}
+                {!! pb_icon('check-on-brand', 12, 'tick hidden text-white') !!}
               </span>
               <span>{{ $label }}</span>
               <input type="checkbox" name="goals[]" value="{{ $key }}" class="hidden" @checked(in_array($key, (array) $current, true))>

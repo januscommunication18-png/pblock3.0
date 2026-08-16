@@ -18,8 +18,10 @@ use Illuminate\Validation\ValidationException;
  */
 class WorkspaceCreator
 {
+    public function __construct(private readonly WorkspaceSettingsManager $settings) {}
+
     /**
-     * @param  array{name:string, slug:string, company_size:string, view_type?:string, timezone?:string|null}  $data
+     * @param  array{name:string, slug:string, company_size:string, view_type?:string, timezone?:string|null, apps?:array<int, string>}  $data
      */
     public function create(User $creator, array $data): Workspace
     {
@@ -57,7 +59,34 @@ class WorkspaceCreator
             // WS-009: the new workspace becomes the creator's active/last-active workspace.
             $creator->forceFill(['current_workspace_id' => $workspace->id])->save();
 
+            $this->enableApps($workspace, $data['apps'] ?? config('workspace.default_apps', []));
+
             return $workspace;
         });
+    }
+
+    /**
+     * Switch on the apps chosen at creation (wiki WIKI-D1/WIKI-D2).
+     *
+     * Written to the workspace's own settings row — the SAME flag Settings → Wiki toggles —
+     * rather than to a list of apps kept beside it. Two records of "is Wiki on?" is two records
+     * free to disagree, and the screens would each believe a different one.
+     *
+     * Projects needs nothing switched on: it is what a workspace is (WIKI-D3).
+     *
+     * @param  array<int, string>  $apps
+     */
+    private function enableApps(Workspace $workspace, array $apps): void
+    {
+        $flags = array_filter([
+            'wiki_enabled' => in_array('wiki', $apps, true),
+        ]);
+
+        if ($flags === []) {
+            return;
+        }
+
+        // Provisions the settings row on first use, inside the workspace's tenancy context.
+        $this->settings->for($workspace)->forceFill($flags)->save();
     }
 }

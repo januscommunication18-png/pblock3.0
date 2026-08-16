@@ -638,7 +638,7 @@ class WorkItemsTest extends ProjectTestCase
             'title' => 'Configure stale ticket automation', 'assignee_ids' => [$alice->id],
         ])->assertStatus(201)->json('item');
 
-        Mail::assertQueued(WorkItemAssignedMail::class, function (WorkItemAssignedMail $mail) use ($alice, $item) {
+        Mail::assertSent(WorkItemAssignedMail::class, function (WorkItemAssignedMail $mail) use ($alice, $item) {
             return $mail->hasTo($alice->email)
                 && $mail->identifier === $item['identifier']
                 && str_contains($mail->url, (string) $item['id']);

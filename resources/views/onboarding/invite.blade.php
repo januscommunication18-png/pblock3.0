@@ -84,7 +84,7 @@
             '<button type="button" class="pb-combo-btn pb-input text-left cursor-pointer" aria-haspopup="listbox" aria-expanded="false">' +
               '<span class="flex items-center justify-between h-full">' +
                 '<span class="pb-combo-value text-faint truncate">Select role</span>' +
-                '{!! pb_icon('sort', 16, 'text-faint shrink-0 ml-1') !!}' +
+                '{!! pb_icon('chevron-down', 16, 'text-faint shrink-0 ml-1') !!}' +
               '</span>' +
             '</button>' +
             '<ul role="listbox" class="pb-combo-list hidden absolute z-40 mt-1 w-full max-h-56 overflow-auto rounded-md bg-white py-1 shadow-lg outline outline-1 outline-black/5">' + roleOptions() + '</ul>' +

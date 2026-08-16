@@ -3,6 +3,7 @@
 use App\Http\Controllers\Auth\AccessGateController;
 use App\Http\Controllers\Auth\EmailSignupController;
 use App\Http\Controllers\Auth\LogoutController;
+use App\Http\Controllers\Auth\SessionController;
 use App\Http\Controllers\Auth\SignInController;
 use App\Http\Controllers\Auth\SocialAuthController;
 use App\Http\Controllers\Auth\SsoController;
@@ -82,9 +83,21 @@ Route::middleware('auth')->group(function () {
     Route::post('/onboarding/goals', [GoalsController::class, 'store'])->name('onboarding.goals.store');
     Route::post('/onboarding/goals/skip', [GoalsController::class, 'skip'])->name('onboarding.goals.skip');
 
+    // Session idle-timeout clock (docs/features/session-timeout.md). `status` is deliberately
+    // NOT activity — see EnforceIdleTimeout.
+    Route::get('/session/status', [SessionController::class, 'status'])->name('session.status');
+    Route::post('/session/extend', [SessionController::class, 'extend'])->name('session.extend');
+
     Route::post('/logout', LogoutController::class)->name('logout');
 });
 
+// ---- Session expiry landing ----
+// In NEITHER the guest nor the auth group: this is where "Sign In Again" goes, and it has to
+// work whether the session is already gone or only the browser thinks so. See
+// SessionController@expired for why pointing the button at /signin directly does not.
+Route::get('/session/expired', [SessionController::class, 'expired'])->name('session.expired');
+
 // ---- Dev-only email viewer (guarded to local env in the controller) ----
 Route::get('/emaillog', [EmailLogController::class, 'index'])->name('dev.emaillog');
+Route::delete('/emaillog', [EmailLogController::class, 'destroyAll'])->name('dev.emaillog.destroy');
 Route::get('/emaillog/{email}', [EmailLogController::class, 'show'])->name('dev.emaillog.show');

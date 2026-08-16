@@ -144,7 +144,10 @@ class WorkspaceInviter
         $roleLabels = config('workspace.roles');
 
         try {
-            Mail::to($invitation->email)->queue(new WorkspaceInvitationMail(
+            // sendNow: an invitation nobody receives is an invitation that did not happen,
+            // and it must not depend on a queue worker being up. See WorkItemStatusNotifier
+            // for the trade this makes across the application.
+            Mail::to($invitation->email)->sendNow(new WorkspaceInvitationMail(
                 workspaceName: (string) $workspace->name,
                 inviterName: $inviter->displayName(),
                 invitedEmail: $invitation->email,

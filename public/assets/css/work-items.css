@@ -101,6 +101,74 @@
 .wi-rich th { background: #f8f9fa; font-weight: 600; }
 
 /* ---------------------------------------------------------------------------
+   @mentions (mentions §17)
+
+   The chip has to read as a reference to a person rather than as decorated text, in
+   BOTH surfaces — the editor you type it into and the read view you see it in — or
+   inserting one looks like it did something different from what it did.
+
+   Deliberately not Jodit's or Tribute's default styling: §17 asks for ProjectBlock's
+   own, and the brand tint is the same one every selected control in the app uses.
+   --------------------------------------------------------------------------- */
+.pb-mention,
+.wi-rich .pb-mention,
+.pg-editor .jodit-wysiwyg .pb-mention {
+  display: inline;
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: #e8f0f6;          /* bg-sel */
+  color: #1b5f8a;               /* brand */
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.wi-rich .pb-mention:hover { background: #d7e6f0; }
+
+/* ---- The `@` popup (Tribute) ---------------------------------------------
+   Tribute ships a plain white list; this is the app's menu — same radius, border,
+   shadow and row height as every other picker, so the mention list does not look
+   like it came from somewhere else. */
+.tribute-container {
+  z-index: 130;                 /* above the drawer (z-85) and the comment modal (z-100) */
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, .12);
+  overflow: hidden;
+  max-height: 264px;
+  overflow-y: auto;
+  min-width: 240px;
+}
+.tribute-container ul { margin: 0; padding: 4px 0; list-style: none; }
+.tribute-container li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #23272f;
+}
+.tribute-container li.pb-mention-active,
+.tribute-container li:hover { background: #f3f4f6; }
+
+.pb-mention-face {
+  width: 26px; height: 26px;
+  border-radius: 999px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  object-fit: cover;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+}
+.pb-mention-who { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.pb-mention-name { color: #23272f; font-weight: 500; }
+.pb-mention-email { color: #6b7280; font-size: 11px; }
+.pb-mention-empty { display: block; padding: 10px 12px; font-size: 13px; color: #6b7280; }
+
+/* ---------------------------------------------------------------------------
    Rich-text editor (Jodit, inline)
 
    <pg-editor> with `document-view="false"` — the work item description, the comment

@@ -7,8 +7,10 @@ use App\Http\Controllers\Settings\MembersSettingsController;
 use App\Http\Controllers\Settings\PlaceholderSettingsController;
 use App\Http\Controllers\Settings\ProjectsSettingsController;
 use App\Http\Controllers\Settings\ReleasesSettingsController;
+use App\Http\Controllers\Settings\SecuritySettingsController;
 use App\Http\Controllers\Settings\TeamspacesSettingsController;
 use App\Http\Controllers\Settings\WikiSettingsController;
+use App\Http\Controllers\Settings\WorkCapacitySettingsController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -39,6 +41,15 @@ Route::middleware(['auth', 'workspace.tenancy'])
         Route::patch('/members/{membership}/role', [MembersSettingsController::class, 'updateRole'])->name('members.role');
         Route::delete('/members/{membership}', [MembersSettingsController::class, 'remove'])->name('members.remove');
         Route::delete('/members/invites/{invitation}', [MembersSettingsController::class, 'revoke'])->name('members.revoke');
+
+        // Administration > Security (docs/features/session-timeout.md)
+        Route::get('/security', [SecuritySettingsController::class, 'show'])->name('security');
+        Route::patch('/security', [SecuritySettingsController::class, 'update'])->name('security.update');
+
+        // Administration > Work Capacity (docs/features/work-capacity.md)
+        Route::get('/work-capacity', [WorkCapacitySettingsController::class, 'show'])->name('work-capacity');
+        Route::patch('/work-capacity', [WorkCapacitySettingsController::class, 'update'])->name('work-capacity.update');
+        Route::post('/work-capacity/toggle', [WorkCapacitySettingsController::class, 'toggle'])->name('work-capacity.toggle');
 
         // Features > Projects (spec §6)
         Route::get('/projects', [ProjectsSettingsController::class, 'show'])->name('projects');

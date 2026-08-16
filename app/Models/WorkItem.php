@@ -4,6 +4,8 @@ namespace App\Models;
 
 use App\Models\Concerns\StampsPivotTenant;
 use App\Models\Scopes\ExcludesDrafts;
+use App\Observers\WorkItemCapacityObserver;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -28,6 +30,7 @@ use Stancl\Tenancy\Database\Concerns\BelongsToTenant;
  * The ExcludesDrafts global scope keeps those rows out of every query in the application, so
  * "work item" means what it always did everywhere except `drafts()`.
  */
+#[ObservedBy(WorkItemCapacityObserver::class)]
 class WorkItem extends Model
 {
     use BelongsToTenant, StampsPivotTenant;
@@ -52,6 +55,7 @@ class WorkItem extends Model
         'cycle_assigned_at',
         'epic_id',
         'estimate_value_id',
+        'capacity_hours',
         'created_by',
         'archived_at',
     ];
@@ -70,6 +74,7 @@ class WorkItem extends Model
             'due_date' => 'date',
             'cycle_assigned_at' => 'datetime',
             'archived_at' => 'datetime',
+            'capacity_hours' => 'decimal:2',
         ];
     }
 

@@ -126,6 +126,48 @@ class IconSetTest extends TestCase
         return $files;
     }
 
+    public function test_hidden_still_hides_a_font_awesome_icon(): void
+    {
+        // Font Awesome sets `display: var(--fa-display, inline-block)` on its family classes.
+        // That is one class — the same specificity as Tailwind's `.hidden { display: none }` —
+        // and its stylesheet is linked AFTER tailwind.css, so at equal weight it wins and
+        // `hidden` quietly stops working on every pb_icon().
+        //
+        // It is not cosmetic: the onboarding goals page hid its checkmark that way, so every
+        // UNSELECTED option showed a tick. `.pb-icon.hidden` is two classes and settles it on
+        // specificity rather than on load order.
+        $css = (string) file_get_contents(public_path('assets/css/styles.css'));
+
+        $this->assertMatchesRegularExpression(
+            '/\.pb-icon\.hidden\s*\{[^}]*display:\s*none/',
+            $css,
+            'Nothing makes `hidden` beat Font Awesome any more — icons toggled with it will stay visible.',
+        );
+
+        // The rule only works because every icon carries `.pb-icon`, in both sets.
+        config()->set('icons.set', 'fontawesome');
+        $this->assertStringContainsString('pb-icon', pb_icon('check', 12, 'hidden'));
+        config()->set('icons.set', 'legacy');
+        $this->assertStringContainsString('pb-icon', pb_icon('check', 12, 'hidden'));
+    }
+
+    public function test_a_dropdown_trigger_uses_a_chevron_not_a_sort_glyph(): void
+    {
+        // `sort` renders as Font Awesome's up/down arrows — the "this column is sortable"
+        // glyph. On a select it reads as the wrong control, and it is what the role pickers
+        // on the invite and workspace screens were showing.
+        $offenders = [];
+
+        foreach ($this->bladeFiles() as $file) {
+            $html = (string) file_get_contents($file);
+            if (str_contains($html, "pb_icon('sort'") && str_contains($html, 'pb-combo')) {
+                $offenders[] = str_replace(base_path().'/', '', $file);
+            }
+        }
+
+        $this->assertSame([], $offenders, "A dropdown is drawn with the sort glyph:\n".implode("\n", $offenders));
+    }
+
     public function test_an_unknown_icon_is_loud_in_development(): void
     {
         config()->set('app.debug', true);

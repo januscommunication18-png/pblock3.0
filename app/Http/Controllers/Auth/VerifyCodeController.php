@@ -11,6 +11,7 @@ use App\Models\UserIdentity;
 use App\Models\WorkspaceInvitation;
 use App\Services\AuthCodeService;
 use App\Services\OnboardingRouter;
+use App\Support\SessionReturnTarget;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -81,11 +82,14 @@ class VerifyCodeController extends Controller
             return $user;
         });
 
+        // Read before the session is regenerated, for the same reason as in SignInController.
+        $returnTo = SessionReturnTarget::pull($request);
+
         $request->session()->forget(['pending_email', 'login_purpose']);
         Auth::login($user, remember: true);
         $request->session()->regenerate();
 
-        return redirect()->route($this->router->destinationFor($user));
+        return redirect()->to($this->router->landingFor($user, $returnTo));
     }
 
     /** POST /verify/resend */

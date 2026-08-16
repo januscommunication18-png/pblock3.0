@@ -92,7 +92,21 @@ class RichTextSanitizer
 
         $text = trim(preg_replace('/\s+/', ' ', html_entity_decode(strip_tags($html))) ?? '');
 
-        return $text === '' ? null : mb_substr($text, 0, $length);
+        if ($text === '') {
+            return null;
+        }
+
+        if (mb_strlen($text) <= $length) {
+            return $text;
+        }
+
+        // Cut on a word boundary and say that it was cut. Slicing mid-word reads as a bug —
+        // "review the automat" — and without the ellipsis nobody can tell a truncated
+        // description from a short one.
+        $cut = mb_substr($text, 0, $length);
+        $lastSpace = mb_strrpos($cut, ' ');
+
+        return rtrim($lastSpace > $length * 0.6 ? mb_substr($cut, 0, $lastSpace) : $cut, " \t\n,;:").'…';
     }
 
     private function sanitizer(): HtmlSanitizer
@@ -115,6 +129,14 @@ class RichTextSanitizer
             ->allowElement('img', ['src', 'alt', 'title', 'width', 'height'])
             ->allowElement('iframe', ['src', 'width', 'height', 'title', 'allowfullscreen', 'frameborder'])
             ->allowAttribute('class', self::ELEMENTS)
+            // §25: the mention chip's own metadata, and nothing more. `data-user-id` is what
+            // makes a mention resolvable to a person after they have been renamed (§8), so it
+            // has to survive sanitizing — but it survives as DATA, never as authority: §24
+            // requires the backend to verify the id names a real, mentionable user before any
+            // record or notification comes of it. A crafted `data-user-id="999"` reaching the
+            // database is expected and harmless; MentionSync is what refuses it.
+            ->allowAttribute('data-user-id', ['span'])
+            ->allowAttribute('data-mention-type', ['span'])
             // Quill marks bullet vs ordered items with `data-list` rather than the wrapping
             // element. Dropping it would silently turn every bullet list into a numbered one.
             ->allowAttribute('data-list', ['li'])

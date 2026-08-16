@@ -57,35 +57,7 @@
         {{-- Enable apps (multi-select). Projects is on today; the rest are Coming Soon. --}}
         <p class="text-[13px] font-medium text-ink mb-1 mt-5">Enable apps <span class="text-danger">*</span></p>
         <p class="text-[12px] text-sub mb-3">Choose what this workspace can do. You can turn more on later as they launch.</p>
-        <div class="grid gap-3">
-          @foreach (config('workspace.apps') as $appKey => $app)
-            @if ($app['available'])
-              <div class="w-full flex items-start gap-3 p-4 rounded-lg border border-brand/40 bg-sel/40 text-left cursor-default" title="Projects is the default app and can’t be turned off">
-                <span class="mt-0.5 h-5 w-5 rounded-md bg-brand grid place-items-center shrink-0">{!! pb_icon('check-on-brand', 12) !!}</span>
-                <div class="min-w-0">
-                  <div class="flex items-center gap-2">
-                    <span class="text-[14px] font-semibold text-head">{{ $app['label'] }}</span>
-                    <span class="text-[10px] uppercase tracking-wide bg-brand/10 text-brand rounded px-1.5 py-0.5">Default</span>
-                  </div>
-                  <div class="text-[12px] text-sub mt-0.5">{{ $app['description'] }}</div>
-                </div>
-                <span role="img" aria-label="Read only" class="ml-auto mt-0.5 shrink-0 text-faint">{!! pb_icon('lock', 14) !!}</span>
-                <input type="hidden" name="apps[]" value="{{ $appKey }}" />
-              </div>
-            @else
-              <div class="w-full flex items-start gap-3 p-4 rounded-lg border border-dashed border-stroke bg-hover/40 text-left opacity-70 cursor-not-allowed select-none" aria-disabled="true">
-                <span class="mt-0.5 h-5 w-5 rounded-md border border-line shrink-0"></span>
-                <div class="min-w-0">
-                  <div class="flex items-center gap-2">
-                    <span class="text-[14px] font-medium text-sub">{{ $app['label'] }}</span>
-                    <span class="text-[10px] uppercase tracking-wide bg-amber-100 text-amber-700 rounded px-1.5 py-0.5">Coming soon</span>
-                  </div>
-                  <div class="text-[12px] text-faint mt-0.5">{{ $app['description'] }}</div>
-                </div>
-              </div>
-            @endif
-          @endforeach
-        </div>
+        @include('partials.workspace-apps')
 
         <button id="continue" type="submit" disabled class="mt-7 w-full h-11 rounded-lg text-[14px] font-semibold bg-hover text-faint cursor-not-allowed transition-colors">Create workspace</button>
       </form>

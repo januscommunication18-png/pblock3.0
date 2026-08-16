@@ -44,6 +44,26 @@ body {
 
 .pb-input::placeholder { color: #9ca3af; }  /* faint */
 
+/* Compact numeric input — a field that sits INSIDE a row of text rather than stacked in a form.
+   -------------------------------------------------------------------------------------------
+   The base .pb-input is `display:block; width:100%`, which is right for a stacked form and
+   wrong beside a label. A Tailwind `w-20` on the same element does NOT fix it: both are single
+   classes, this stylesheet loads after tailwind.css, so .pb-input wins and the utility is
+   silently ignored — the input stretches and the row it lives in falls apart. The width has to
+   be settled here, at higher specificity, or not at all.
+
+   `flex: none` because these live in flex rows: without it the field either absorbs the spare
+   space or gets crushed by a sibling that has flex-1. */
+.pb-input.is-compact {
+  display: inline-block;
+  flex: none;
+  width: 5.5rem;
+  height: 2rem;
+  padding: 0 0.5rem;
+  font-size: 13px;
+  text-align: right;
+}
+
 .pb-input:focus {
   outline: 2px solid #1b5f8a;      /* brand */
   outline-offset: -2px;
@@ -230,3 +250,22 @@ input[type="color"].pb-color-input::-moz-color-swatch { border: 1px solid #d1d5d
      each header keeps its own padding the rest of the time. */
   html[data-sidebar="collapsed"] :has(> [data-sidebar-expand]) { padding-left: 12px; }
 }
+
+/* ---------------------------------------------------------------------------
+   Icons: let `hidden` hide one
+
+   Font Awesome sets `display: var(--fa-display, inline-block)` on `.fa-sharp`,
+   `.fa-regular` and every other family class. That is ONE class — the same
+   specificity as Tailwind's `.hidden { display: none }` — and its stylesheet is
+   linked after tailwind.css, so at equal weight it wins and `hidden` silently
+   stops working on any pb_icon().
+
+   That is not cosmetic: the onboarding goals page hid its tick that way, so every
+   unselected option showed a checkmark. It would have gone on being wrong for any
+   icon toggled with `hidden` anywhere in the app.
+
+   Two classes, so it settles on specificity rather than on load order — the same
+   fix (and the same reasoning) as the Tabulator group-row rule in work-items.css.
+   No `!important`: the point is to be more specific, not louder.
+   --------------------------------------------------------------------------- */
+.pb-icon.hidden { display: none; }

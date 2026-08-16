@@ -32,8 +32,13 @@ PB.boot('project-estimation', {
       disableConfirm: { open: false, dialog: null, busy: false },
       // §21's warning, which has to name the number of work items first.
       removeConfirm: { open: false, value: null },
-      adding: { label: '', minutes: '', busy: false },
-      editing: { id: null, label: '' }
+      adding: { label: '', minutes: '', hours: '', busy: false },
+      editing: { id: null, label: '' },
+      // Work Capacity context: the workspace's working week, and whether mapping is wanted.
+      capacity: b.capacity || { enabled: false },
+      // Which value's hours field is mid-save, so one row's spinner is not every row's.
+      savingHours: null,
+      multiplier: ''
     };
   },
   computed: {
@@ -51,7 +56,22 @@ PB.boot('project-estimation', {
     /** Time systems ask for minutes as well as a label; nothing else does. */
     isTime: function () { return !!this.estimation && this.estimation.type === 'time'; },
     isPoints: function () { return !!this.estimation && this.estimation.type === 'points'; },
-    atLimit: function () { return this.activeValues.length >= this.valuesMax; }
+    atLimit: function () { return this.activeValues.length >= this.valuesMax; },
+
+    /* Mapping is only asked for when there is something to map INTO. With capacity tracking
+       off, an hours column collects a number that feeds nothing. */
+    showsCapacity: function () { return !!this.capacity.enabled && !!this.estimation; },
+
+    /* A time estimate already IS hours, so its figure is derived and read-only — asking for
+       it twice invites two answers that disagree. */
+    capacityIsDerived: function () { return this.isTime; },
+
+    /* §41's warning, at the point somebody can act on it: an unmapped value contributes
+       nothing to planned capacity, and silence would read as "nothing assigned". */
+    unmappedCount: function () {
+      if (!this.showsCapacity || this.capacityIsDerived) return 0;
+      return this.activeValues.filter(function (v) { return v.hours === null; }).length;
+    }
   },
   methods: {
     icon: function (name, size, cls) { return wiIcon(name, size, cls); },
@@ -156,13 +176,51 @@ PB.boot('project-estimation', {
         var body = { label: label };
         if (this.isTime && this.adding.minutes) body.duration_minutes = Number(this.adding.minutes);
         if (this.isPoints && !isNaN(Number(label))) body.numeric_value = Number(label);
+        if (this.adding.hours !== '') body.capacity_hours = Number(this.adding.hours);
         var resp = await this.$pb.api(this.endpoints.values, { method: 'POST', body: body });
         this.estimation = resp.estimation;
-        this.adding = { label: '', minutes: '', busy: false };
+        this.adding = { label: '', minutes: '', hours: '', busy: false };
         this.$pb.toast(resp.message || 'Added.');
       } catch (e) { this.$pb.toast(this.$pb.firstError(e), 'error'); }
       this.adding.busy = false;
     },
+    /* Hours for one value. Saved on blur rather than per keystroke: every save re-plans the
+       open work items carrying this value, which is not something to do on the way from 1 to
+       16. */
+    saveHours: async function (v, raw) {
+      var next = String(raw).trim() === '' ? null : Number(raw);
+
+      if (next !== null && (isNaN(next) || next < 0)) return;
+      if (next === v.capacity_hours) return;
+
+      this.savingHours = v.id;
+      try {
+        var resp = await this.$pb.api(this.$pb.withId(this.endpoints.value, v.id), {
+          method: 'PATCH', body: { capacity_hours: next }
+        });
+        this.estimation = resp.estimation;
+      } catch (e) {
+        this.$pb.toast(this.$pb.firstError(e), 'error');
+      }
+      this.savingHours = null;
+    },
+
+    /* §5's shorthand — "1 point = 2 hours" — as a one-click fill of the column §8 actually
+       shows as a table. The multiplier is never stored: it cannot express a team deciding
+       8 points is worth 16 hours rather than 16, which is exactly what estimation scales do. */
+    applyMultiplier: async function () {
+      var factor = Number(this.multiplier);
+      if (!factor || factor <= 0) return;
+
+      for (var i = 0; i < this.activeValues.length; i++) {
+        var v = this.activeValues[i];
+        var base = v.numeric_value !== null ? v.numeric_value : Number(v.label);
+        if (isNaN(base)) continue;
+        await this.saveHours(v, Math.round(base * factor * 100) / 100);
+      }
+      this.$pb.toast('Capacity hours filled from the multiplier.');
+    },
+
     startEdit: function (v) { this.editing = { id: v.id, label: v.label }; },
     cancelEdit: function () { this.editing = { id: null, label: '' }; },
     saveEdit: async function () {
@@ -251,6 +309,48 @@ PB.boot('project-estimation', {
     'class="ml-auto h-8 px-3 rounded-md border border-stroke text-[13px] font-semibold text-ink hover:bg-hover whitespace-nowrap">Change type</button>' +
     '</div>' +
 
+    // ===== Work Capacity mapping (work-capacity §7) =====
+    // The working week is shown here, not just linked to, because the numbers typed below are
+    // meaningless without it: "16h" is a heavy item against a 40h week and an impossible one
+    // against 20h.
+    '<div v-if="showsCapacity" class="px-5 py-4 border-b border-line bg-hover/40">' +
+    '<div class="flex flex-wrap items-center gap-x-6 gap-y-2">' +
+    '<div><div class="text-[11px] font-semibold text-sub uppercase tracking-wide">Working day</div>' +
+    '<div class="text-[15px] font-bold text-head">{{ capacity.hoursPerDay }}h</div></div>' +
+    '<div><div class="text-[11px] font-semibold text-sub uppercase tracking-wide">Working week</div>' +
+    '<div class="text-[15px] font-bold text-head">{{ capacity.weeklyHours }}h</div></div>' +
+    '<div class="text-[12px] text-sub">' +
+    '{{ capacity.hoursPerDay }}h × {{ capacity.workingDays }} day<span v-if="capacity.workingDays !== 1">s</span>' +
+    '</div>' +
+    '<a :href="capacity.settingsUrl" class="ml-auto text-[12px] font-semibold text-brand hover:underline">Change</a>' +
+    '</div>' +
+
+    '<p class="text-[12px] text-sub mt-3 max-w-[620px]">' +
+    '<template v-if="capacityIsDerived">' +
+    'This project estimates in time, so each value is already worth its own duration — nothing to map.' +
+    '</template>' +
+    '<template v-else>' +
+    'Give each value the working hours it represents, so estimates can be compared with the hours ' +
+    'people actually have.' +
+    '</template></p>' +
+
+    // The multiplier — a shortcut into the column, never a stored rule.
+    '<div v-if="!capacityIsDerived && isPoints" class="flex flex-wrap items-center gap-2 mt-3">' +
+    '<span class="text-[12px] text-sub whitespace-nowrap">1 point =</span>' +
+    '<input v-model="multiplier" type="number" step="0.5" min="0" placeholder="2" class="pb-input is-compact" />' +
+    '<span class="text-[12px] text-sub whitespace-nowrap">hours</span>' +
+    '<button type="button" @click="applyMultiplier" :disabled="!multiplier" ' +
+    'class="h-8 px-3 rounded-md border border-stroke text-[12px] font-semibold text-ink hover:bg-hover ' +
+    'disabled:opacity-40 whitespace-nowrap">Fill all</button>' +
+    '</div>' +
+
+    '<p v-if="unmappedCount" class="text-[12px] text-amber-700 mt-3">' +
+    '{{ unmappedCount }} value<span v-if="unmappedCount !== 1">s</span> ' +
+    '<span v-if="unmappedCount === 1">has</span><span v-else>have</span> no hours yet. ' +
+    'Work items using <span v-if="unmappedCount === 1">it</span><span v-else>them</span> are counted as ' +
+    'unestimated rather than as no work.</p>' +
+    '</div>' +
+
     '<div class="divide-y divide-line">' +
     '<div v-for="(v, i) in activeValues" :key="v.id" class="flex items-center gap-2 px-5 h-12">' +
     '<span class="text-[12px] text-faint w-5 shrink-0">{{ i + 1 }}</span>' +
@@ -262,6 +362,20 @@ PB.boot('project-estimation', {
     '</template>' +
     '<template v-else>' +
     '<span class="text-[13px] text-ink flex-1 truncate">{{ v.label }}</span>' +
+
+    // One hours field per value (work-capacity CAP-D1). Editable for points and sizes;
+    // read-only for time, which already carries its own duration.
+    '<div v-if="showsCapacity" class="flex items-center gap-1.5 shrink-0">' +
+    '<span v-if="capacityIsDerived" class="text-[12px] text-sub tabular-nums w-16 text-right">' +
+    '{{ v.hours === null ? \'—\' : v.hours + \'h\' }}</span>' +
+    '<template v-else>' +
+    '<input :value="v.capacity_hours" @change="saveHours(v, $event.target.value)" ' +
+    ':disabled="savingHours === v.id" type="number" step="0.5" min="0" placeholder="—" ' +
+    'class="pb-input is-compact" :aria-label="\'Capacity hours for \' + v.label" />' +
+    '<span class="text-[12px] text-sub">h</span>' +
+    '</template>' +
+    '</div>' +
+
     '<span v-if="v.in_use" class="text-[11px] text-faint whitespace-nowrap">{{ v.in_use }} work items</span>' +
     '<button type="button" @click="move(v, -1)" :disabled="i === 0" data-tip="Move up" aria-label="Move up" ' +
     'class="h-7 w-7 grid place-items-center rounded text-sub hover:bg-hover disabled:opacity-30" v-html="icon(\'chevron-down\', 14, \'rotate-180\')"></button>' +
@@ -278,7 +392,9 @@ PB.boot('project-estimation', {
     '<div class="flex items-center gap-2 px-5 py-3">' +
     '<input v-model="adding.label" :maxlength="labelMax" :disabled="atLimit" ' +
     ':placeholder="atLimit ? \'Maximum values reached\' : \'Add a value…\'" @keyup.enter="addValue" class="pb-input flex-1" />' +
-    '<input v-if="isTime" v-model="adding.minutes" type="number" min="1" placeholder="Minutes" class="pb-input w-28" />' +
+    '<input v-if="isTime" v-model="adding.minutes" type="number" min="1" placeholder="Min" class="pb-input is-compact" />' +
+    '<input v-if="showsCapacity && !capacityIsDerived" v-model="adding.hours" type="number" step="0.5" min="0" ' +
+    'placeholder="Hours" class="pb-input is-compact" />' +
     '<button type="button" @click="addValue" :disabled="!adding.label.trim() || adding.busy || atLimit" ' +
     'class="h-9 px-4 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold disabled:opacity-50">Add</button>' +
     '</div></div>' +
