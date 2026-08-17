@@ -3,6 +3,7 @@
 use App\Models\WikiCollection;
 use App\Models\WikiCollectionGroup;
 use App\Models\WikiCollectionMember;
+use App\Models\WikiCover;
 use App\Models\WikiPage;
 use App\Models\WorkspaceSettings;
 use App\Services\WorkspaceSettingsManager;
@@ -509,4 +510,38 @@ it('asks before deleting, and says who loses access', function () {
 
     // Nothing happens until the name is typed and Delete Collection is pressed.
     expect($workspace->run(fn () => WikiCollection::find($collection->id)))->not->toBeNull();
+});
+
+it('searches from the header, not from the navigation', function () {
+    [$owner, $workspace] = wikiWorkspace('wiki-header-search');
+
+    $collection = $workspace->run(function () use ($workspace, $owner) {
+        $c = WikiCollection::create([
+            'tenant_id' => $workspace->id, 'name' => 'Help Desk Software',
+            'visibility' => 'public', 'created_by' => $owner->id, 'position' => 1,
+        ]);
+
+        foreach (['Escalation process', 'Handover notes'] as $i => $title) {
+            WikiPage::create([
+                'tenant_id' => $workspace->id, 'wiki_collection_id' => $c->id,
+                'title' => $title, 'content' => '<p>Body.</p>',
+                'created_by' => $owner->id, 'updated_by' => $owner->id, 'position' => $i + 1,
+            ]);
+        }
+
+        WikiCover::forCollection($c)->fill([
+            'is_enabled' => true, 'title' => 'Product Knowledge Base',
+        ])->save();
+
+        return $c;
+    });
+
+    $this->actingAs($owner);
+
+    // Results are a list you choose from, not a filter of the column beside it.
+    visit("/wiki/collections/{$collection->id}/preview")
+        ->assertDontSee('Filter pages')
+        ->type('#wiki-search', 'handover')
+        ->assertSee('Handover notes')
+        ->assertNoJavascriptErrors();
 });

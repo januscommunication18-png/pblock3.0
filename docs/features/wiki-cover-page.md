@@ -362,7 +362,33 @@ configured cards, which will then take over from these.
   `max-w-[980px]` and every `grid-cols` variant absent from it. The markup was right and nothing
   moved, because the classes did not exist. Anything new in a Blade or a JS string template needs
   that rebuild before it means anything.
-- The **global search toggle renders nothing yet** — the Wiki has no search at all (`wiki.md` →
+- **A cover replaces the collection description in the navigation.** The cover already introduces
+  the collection with a title and a short description of its own; showing the collection's
+  description as well puts two summaries on one screen and leaves the reader working out which is
+  which. Without a cover it is the only introduction there is, so it stays.
+- **Global search is in the header**, and the toggle now governs something. It replaced the
+  "Filter pages…" box that sat at the top of the navigation: a filter that hides rows in one
+  column only searches that column, while the same control in the header reads as a search of the
+  whole collection — which is what it is. Results are a **list you choose from**, not a filter of
+  the column beside it, with ↑/↓/Enter/Escape, a stated *No pages match that*, and Enter taking
+  the first hit when nothing is highlighted.
+- **Two searches, doing different jobs.** The dropdown matches **page names**, from an index
+  embedded in the page — instant, no round trip, for jumping to a page you can name. Pressing
+  Enter (or the row at the foot of the dropdown) opens the **results page**, which is rendered on
+  the server and therefore reads the **documents themselves** — which is what somebody typing a
+  phrase they half-remember is actually after. The dropdown says so rather than letting itself
+  look like the whole answer.
+- The results page is `?q=` **in the address**, so a search can be linked to, reloaded and gone
+  Back from, and works with JavaScript off — the header input is a plain GET form.
+- It takes over the reading column and **leaves the navigation** in place, so a search that found
+  the wrong thing is one click from where you were. Results are **cards**, the shape the cover
+  already uses for a page, each showing the section it lives in and the matched phrase **in its
+  surroundings** — so a card says why it is a result. Cuts land on word boundaries; slicing
+  mid-word reads as a rendering fault rather than an excerpt.
+- No matches is **stated**, not silent.
+- Like alignment and the contents column, it appears **only when the cover is enabled**: the
+  switch describes a front door, and a collection without one has configured none of this.
+- ~~The **global search toggle renders nothing yet**~~ — the Wiki has no search at all (`wiki.md` →
   Not built yet), and a search box that cannot search is a lie told in a prominent position. The
   setting saves and waits for Slice 4.
 

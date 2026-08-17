@@ -117,6 +117,84 @@ class WikiReader
     }
 
     /**
+     * Pages matching a search, for the results page (FR-WC-017 … FR-WC-018).
+     *
+     * Titles AND bodies. The header's dropdown can only see what was embedded in the page, so it
+     * matches names; this runs on the server against content already loaded for the navigation,
+     * so it can read the documents themselves — which is what somebody typing a phrase they
+     * remember from a page is actually looking for.
+     *
+     * @param  array<int, array<string, mixed>>  $sections
+     * @return array<int, array<string, mixed>>
+     */
+    public function search(array $sections, string $query): array
+    {
+        $q = trim($query);
+
+        if ($q === '') {
+            return [];
+        }
+
+        $needle = mb_strtolower($q);
+        $results = [];
+
+        foreach ($sections as $section) {
+            $groups = [[$section['name'], $section['pages']]];
+
+            foreach ($section['children'] ?? [] as $child) {
+                $groups[] = [$section['name'].' → '.$child['name'], $child['pages']];
+            }
+
+            foreach ($groups as [$where, $pages]) {
+                foreach ($pages as $page) {
+                    $inTitle = str_contains(mb_strtolower((string) $page->title), $needle);
+                    $body = $this->plain($page->content);
+                    $at = mb_stripos($body, $needle);
+
+                    if (! $inTitle && $at === false) {
+                        continue;
+                    }
+
+                    $results[] = [
+                        'page' => $page,
+                        'section' => $where,
+                        // Where the words were found, so a card can say why it is a result.
+                        'snippet' => $at === false ? Str::limit($body, 160) : $this->around($body, $at, $needle),
+                        'in_title' => $inTitle,
+                    ];
+                }
+            }
+        }
+
+        return $results;
+    }
+
+    /** A page's body as readable text — the same tag-to-space rule the cover excerpt uses. */
+    private function plain(?string $html): string
+    {
+        return (string) Str::of((string) preg_replace('/<[^>]*>/', ' ', (string) $html))->squish();
+    }
+
+    /**
+     * The match with its surroundings, so a card shows the phrase in context.
+     *
+     * Cut at a word boundary where there is one nearby: slicing mid-word produces "…scalation
+     * proc…", which reads as a rendering fault rather than as an excerpt.
+     */
+    private function around(string $text, int $at, string $needle): string
+    {
+        $start = max(0, $at - 60);
+        $slice = mb_substr($text, $start, mb_strlen($needle) + 160);
+
+        if ($start > 0) {
+            $space = mb_strpos($slice, ' ');
+            $slice = '…'.($space === false ? $slice : mb_substr($slice, $space + 1));
+        }
+
+        return mb_strlen($text) > $start + mb_strlen($slice) ? rtrim($slice).'…' : $slice;
+    }
+
+    /**
      * The cover's section cards, derived from what the collection already contains
      * (docs/features/wiki-cover-page.md).
      *

@@ -36,6 +36,29 @@
      away with it. --}}
 <body class="bg-white text-ink text-[13px] h-screen flex flex-col overflow-hidden">
 
+@php
+  /* What the header search looks through: every page in the collection, with the address
+     the navigation would have used. Built here rather than in the three controllers that
+     render this template, because `$pageUrl` differs in each and is already in scope.
+
+     Page NAMES only. Bodies would have to be embedded in the page to be searched from it,
+     which for a large collection is a payload nobody asked to download — and searching
+     half of them would be worse than not offering it, because a search that quietly misses
+     things reads as a broken feature. Body search wants an endpoint. */
+  /* The results page. `q` in the address rather than state held in the browser, so a search
+     can be linked to, reloaded and gone Back from — and so it works with JavaScript off. */
+  $searchQuery = trim((string) request('q'));
+  $searchResults = $searchQuery === '' ? [] : app(App\Services\WikiReader::class)->search($sections, $searchQuery);
+
+  $searchIndex = collect($sections)
+    ->flatMap(fn (array $s) => collect($s['pages'])
+      ->concat(collect($s['children'] ?? [])->flatMap(fn (array $c) => $c['pages'])))
+    ->map(fn ($page) => ['t' => $page->title, 'u' => $pageUrl($page)])
+    ->values()
+    ->all();
+@endphp
+
+
   @if (($guest ?? null))
     {{-- Says whose document this is and how they came to be reading it. A guest has no
          navigation and no account; without this the page is a document from nowhere. --}}
@@ -69,7 +92,35 @@
         <div class="text-[11px] text-sub truncate leading-tight">{{ $workspace->name }}</div>
       </div>
 
-      @if ($current)
+      {{-- Search, in the header (FR-WC-016).
+
+           It replaces the "Filter pages…" box that used to sit at the top of the navigation. A
+           filter that hides rows in one column only searches that column; in the header it reads
+           as a search of the whole document, which is what it is.
+
+           Only when the cover's Global search switch is on — and only when there IS a cover, the
+           same rule the rest of the cover's settings follow: they describe a front door, and a
+           collection without one has not configured any of this. --}}
+      @if ($cover['is_enabled'] && $cover['global_search_enabled'] && count($searchIndex))
+        <form method="GET" action="{{ $coverUrl }}"
+              class="ml-auto relative w-full max-w-[280px]" data-search-root>
+          <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-faint pointer-events-none">
+            {!! pb_icon('magnifying-glass', 14) !!}
+          </span>
+          <input type="search" id="wiki-search" name="q" autocomplete="off" role="combobox"
+                 aria-expanded="false" aria-controls="wiki-search-results"
+                 value="{{ $searchQuery }}"
+                 placeholder="Search pages…" aria-label="Search pages in this collection"
+                 data-search="{{ json_encode($searchIndex) }}"
+                 class="w-full h-9 pl-8 pr-3 rounded-md bg-hover text-[13px] text-ink placeholder:text-faint
+                        outline outline-1 -outline-offset-1 outline-transparent focus:bg-white focus:outline-stroke" />
+
+          {{-- Results, not a filter of something else: selecting one goes there. --}}
+          <div id="wiki-search-results" role="listbox" hidden
+               class="absolute left-0 right-0 top-11 z-40 rounded-lg border border-line bg-white shadow-lg
+                      py-1 max-h-[320px] overflow-y-auto"></div>
+        </form>
+      @elseif ($current)
         <span class="ml-auto hidden sm:block text-[12px] text-faint truncate max-w-[40%]">{{ $current->title }}</span>
       @endif
     </div>
@@ -97,16 +148,15 @@
            ])>{{ $cover['title'] ?: $collection->name }}</a>
       @endif
 
-      @if ($collection->description)
+      {{-- The collection's description, but ONLY when there is no cover.
+
+           A cover already introduces the collection with a title and a short description of its
+           own, so showing this as well puts two introductions on one screen — and the reader has
+           to work out which one is the summary. Without a cover this is the only introduction
+           there is, so it stays. --}}
+      @if ($collection->description && ! $cover['is_enabled'])
         <p class="text-[12px] text-sub mb-4">{{ $collection->description }}</p>
       @endif
-
-      {{-- Filters the list below. Plain JS and no endpoint: everything it searches is already
-           on the page, and a round trip to hide four links would be theatre. --}}
-      <input type="search" id="wiki-nav-filter" placeholder="Filter pages…"
-             aria-label="Filter pages"
-             class="w-full h-9 px-3 mb-4 rounded-md bg-hover text-[13px] text-ink placeholder:text-faint
-                    outline outline-1 -outline-offset-1 outline-transparent focus:bg-white focus:outline-stroke" />
 
       @forelse ($sections as $section)
         @php
@@ -193,7 +243,6 @@
         <p class="text-[13px] text-faint">This collection has no pages yet.</p>
       @endforelse
 
-      <p id="wiki-nav-empty" class="hidden text-[12px] text-faint">Nothing matches that.</p>
     </nav>
 
     @php
@@ -221,7 +270,56 @@
         'mx-auto' => $align === 'center',
         'ml-auto' => $align === 'right',
       ])>
-      @if ($onCover)
+      @if ($searchQuery !== '')
+        {{-- The results page (FR-WC-018).
+
+             It takes over the reading column rather than opening somewhere else: the navigation
+             stays put, so a search that found the wrong thing is one click from where you were.
+             Cards, because a result is a page and a page is what the cover already draws as a
+             card — two shapes for one thing would be one too many. --}}
+        @php($searchHeading = count($searchResults).' result'.(count($searchResults) === 1 ? '' : 's').' for “'.$searchQuery.'”')
+        <h1 class="text-[24px] font-bold text-head tracking-tight">{{ $searchHeading }}</h1>
+
+        @if (count($searchResults))
+          <div class="grid gap-3 mt-6">
+            @foreach ($searchResults as $result)
+              {{-- The whole card is the link, one anchor, with the affordance inside it. --}}
+              <a href="{{ $pageUrl($result['page']) }}"
+                 class="group block rounded-xl border border-line p-4 transition-colors
+                        hover:border-stroke hover:bg-hover/50 focus:outline-none
+                        focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2">
+                <div class="flex items-center gap-2">
+                  <span class="shrink-0 text-faint">{!! pb_icon('file-lines', 14) !!}</span>
+                  <span class="text-[14px] font-semibold text-head group-hover:text-brand truncate">
+                    {{ $result['page']->title }}
+                  </span>
+                  {{-- Where it lives, so two pages with similar names are tellable apart. --}}
+                  <span class="ml-auto shrink-0 text-[11px] uppercase tracking-wide text-faint truncate max-w-[40%]">
+                    {{ $result['section'] }}
+                  </span>
+                </div>
+
+                @if ($result['snippet'])
+                  {{-- The words in their surroundings, so the card says WHY it is a result. --}}
+                  <p class="text-[13px] text-sub mt-1.5 pl-6">{{ $result['snippet'] }}</p>
+                @endif
+              </a>
+            @endforeach
+          </div>
+        @else
+          {{-- Stated, not silent: an empty column reads as a search that broke. --}}
+          <p class="text-[13px] text-sub mt-4 max-w-[520px]">
+            Nothing in this collection matches that. Try a shorter phrase, or a word you know
+            appears in the page.
+          </p>
+        @endif
+
+        <p class="mt-6">
+          <a href="{{ $coverUrl }}" class="text-[13px] font-semibold text-brand hover:underline">
+            &larr; Back to {{ $cover['is_enabled'] ? ($cover['title'] ?: $collection->name) : $collection->name }}
+          </a>
+        </p>
+      @elseif ($onCover)
         {{-- The front door (docs/features/wiki-cover-page.md). --}}
         <h1 class="text-[34px] font-bold text-head tracking-tight">{{ $cover['title'] ?: $collection->name }}</h1>
         @if ($cover['short_description'])
@@ -384,44 +482,107 @@
 
       restore();
 
-      /* ---- filter -----------------------------------------------------------------------
-         Plain JS and no endpoint: everything it searches is already on the page, and a round
-         trip to hide four links would be theatre. */
-      var box = document.getElementById('wiki-nav-filter');
-      var empty = document.getElementById('wiki-nav-empty');
-      if (!box) return;
+    })();
 
-      box.addEventListener('input', function () {
-        var q = box.value.trim().toLowerCase();
-        var shown = 0;
+    /* ---- header search (FR-WC-016 … FR-WC-018) -------------------------------------------
+       Over the page names already listed in the navigation, so there is no round trip and
+       nothing to keep in step. Results are a LIST you choose from, not a filter of the column
+       beside it: this sits in the header and reads as a search of the whole collection. */
+    (function () {
+      var box = document.getElementById('wiki-search');
+      var panel = document.getElementById('wiki-search-results');
+      if (!box || !panel) return;
 
-        Array.prototype.forEach.call(nav.querySelectorAll('[data-nav-item]'), function (li) {
-          var hit = !q || li.getAttribute('data-nav-item').indexOf(q) !== -1;
-          li.hidden = !hit;
-          if (hit) shown++;
+      var pages = [];
+      try { pages = JSON.parse(box.getAttribute('data-search') || '[]'); } catch (e) {}
+
+      var hits = [];
+      var active = -1;
+
+      function esc(v) {
+        return String(v == null ? '' : v).replace(/[&<>"]/g, function (ch) {
+          return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch];
         });
+      }
 
-        /* A parent whose CHILD matched stays on screen. Deepest first, so a match three levels
-           down has already un-hidden its own parent by the time that parent is considered —
-           otherwise the branch leading to a hit is cut above it and the hit disappears with it. */
-        nodes.slice().reverse().forEach(function (node) {
-          var row = node.querySelector(':scope > [data-nav-item]');
+      function close() {
+        panel.hidden = true;
+        box.setAttribute('aria-expanded', 'false');
+        active = -1;
+      }
 
-          if (q && row && row.hidden && node.querySelector('[data-nav-item]:not([hidden])')) {
-            row.hidden = false;
-          }
+      function paintActive() {
+        Array.prototype.forEach.call(panel.querySelectorAll('[role="option"]'), function (el, i) {
+          var on = i === active;
+          el.classList.toggle('bg-sel', on);
+          el.classList.toggle('text-brand', on);
+          el.setAttribute('aria-selected', String(on));
+          if (on) el.scrollIntoView({ block: 'nearest' });
         });
+      }
 
-        sections.forEach(function (section) {
-          // A group whose every page is filtered out is a heading with nothing under it.
-          section.hidden = !!q && !section.querySelector('[data-nav-item]:not([hidden])');
-        });
+      function render(q) {
+        if (!q) { close(); return; }
 
-        // While filtering everything surviving is open: a match hidden inside a folded branch
-        // is a search that found nothing, as far as the reader can tell.
-        if (q) { nodes.forEach(function (node) { paint(node, true); }); } else { restore(); }
+        hits = pages.filter(function (p) {
+          return String(p.t).toLowerCase().indexOf(q) !== -1;
+        }).slice(0, 12);
 
-        if (empty) empty.classList.toggle('hidden', shown > 0);
+        if (!hits.length) {
+          // A stated no-results, not an empty box: silence looks like a search that broke.
+          panel.innerHTML = '<p class="px-3 py-2.5 text-[13px] text-faint">No pages match that.</p>';
+        } else {
+          panel.innerHTML = hits.map(function (p, i) {
+            return '<a role="option" aria-selected="false" data-i="' + i + '" href="' + esc(p.u) + '" ' +
+              'class="block px-3 py-2 text-[13px] text-ink hover:bg-hover truncate">' + esc(p.t) + '</a>';
+          }).join('');
+        }
+
+        /* These are page NAMES. The results page reads the documents too, so it can find more —
+           say so rather than letting the dropdown look like the whole answer. */
+        panel.innerHTML += '<button type="submit" ' +
+          'class="w-full text-left px-3 py-2 mt-1 border-t border-line text-[12px] font-semibold ' +
+          'text-brand hover:bg-hover">Search page contents for “' + esc(box.value.trim()) + '” →</button>';
+
+        panel.hidden = false;
+        box.setAttribute('aria-expanded', 'true');
+        active = -1;
+      }
+
+      box.addEventListener('input', function () { render(box.value.trim().toLowerCase()); });
+      box.addEventListener('focus', function () { render(box.value.trim().toLowerCase()); });
+
+      // Keyboard, because a results list you can only reach with a mouse is half a control.
+      box.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') { close(); box.blur(); return; }
+        if (panel.hidden || !hits.length) return;
+
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          active = (active + 1) % hits.length;
+          paintActive();
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          active = (active <= 0 ? hits.length : active) - 1;
+          paintActive();
+        } else if (e.key === 'Enter' && active !== -1) {
+          // A highlighted result goes straight there. With nothing highlighted the keypress is
+          // left alone, so the form submits and the full results page opens — which is the one
+          // that searches page BODIES as well as their names.
+          e.preventDefault();
+          window.location.href = hits[active].u;
+        }
+      });
+
+      panel.addEventListener('mousemove', function (e) {
+        var option = e.target.closest('[role="option"]');
+        if (!option) return;
+        active = Number(option.getAttribute('data-i'));
+        paintActive();
+      });
+
+      document.addEventListener('click', function (e) {
+        if (!e.target.closest('[data-search-root]')) close();
       });
     })();
   </script>

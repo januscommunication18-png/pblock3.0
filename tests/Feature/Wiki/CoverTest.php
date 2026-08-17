@@ -589,6 +589,137 @@ class CoverTest extends TestCase
         $this->assertSame('Out of hours', $tree[0]['page']->title);
     }
 
+    public function test_a_cover_replaces_the_collection_description_in_the_navigation(): void
+    {
+        $this->setUpWiki();
+        $this->collection->forceFill([
+            'description' => 'Everything about the help desk, written down.',
+        ])->save();
+
+        $page = $this->page('Escalation process');
+        $url = "/wiki/collections/{$this->collection->id}/preview?page={$page->id}";
+
+        // Without a cover the description is the only introduction there is.
+        $this->actingAs($this->owner)->get($url)
+            ->assertOk()->assertSee('Everything about the help desk, written down.');
+
+        $this->save()->assertOk();
+
+        // With one, its title and short description introduce the collection — a second
+        // description in the navigation is two summaries on one screen.
+        $this->actingAs($this->owner)->get($url)
+            ->assertOk()
+            ->assertDontSee('Everything about the help desk, written down.')
+            ->assertSee('Product Knowledge Base');
+    }
+
+    public function test_search_lives_in_the_header_and_answers_to_its_switch(): void
+    {
+        $this->setUpWiki();
+        $page = $this->page('Escalation process');
+        $url = "/wiki/collections/{$this->collection->id}/preview?page={$page->id}";
+
+        $this->save(['global_search_enabled' => true])->assertOk();
+
+        $response = $this->actingAs($this->owner)->get($url)->assertOk();
+
+        $response->assertSee('id="wiki-search"', false);
+        // The index it searches is the collection's own page names.
+        $response->assertSee('Escalation process');
+        // It replaced the box that used to sit at the top of the navigation.
+        $response->assertDontSee('wiki-nav-filter', false);
+        $response->assertDontSee('Filter pages', false);
+
+        $this->save(['global_search_enabled' => false])->assertOk();
+
+        $this->actingAs($this->owner)->get($url)->assertOk()->assertDontSee('id="wiki-search"', false);
+    }
+
+    // ---- the results page --------------------------------------------------------------
+
+    public function test_searching_lists_results_as_cards_that_open_the_page(): void
+    {
+        $this->setUpWiki();
+        $page = $this->page('Escalation process', '<h2>Timings</h2><p>Ring the on-call within ten minutes.</p>');
+        $this->page('Handover notes', '<p>Write it down.</p>');
+        $this->save()->assertOk();
+
+        $response = $this->actingAs($this->owner)
+            ->get("/wiki/collections/{$this->collection->id}/preview?q=escalation");
+
+        $response->assertOk();
+        $response->assertSee('1 result for “escalation”', false);
+        // Each card links to the page it stands for.
+        $response->assertSee('preview?page='.$page->id, false);
+
+        /* Not assertDontSee on the other title: the navigation lists every page in the
+           collection whatever is being searched, so its name is on the screen either way. The
+           count is what says the search discriminated. */
+        $results = app(WikiReader::class)->search(
+            app(WikiReader::class)->sections($this->collection->fresh()), 'escalation'
+        );
+
+        $this->assertSame(['Escalation process'], array_map(fn ($r) => $r['page']->title, $results));
+    }
+
+    public function test_the_results_page_reads_the_documents_not_only_their_names(): void
+    {
+        $this->setUpWiki();
+        $page = $this->page('Escalation process', '<p>Ring the on-call within ten minutes.</p>');
+        $this->save()->assertOk();
+
+        // The word appears nowhere in the title — this is the whole reason the results page
+        // exists beside the header dropdown, which can only see names.
+        $this->actingAs($this->owner)
+            ->get("/wiki/collections/{$this->collection->id}/preview?q=on-call")
+            ->assertOk()
+            ->assertSee('Escalation process')
+            // And the card shows the phrase in its surroundings, so it says why it matched.
+            ->assertSee('Ring the on-call within ten minutes.');
+    }
+
+    public function test_a_search_that_finds_nothing_says_so(): void
+    {
+        $this->setUpWiki();
+        $this->page('Escalation process');
+        $this->save()->assertOk();
+
+        // An empty column reads as a search that broke.
+        $this->actingAs($this->owner)
+            ->get("/wiki/collections/{$this->collection->id}/preview?q=zzzznothing")
+            ->assertOk()
+            ->assertSee('0 results for “zzzznothing”', false)
+            ->assertSee('Nothing in this collection matches that.');
+    }
+
+    public function test_the_results_page_replaces_the_document_and_keeps_the_way_back(): void
+    {
+        $this->setUpWiki();
+        $page = $this->page('Escalation process', '<p>Ring the on-call.</p>');
+        $this->save()->assertOk();
+
+        $this->actingAs($this->owner)
+            ->get("/wiki/collections/{$this->collection->id}/preview?page={$page->id}&q=escalation")
+            ->assertOk()
+            ->assertSee('1 result for “escalation”', false)
+            // The document itself is not rendered underneath the results.
+            ->assertDontSee('wi-rich', false)
+            ->assertSee('Back to Product Knowledge Base');
+    }
+
+    public function test_a_collection_without_a_cover_has_no_header_search(): void
+    {
+        $this->setUpWiki();
+        $page = $this->page('Escalation process');
+
+        // The switch describes a front door. A collection that has not configured one has not
+        // configured this either — the same rule alignment and the contents column follow.
+        $this->actingAs($this->owner)
+            ->get("/wiki/collections/{$this->collection->id}/preview?page={$page->id}")
+            ->assertOk()
+            ->assertDontSee('id="wiki-search"', false);
+    }
+
     public function test_the_contents_column_answers_to_the_on_this_page_switch(): void
     {
         $this->setUpWiki();
