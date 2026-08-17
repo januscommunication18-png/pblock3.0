@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Project;
 
+use App\Filters\FilterRegistry;
+use App\Filters\FilterSet;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Project\StoreCycleRequest;
 use App\Http\Requests\Project\UpdateCycleRequest;
@@ -283,7 +285,7 @@ class CycleController extends Controller
             ->orderBy('sequence_no')
             ->get();
 
-        return $this->payload->build($project, null, $items) + [
+        return $this->payload->build($project, null, $items, $this->filters($project)) + [
             'seed' => $cycle->status() === 'completed' ? [] : ['cycle_id' => $cycle->id],
             'embedded' => true,
         ];
@@ -439,5 +441,21 @@ class CycleController extends Controller
             ])->values()->all(),
             'labels' => $i->labels->map(fn ($l) => ['id' => $l->id, 'name' => $l->name, 'color' => $l->color])->values()->all(),
         ])->all();
+    }
+
+    /**
+     * The filters this request is asking for (docs/features/filters.md).
+     *
+     * The same categories the Work Items screen offers, because this screen shows the same rows
+     * through the same toolbar — a second definition here would be a second answer to what
+     * "Status" means.
+     */
+    private function filters(Project $project): FilterSet
+    {
+        return FilterSet::fromRequest(
+            request(),
+            app(FilterRegistry::class)->workItems($project),
+            $project,
+        );
     }
 }

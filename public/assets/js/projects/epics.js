@@ -72,7 +72,15 @@ PB.boot('project-epics', {
       searchOpen: false,
       showArchived: false,
       // §8's three tabs. Overview first: it is the summary the rest drills into.
-      tab: 'overview',
+      /* The tab lives in the ADDRESS, not only in memory.
+
+         Anything that reloads this screen — applying a filter, following a link, pressing Back —
+         used to land on the default tab, so filtering from the Work items tab appeared to throw
+         the user back to Overview and lose the result they had just asked for. */
+      tab: (function () {
+        try { return new URLSearchParams(window.location.search).get('tab') || 'overview'; }
+        catch (e) { return 'overview'; }
+      })(),
       // §8: the Work Items tab filters by module and cycle, which is how an epic's spread
       // across those dimensions becomes legible without nesting them (§11/§12).
       filters: { module: '', cycle: '' },
@@ -87,6 +95,18 @@ PB.boot('project-epics', {
       dateMenu: { open: '', style: {} }
     };
   },
+  watch: {
+    /* replaceState, not push: switching tabs is not a navigation somebody wants to press Back
+       through, but it does have to survive the next reload. */
+    tab: function (value) {
+      try {
+        var params = new URLSearchParams(window.location.search);
+        params.set('tab', value);
+        window.history.replaceState({}, '', window.location.pathname + '?' + params.toString());
+      } catch (e) {}
+    },
+  },
+
   computed: {
     pageEpic: function () {
       var self = this;

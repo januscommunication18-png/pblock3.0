@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Project;
 
+use App\Filters\FilterRegistry;
+use App\Filters\FilterSet;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Project\StoreEpicRequest;
 use App\Http\Requests\Project\UpdateEpicRequest;
@@ -487,7 +489,7 @@ class EpicController extends Controller
      */
     private function epicScreenPayload(Project $project, Epic $epic): array
     {
-        return $this->payload->build($project, null, $this->epicItems($epic)) + [
+        return $this->payload->build($project, null, $this->epicItems($epic), $this->filters($project)) + [
             'seed' => $project->featureEnabled('epics') && ! $epic->isArchived()
                 ? ['epic_id' => $epic->id]
                 : [],
@@ -506,8 +508,7 @@ class EpicController extends Controller
         return $epic->workItems()
             ->active()
             ->with(['state', 'assignees', 'labels', 'parent:id,identifier,title', 'cycle', 'epic', 'estimateValue', 'modules', 'creator'])
-            ->orderBy('sequence_no')
-            ->get();
+            ->orderBy('sequence_no');
     }
 
     /**
@@ -573,5 +574,21 @@ class EpicController extends Controller
             ->filter(fn (WorkspaceMembership $m) => $m->user !== null)
             ->map(fn (WorkspaceMembership $m) => $this->person($m->user))
             ->values()->all();
+    }
+
+    /**
+     * The filters this request is asking for (docs/features/filters.md).
+     *
+     * The same categories the Work Items screen offers, because this screen shows the same rows
+     * through the same toolbar — a second definition here would be a second answer to what
+     * "Status" means.
+     */
+    private function filters(Project $project): FilterSet
+    {
+        return FilterSet::fromRequest(
+            request(),
+            app(FilterRegistry::class)->workItems($project),
+            $project,
+        );
     }
 }

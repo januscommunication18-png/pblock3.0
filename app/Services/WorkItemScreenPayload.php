@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Filters\FilterRegistry;
+use App\Filters\FilterSet;
 use App\Models\Cycle;
 use App\Models\Epic;
 use App\Models\EstimateValue;
@@ -13,6 +15,8 @@ use App\Models\ProjectItemState;
 use App\Models\WorkItem;
 use App\Models\WorkspaceMembership;
 use App\Policies\WorkItemPolicy;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 
@@ -41,7 +45,7 @@ class WorkItemScreenPayload
      * @param  Collection<int, WorkItem>|null  $items  a narrowed set, or null for the project\'s own list
      * @return array<string, mixed>
      */
-    public function build(Project $project, ?WorkItem $pageItem = null, $items = null): array
+    public function build(Project $project, ?WorkItem $pageItem = null, $items = null, ?FilterSet $filters = null): array
     {
         $states = $this->states->for($project);
         $canCreate = Auth::user()->can('create', [WorkItem::class, $project]);
@@ -53,7 +57,15 @@ class WorkItemScreenPayload
                 'identifier' => $project->identifier,
                 'emoji' => $project->emoji,
             ],
-            'items' => $items !== null ? $this->cards($items) : $this->items($project, $pageItem),
+            'items' => $items !== null
+                ? $this->cards($this->resolve($items, $project, $filters))
+                : $this->items($project, $pageItem, $filters),
+            // What the Filter panel draws, and what is currently narrowing the list
+            // (docs/features/filters.md).
+            'filterCategories' => app(FilterRegistry::class)
+                ->describe(app(FilterRegistry::class)->workItems($project), $project),
+            'activeFilters' => $filters?->all() ?? [],
+            'filterChips' => $filters?->chips() ?? [],
             'states' => $states->map(fn (ProjectItemState $s) => [
                 'id' => $s->id, 'name' => $s->name, 'color' => $s->color, 'group' => $s->group,
             ])->values()->all(),
@@ -164,6 +176,34 @@ class WorkItemScreenPayload
     }
 
     /**
+     * A caller's items, filtered.
+     *
+     * Screens that show a SUBSET — an epic, a cycle, a module — hand their own query in rather
+     * than letting this class build one, because "the items in this epic" is theirs to define.
+     * Handing a BUILDER lets the filters reach the database; handing a collection means they were
+     * already fetched, and the only honest thing left is to narrow them in PHP.
+     *
+     * @param  Builder|Relation|Collection<int, WorkItem>  $items
+     * @return Collection<int, WorkItem>
+     */
+    private function resolve($items, Project $project, ?FilterSet $filters)
+    {
+        $filters ??= FilterSet::none($project);
+
+        if ($items instanceof Builder) {
+            return $filters->apply($items)->get();
+        }
+
+        // A relation is a builder wearing a different coat; `getQuery()` is the Eloquent builder
+        // underneath it, which is what the categories know how to constrain.
+        if ($items instanceof Relation) {
+            return $filters->apply($items->getQuery())->get();
+        }
+
+        return $items;
+    }
+
+    /**
      * Rows for a set the caller already resolved.
      *
      * @param  Collection<int, WorkItem>  $items
@@ -231,17 +271,26 @@ class WorkItemScreenPayload
      *
      * @return array<int, array<string, mixed>>
      */
-    public function items(Project $project, ?WorkItem $pageItem = null): array
+    public function items(Project $project, ?WorkItem $pageItem = null, ?FilterSet $filters = null): array
     {
         $user = Auth::user();
         // §10: a project set to "assigned work items only" filters the LIST too — hiding rows
         // in the client while the API still returns them is not a restriction.
         $assignedOnly = ! app(WorkItemPolicy::class)->canSeeEveryItem($user, $project);
 
-        $items = WorkItem::query()
+        $query = WorkItem::query()
             ->forProject($project->id)
             ->active()
-            ->when($assignedOnly, fn ($q) => $q->whereHas('assignees', fn ($a) => $a->whereKey($user->id)))
+            ->when($assignedOnly, fn ($q) => $q->whereHas('assignees', fn ($a) => $a->whereKey($user->id)));
+
+        /*
+         * Filters narrow what the policy already allowed, and they are applied BEFORE the limit
+         * (F-1, F-3). Filtering the page rather than the query would take the first N rows and
+         * then discard some of them, which reads as a filter losing things it never had.
+         */
+        ($filters ?? FilterSet::none($project))->apply($query);
+
+        $items = $query
             ->with(['state', 'assignees', 'labels', 'parent:id,identifier,title', 'cycle', 'epic', 'estimateValue', 'modules', 'creator'])
             ->orderBy('sequence_no')
             ->limit((int) config('projects.work_item_page_size'))

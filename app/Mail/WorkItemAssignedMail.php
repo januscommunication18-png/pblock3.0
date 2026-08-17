@@ -44,7 +44,8 @@ class WorkItemAssignedMail extends Mailable implements ShouldQueue
 
     public function envelope(): Envelope
     {
-        return new Envelope(subject: "{$this->identifier} {$this->title} — assigned to you");
+        // Name first, ID in brackets — the agreed format everywhere a work item is named.
+        return new Envelope(subject: "{$this->title} ({$this->identifier}) — assigned to you");
     }
 
     public function content(): Content

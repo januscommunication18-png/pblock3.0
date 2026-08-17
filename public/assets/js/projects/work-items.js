@@ -564,6 +564,197 @@ function wiBlankForm(stateId, seed) {
  * Everything it needs arrives in `bootstrap` (WorkItemScreenPayload), so a host only has to
  * hand it a payload — there is no hidden dependency on being the page.
  */
+/* The filter panel and its chips (docs/features/filters.md).
+   ------------------------------------------------------------------
+   Their own components so every screen embedding the work item toolbar — an epic, a cycle, a
+   module — draws the same filter rather than a copy of it. They own no state: the address is the
+   filter (F-D2), so choosing a value navigates and the SERVER decides what was applied. That is
+   what stops the ticks in the panel claiming something the query did not do.
+   ------------------------------------------------------------------ */
+var WiFilterMixin = {
+  methods: {
+    chosen: function (key) { return (this.draft || this.active || {})[key] || []; },
+
+    /* Ticking a box edits a DRAFT, not the address.
+       Applying each click straight away meant every tick navigated, which reloaded the screen
+       and closed the panel — so the second value could never be chosen and only the first
+       survived. Selections are collected while the panel is open and committed once, when it
+       closes. */
+    toggleValue: function (key, value) {
+      var next = Object.assign({}, this.draft || this.active);
+      var current = (next[key] || []).slice();
+      var at = current.indexOf(value);
+
+      if (at === -1) { current.push(value); } else { current.splice(at, 1); }
+
+      if (current.length) { next[key] = current; } else { delete next[key]; }
+
+      this.draft = next;
+    },
+
+    clearCategory: function (key) {
+      var next = Object.assign({}, this.draft || this.active);
+      delete next[key];
+
+      // From a chip there is no panel to close, so it commits at once.
+      if (this.draft) { this.draft = next; } else { this.goToFilters(next); }
+    },
+
+    clearFilters: function () { this.goToFilters({}); },
+
+    /** Commit the draft, if it says anything different from what is already applied. */
+    commitFilters: function () {
+      var draft = this.draft;
+      this.draft = null;
+
+      if (draft && JSON.stringify(draft) !== JSON.stringify(this.active || {})) {
+        this.goToFilters(draft);
+      }
+    },
+
+    goToFilters: function (next) {
+      var params = new URLSearchParams(window.location.search);
+
+      (this.categories || []).forEach(function (c) { params.delete(c.key); });
+      Object.keys(next).forEach(function (k) { params.set(k, next[k].join(',')); });
+
+      var query = params.toString();
+      window.location.href = window.location.pathname + (query ? '?' + query : '');
+    }
+  }
+};
+
+var WiFilter = {
+  name: 'wi-filter',
+  mixins: [WiFilterMixin],
+  props: { categories: { type: Array, default: function () { return []; } }, active: { type: Object, default: function () { return {}; } } },
+  data: function () { return { panel: { open: false, category: null, q: '' }, draft: null }; },
+  computed: {
+    /** How many CATEGORIES are narrowing the list — the unit of the AND. */
+    filterCount: function () { return Object.keys(this.active || {}).length; },
+
+    /** Said in the panel while a draft differs from what the list is currently showing. */
+    hasPendingFilters: function () {
+      return !!this.draft && JSON.stringify(this.draft) !== JSON.stringify(this.active || {});
+    },
+
+    activeCategory: function () {
+      var key = this.panel.category;
+      return this.categories.filter(function (c) { return c.key === key; })[0] || { options: [] };
+    },
+
+    visibleOptions: function () {
+      var q = String(this.panel.q || '').trim().toLowerCase();
+      return this.activeCategory.options.filter(function (o) {
+        return !q || String(o.label || '').toLowerCase().indexOf(q) > -1;
+      });
+    }
+  },
+  methods: {
+    toggleFilterPanel: function () {
+      if (this.panel.open) { this.closeFilterPanel(); return; }
+
+      this.panel.open = true;
+      // Always back at the categories: reopening inside whichever list was last used is the
+      // panel remembering something nobody asked it to.
+      this.panel.category = null;
+      this.panel.q = '';
+      // Start from what is applied; every tick edits this until the panel closes.
+      this.draft = Object.assign({}, this.active);
+    },
+
+    closeFilterPanel: function () {
+      this.panel.open = false;
+      this.panel.category = null;
+      this.panel.q = '';
+      this.commitFilters();
+    }
+  },
+  template:
+    '<span class="relative">' +
+    '<button type="button" @click.stop="toggleFilterPanel" ' +
+    ':aria-expanded="String(panel.open)" aria-haspopup="menu" ' +
+    ':class="[\'inline-flex items-center gap-1.5 h-8 px-3 rounded-md border text-[13px] whitespace-nowrap\', ' +
+    'filterCount ? \'border-brand/40 bg-sel/40 text-brand font-semibold\' : \'border-stroke text-ink hover:bg-hover\']">' +
+    '' + wiIcon('filter', 14, 'text-faint') + 'Filter' +
+    // The count is of CATEGORIES, because a category is the unit of the AND.
+    '<span v-if="filterCount" class="text-[11px] font-semibold bg-brand text-white rounded-full px-1.5">{{ filterCount }}</span>' +
+    '</button>' +
+
+    '<div v-if="panel.open" class="fixed inset-0 z-30" @click="closeFilterPanel"></div>' +
+    '<div v-if="panel.open" ' +
+    'class="absolute right-0 top-9 z-40 w-64 rounded-lg border border-line bg-white shadow-lg py-1">' +
+
+    // ---- the categories ----
+    '<template v-if="!panel.category">' +
+    '<button v-for="c in categories" :key="c.key" type="button" @click="panel.category = c.key" ' +
+    'class="w-full flex items-center gap-2 px-3 h-9 text-[13px] text-ink hover:bg-hover text-left">' +
+    '<span class="flex-1 truncate">{{ c.label }}</span>' +
+    '<span v-if="chosen(c.key).length" class="text-[11px] font-semibold text-brand">{{ chosen(c.key).length }}</span>' +
+    '' + wiIcon('chevron-right', 12, 'text-faint') + '</button>' +
+    '<div class="border-t border-line mt-1 pt-1">' +
+    '<button v-if="hasPendingFilters" type="button" @click="closeFilterPanel" ' +
+    'class="w-full px-3 h-9 text-[13px] font-semibold text-brand hover:bg-hover text-left">Apply</button>' +
+    '<button type="button" @click="clearFilters" :disabled="!filterCount" ' +
+    'class="w-full px-3 h-9 text-[13px] text-ink hover:bg-hover text-left disabled:opacity-40">Clear all</button>' +
+    '</div></template>' +
+
+    // ---- one category's values ----
+    '<template v-else>' +
+    '<div class="flex items-center gap-1 px-2 pb-1 border-b border-line">' +
+    '<button type="button" @click="panel.category = null; panel.q = \'\'" ' +
+    'aria-label="Back to categories" class="h-7 w-7 grid place-items-center rounded text-sub hover:bg-hover">' +
+    '' + wiIcon('chevron-left', 13) + '</button>' +
+    '<span class="text-[13px] font-semibold text-head flex-1 truncate">{{ activeCategory.label }}</span>' +
+    '<button v-if="hasPendingFilters" type="button" @click="closeFilterPanel" ' +
+    'class="text-[12px] font-semibold text-brand hover:underline px-1">Apply</button>' +
+    '<button type="button" @click="clearCategory(panel.category)" ' +
+    'class="text-[12px] font-semibold text-brand hover:underline px-1">Clear</button>' +
+    '</div>' +
+
+    // Searchable where the list can be long — Members and Label especially.
+    '<input v-if="activeCategory.options.length > 8" v-model="panel.q" type="search" ' +
+    'placeholder="Search…" aria-label="Search values" ' +
+    'class="w-[calc(100%-1rem)] mx-2 my-1 h-8 px-2 rounded-md bg-hover text-[13px] text-ink placeholder:text-faint ' +
+    'outline outline-1 -outline-offset-1 outline-transparent focus:bg-white focus:outline-stroke" />' +
+
+    '<div class="max-h-[280px] overflow-y-auto">' +
+    '<label v-for="o in visibleOptions" :key="o.value" ' +
+    'class="flex items-center gap-2.5 px-3 h-9 text-[13px] text-ink hover:bg-hover cursor-pointer">' +
+    '<input type="checkbox" class="accent-brand" :checked="chosen(panel.category).indexOf(o.value) > -1" ' +
+    '@change="toggleValue(panel.category, o.value)" />' +
+    '<span v-if="o.color" class="h-2 w-2 rounded-full shrink-0" :style="{ background: o.color }"></span>' +
+    '<span v-else-if="o.initial" class="h-5 w-5 shrink-0 rounded-full grid place-items-center text-[9px] font-bold text-white bg-cover bg-center" ' +
+    ':style="o.avatar ? { backgroundImage: \'url(\' + o.avatar + \')\' } : { background: $pb.avatarColor(o) }">' +
+    '<template v-if="!o.avatar">{{ o.initial }}</template></span>' +
+    '<span class="truncate">{{ o.label }}</span></label>' +
+    '<p v-if="!visibleOptions.length" class="px-3 py-2 text-[13px] text-faint">Nothing matches that.</p>' +
+    '</div></template>' +
+    '</div></span>'
+};
+
+var WiFilterChips = {
+  name: 'wi-filter-chips',
+  mixins: [WiFilterMixin],
+  props: {
+    chips: { type: Array, default: function () { return []; } },
+    active: { type: Object, default: function () { return {}; } },
+    categories: { type: Array, default: function () { return []; } }
+  },
+  // No panel here, so nothing is ever held back: removing a chip applies at once.
+  data: function () { return { draft: null }; },
+  template:
+    '<div class="flex items-center gap-2 flex-wrap px-5 sm:px-6 py-2 border-b border-line shrink-0">' +
+    '<span v-for="chip in chips" :key="chip.key" ' +
+    'class="inline-flex items-center gap-1.5 h-7 pl-2.5 pr-1.5 rounded-full bg-sel text-[12px] text-ink">' +
+    '<b class="font-semibold">{{ chip.label }}:</b><span class="truncate max-w-[200px]">{{ chip.text }}</span>' +
+    '<button type="button" @click="clearCategory(chip.key)" :aria-label="\'Remove \' + chip.label + \' filter\'" ' +
+    'class="h-4 w-4 grid place-items-center rounded-full text-sub hover:bg-white hover:text-ink">&times;</button>' +
+    '</span>' +
+    '<button type="button" @click="clearFilters" class="text-[12px] font-semibold text-brand hover:underline">Clear all</button>' +
+    '</div>'
+};
+
 var WorkItemsScreen = {
   props: { bootstrap: Object },
   data: function () {
@@ -575,6 +766,13 @@ var WorkItemsScreen = {
       : null;
 
     return {
+      // Filters (docs/features/filters.md). `activeFilters` mirrors what the SERVER applied, so
+      // the panel's ticks and the list can never disagree — the address is the state, and a
+      // change navigates rather than being held here.
+      filterCategories: b.filterCategories || [],
+      activeFilters: b.activeFilters || {},
+      filterChips: b.filterChips || [],
+
       project: b.project || {},
       items: Array.isArray(b.items) ? b.items : [],
       states: Array.isArray(b.states) ? b.states : [],
@@ -936,7 +1134,7 @@ var WorkItemsScreen = {
       ];
     }
   },
-  components: { 'wi-calendar': WiCalendar, 'wi-editor': WiEditor, 'wi-avatar': WiAvatar, 'wi-list': WiList, 'pg-editor': PgEditor },
+  components: { 'wi-calendar': WiCalendar, 'wi-editor': WiEditor, 'wi-avatar': WiAvatar, 'wi-list': WiList, 'pg-editor': PgEditor, 'wi-filter': WiFilter, 'wi-filter-chips': WiFilterChips },
   mounted: function () {
     this.bindGlobalCreate();
 
@@ -974,6 +1172,22 @@ var WorkItemsScreen = {
       self._resizeTimer = setTimeout(self.remeasureDescription, 150);
     };
     window.addEventListener('resize', this._onResize);
+
+    /* Arrived from a copy made on the per-item page. The row is already in this list — it was
+       created before the redirect — so this only has to name it. */
+    try {
+      var copiedId = new URLSearchParams(window.location.search).get('copied');
+
+      if (copiedId) {
+        var made = (this.items || []).filter(function (i) { return String(i.id) === String(copiedId); })[0];
+        this.$pb.toast(this.copiedMessage(made));
+
+        var params = new URLSearchParams(window.location.search);
+        params.delete('copied');
+        var q = params.toString();
+        window.history.replaceState({}, '', window.location.pathname + (q ? '?' + q : ''));
+      }
+    } catch (e) {}
 
     // Arrived from another screen's "New work item" action (?create=1) — open the modal.
     try {
@@ -2132,15 +2346,46 @@ var WorkItemsScreen = {
     },
     rowCopy: async function () {
       var it = this.rowMenu.item;
+      // From the DETAIL view the new item is not visible anywhere on screen, so the list is
+      // where it has to be shown.
+      var fromDetail = this.pageMode || (this.drawer.open && String(this.drawer.id) === String(it && it.id));
+
       this.closeRowMenu();
       if (!it || !this.endpoints.duplicate) return;
+
       try {
         var resp = await this.$pb.api(this.$pb.withId(this.endpoints.duplicate, it.id), { method: 'POST' });
-        this.items.push(resp.item);
+        var copy = resp.item;
+
+        /* The per-item page IS one item, so showing the copy means leaving. `?copied=` carries
+           the message across the reload — a toast raised just before a navigation is a toast
+           nobody sees. */
+        if (this.pageMode && copy) {
+          window.location.href = this.endpoints.list + '?copied=' + encodeURIComponent(copy.id);
+
+          return;
+        }
+
+        this.items.push(copy);
         this.refreshTable();
-        this.$pb.toast(resp.message || 'Work item copied.');
+        // Named, not "Work item copied": the ID and the title are how somebody finds the new
+        // row in a list they are now looking at.
+        this.$pb.toast(this.copiedMessage(copy));
+
+        // Back to the list, with the new row in it — the copy is the thing to look at now, and
+        // the drawer is still showing the item it was made from.
+        if (fromDetail) this.closeDrawer();
       } catch (e) { this.$pb.toast(this.$pb.firstError(e), 'error'); }
     },
+
+    copiedMessage: function (item) {
+      if (!item) return 'Work item copied.';
+
+      // Name first, ID in brackets: the name is what somebody is scanning the list for, and the
+      // ID is how they confirm they found the right row.
+      return 'Copied to ' + item.title + (item.identifier ? ' (' + item.identifier + ')' : '');
+    },
+
     rowOpenTab: function () {
       var it = this.rowMenu.item;
       this.closeRowMenu();
@@ -2346,12 +2591,20 @@ var WorkItemsScreen = {
     '' + wiIcon('bars-thin', 15, 'text-sub') + '' +
     'Work items <span class="text-[11px] font-semibold text-sub bg-hover rounded-full px-1.5 py-0.5">{{ totalCount }}</span></span>' +
     '<div class="ml-auto flex items-center gap-1.5">' +
+
+    // The panel is its own component so every screen that embeds this toolbar — an epic, a
+    // cycle, a module — gets the same one rather than a copy that drifts.
+    '<wi-filter v-if="filterCategories.length" :categories="filterCategories" :active="activeFilters" />' +
+
     // Hidden when this screen is embedded in another (an epic's Work Items tab): that host
     // has its own Add button in its header, and two side by side is one too many. Creating
     // new work is still one click away — every group row keeps its "+".
     '<button v-if="canCreate && !embedded" type="button" @click="openCreate(\'\')" class="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold whitespace-nowrap">' +
     '' + wiIcon('plus', 14) + 'Add work item</button>' +
     '</div></div>' +
+
+    '<wi-filter-chips v-if="filterChips.length" :chips="filterChips" :active="activeFilters" ' +
+    ':categories="filterCategories" />' +
 
     // ===== Grid (desktop) =====
     '<wi-list v-show="items.length" ref="list" class="flex-1 min-h-0 hidden sm:block" ' +

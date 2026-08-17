@@ -10,8 +10,10 @@
         </td></tr>
 
         <tr><td style="padding:16px 32px 0;">
-          <div style="font-size:12px;color:#6b7280;letter-spacing:.04em;">{{ $identifier }}</div>
-          <h1 style="font-size:20px;font-weight:700;color:#0f0f10;margin:4px 0 12px;">{{ $title }}</h1>
+          {{-- Name first, ID in brackets — the agreed format everywhere a work item is named. --}}
+          <h1 style="font-size:20px;font-weight:700;color:#0f0f10;margin:4px 0 12px;">
+            {{ $title }} <span style="font-weight:400;color:#6b7280;">({{ $identifier }})</span>
+          </h1>
           <p style="font-size:14px;color:#6b7280;margin:0 0 20px;">
             <strong style="color:#23272f;">{{ $assignerName }}</strong> assigned this work item to you in
             <strong style="color:#23272f;">{{ $projectName }}</strong>.

@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Project;
 
+use App\Filters\FilterRegistry;
+use App\Filters\FilterSet;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Project\StoreModuleRequest;
 use App\Http\Requests\Project\UpdateModuleRequest;
@@ -255,7 +257,7 @@ class ModuleController extends Controller
             ->orderBy('sequence_no')
             ->get();
 
-        return $this->payload->build($project, null, $items) + [
+        return $this->payload->build($project, null, $items, $this->filters($project)) + [
             'seed' => $project->featureEnabled('modules') && ! $module->isArchived()
                 ? ['module_ids' => [$module->id]]
                 : [],
@@ -438,5 +440,21 @@ class ModuleController extends Controller
             ->filter(fn (WorkspaceMembership $m) => $m->user !== null)
             ->map(fn (WorkspaceMembership $m) => $this->person($m->user))
             ->values()->all();
+    }
+
+    /**
+     * The filters this request is asking for (docs/features/filters.md).
+     *
+     * The same categories the Work Items screen offers, because this screen shows the same rows
+     * through the same toolbar — a second definition here would be a second answer to what
+     * "Status" means.
+     */
+    private function filters(Project $project): FilterSet
+    {
+        return FilterSet::fromRequest(
+            request(),
+            app(FilterRegistry::class)->workItems($project),
+            $project,
+        );
     }
 }

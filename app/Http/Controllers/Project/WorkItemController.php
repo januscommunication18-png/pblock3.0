@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Project;
 
+use App\Filters\FilterRegistry;
+use App\Filters\FilterSet;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Project\StoreWorkItemRequest;
 use App\Http\Requests\Project\UpdateWorkItemRequest;
@@ -77,7 +79,14 @@ class WorkItemController extends Controller
             'canCreateProject' => $canCreate,
             // Gates Settings in the header's ⋯ menu (the settings screen re-checks it).
             'canManage' => Auth::user()->can('manage', $project),
-            'bootstrap' => $this->payload->build($project, $pageItem),
+            // The address is the filter state, so the request is where they come from
+            // (docs/features/filters.md, F-D2). A stale or hand-edited link narrows differently
+            // rather than erroring: unknown values are dropped, and the chips show what ran.
+            'bootstrap' => $this->payload->build($project, $pageItem, null, FilterSet::fromRequest(
+                request(),
+                app(FilterRegistry::class)->workItems($project),
+                $project,
+            )),
         ]);
     }
 

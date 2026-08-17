@@ -36,6 +36,18 @@ function cyParse(iso) {
 // ================= progress ring (§5.1/§5.2) =================
 var CyRing = {
   props: { percent: { type: Number, default: 0 }, size: { type: Number, default: 92 }, stroke: { type: Number, default: 9 } },
+  watch: {
+    /* replaceState, not push: switching tabs is not a navigation somebody wants to press Back
+       through, but it does have to survive the next reload. */
+    tab: function (value) {
+      try {
+        var params = new URLSearchParams(window.location.search);
+        params.set('tab', value);
+        window.history.replaceState({}, '', window.location.pathname + '?' + params.toString());
+      } catch (e) {}
+    },
+  },
+
   computed: {
     r: function () { return (this.size - this.stroke) / 2 - 1; },
     circumference: function () { return 2 * Math.PI * this.r; },
@@ -78,7 +90,15 @@ PB.boot('project-cycles', {
       nameMax: b.nameMax || 120,
       descriptionMax: b.descriptionMax || 2000,
       endpoints: b.endpoints || {},
-      tab: 'active',
+      /* The tab lives in the ADDRESS, not only in memory.
+
+         Anything that reloads this screen — applying a filter, following a link, pressing Back —
+         used to land on the default tab, so filtering from the Work items tab appeared to throw
+         the user back to Overview and lose the result they had just asked for. */
+      tab: (function () {
+        try { return new URLSearchParams(window.location.search).get('tab') || 'active'; }
+        catch (e) { return 'active'; }
+      })(),
       query: '',
       searchOpen: false,
       // Create / edit cycle
