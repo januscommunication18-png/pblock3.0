@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Services\OnboardingRouter;
+use App\Services\WikiNavigation;
 use App\Services\WorkspaceSwitcher;
 use Illuminate\Auth\Middleware\RedirectIfAuthenticated;
 use Illuminate\Http\Request;
@@ -50,6 +51,19 @@ class AppServiceProvider extends ServiceProvider
                 'switcherWorkspaces',
                 $user ? app(WorkspaceSwitcher::class)->workspacesFor($user) : [],
             );
+        });
+
+        // The Wiki sidebar, for the same reason: it rides along with the shared sidebar on every
+        // Wiki screen, and its collections list must be permission-filtered in ONE place rather
+        // than in each of the four controllers that happen to render it.
+        View::composer('partials.wiki-nav', function ($view) {
+            $user = Auth::user();
+            $nav = app(WikiNavigation::class);
+
+            $view->with([
+                'wikiSections' => $nav->sectionsFor(request()),
+                'wikiCollections' => $user ? $nav->collectionsFor($user, request()) : [],
+            ]);
         });
     }
 }

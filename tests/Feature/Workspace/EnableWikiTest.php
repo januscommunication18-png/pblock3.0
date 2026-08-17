@@ -5,6 +5,7 @@ namespace Tests\Feature\Workspace;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceSettings;
+use App\Services\WorkspaceApps;
 use App\Services\WorkspaceCreator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -139,5 +140,195 @@ class EnableWikiTest extends TestCase
             ->assertOk()->assertJsonPath('enabled', false);
 
         $this->assertFalse($this->wikiEnabled($workspace));
+    }
+
+    // ---- Settings → General ---------------------------------------------------------------
+
+    public function test_the_general_screen_lists_what_the_workspace_subscribes_to(): void
+    {
+        $user = $this->creator();
+        app(WorkspaceCreator::class)->create($user, [
+            'name' => 'Acme Inc', 'slug' => 'acme-inc', 'company_size' => '2-10',
+            'apps' => ['projects', 'wiki'],
+        ]);
+
+        $apps = collect($this->actingAs($user->fresh())
+            ->get('/settings/general')->assertOk()
+            ->viewData('bootstrap')['apps'])->keyBy('key');
+
+        // Projects is on because it is what a workspace IS, and cannot be switched off.
+        $this->assertTrue($apps['projects']['enabled']);
+        $this->assertTrue($apps['projects']['locked']);
+
+        $this->assertTrue($apps['wiki']['enabled']);
+        $this->assertFalse($apps['wiki']['locked']);
+
+        // Unreleased apps are listed so people can see what is coming, but not as a choice.
+        $this->assertFalse($apps['helpdesk']['available']);
+    }
+
+    public function test_wiki_can_be_switched_on_from_the_general_screen(): void
+    {
+        $user = $this->creator();
+        $workspace = app(WorkspaceCreator::class)->create($user, [
+            'name' => 'Acme Inc', 'slug' => 'acme-inc', 'company_size' => '2-10',
+        ]);
+
+        $this->actingAs($user->fresh())->patchJson('/settings/general', $this->generalPayload([
+            'apps' => ['wiki'],
+        ]))->assertOk();
+
+        $this->assertTrue($this->wikiEnabled($workspace));
+    }
+
+    public function test_unticking_an_app_on_the_general_screen_switches_it_off(): void
+    {
+        $user = $this->creator();
+        $workspace = app(WorkspaceCreator::class)->create($user, [
+            'name' => 'Acme Inc', 'slug' => 'acme-inc', 'company_size' => '2-10',
+            'apps' => ['projects', 'wiki'],
+        ]);
+
+        // An empty list has to mean "none of the optional ones", or the card could never be
+        // used to turn the last app off.
+        $this->actingAs($user->fresh())->patchJson('/settings/general', $this->generalPayload([
+            'apps' => [],
+        ]))->assertOk();
+
+        $this->assertFalse($this->wikiEnabled($workspace));
+    }
+
+    public function test_saving_the_general_screen_without_apps_leaves_them_alone(): void
+    {
+        $user = $this->creator();
+        $workspace = app(WorkspaceCreator::class)->create($user, [
+            'name' => 'Acme Inc', 'slug' => 'acme-inc', 'company_size' => '2-10',
+            'apps' => ['projects', 'wiki'],
+        ]);
+
+        // Renaming a workspace must not silently unsubscribe it from everything.
+        $this->actingAs($user->fresh())->patchJson('/settings/general', $this->generalPayload())
+            ->assertOk();
+
+        $this->assertTrue($this->wikiEnabled($workspace));
+    }
+
+    public function test_an_unreleased_app_cannot_be_switched_on_from_general(): void
+    {
+        $user = $this->creator();
+        app(WorkspaceCreator::class)->create($user, [
+            'name' => 'Acme Inc', 'slug' => 'acme-inc', 'company_size' => '2-10',
+        ]);
+
+        $this->actingAs($user->fresh())->patchJson('/settings/general', $this->generalPayload([
+            'apps' => ['helpdesk'],
+        ]))->assertStatus(422)->assertJsonValidationErrors('apps.0');
+    }
+
+    public function test_projects_cannot_be_named_as_a_toggleable_app(): void
+    {
+        $user = $this->creator();
+        app(WorkspaceCreator::class)->create($user, [
+            'name' => 'Acme Inc', 'slug' => 'acme-inc', 'company_size' => '2-10',
+        ]);
+
+        // It is not optional, so it is not a value this field accepts (WIKI-D3).
+        $this->actingAs($user->fresh())->patchJson('/settings/general', $this->generalPayload([
+            'apps' => ['projects'],
+        ]))->assertStatus(422)->assertJsonValidationErrors('apps.0');
+    }
+
+    /** @return array<string, mixed> */
+    private function generalPayload(array $overrides = []): array
+    {
+        return array_merge([
+            'name' => 'Acme Inc',
+            'slug' => 'acme-inc',
+            'company_size' => '2-10',
+            'timezone' => 'UTC',
+        ], $overrides);
+    }
+
+    // ---- navigation -------------------------------------------------------------------------
+
+    public function test_the_left_rail_shows_wiki_only_once_it_is_enabled(): void
+    {
+        $user = $this->creator();
+        $workspace = app(WorkspaceCreator::class)->create($user, [
+            'name' => 'Acme Inc', 'slug' => 'acme-inc', 'company_size' => '2-10',
+        ]);
+
+        // Enabling a setting that changes nothing visible reads as a setting that did nothing.
+        $this->actingAs($user->fresh())->get(route('projects.index'))
+            ->assertOk()->assertDontSee('wiki.home');
+
+        app(WorkspaceApps::class)->sync($workspace, ['wiki']);
+
+        $this->actingAs($user->fresh())->get(route('projects.index'))
+            ->assertOk()->assertSee(route('wiki.home'), false);
+    }
+
+    public function test_the_wiki_area_opens_when_enabled(): void
+    {
+        $user = $this->creator();
+        app(WorkspaceCreator::class)->create($user, [
+            'name' => 'Acme Inc', 'slug' => 'acme-inc', 'company_size' => '2-10',
+            'apps' => ['projects', 'wiki'],
+        ]);
+
+        $this->actingAs($user->fresh())->get('/wiki')
+            ->assertOk()
+            ->assertSee('Collections');
+    }
+
+    public function test_the_wiki_area_is_not_reachable_when_it_is_off(): void
+    {
+        $user = $this->creator();
+        app(WorkspaceCreator::class)->create($user, [
+            'name' => 'Acme Inc', 'slug' => 'acme-inc', 'company_size' => '2-10',
+        ]);
+
+        // Hidden from the rail is not the same as unreachable — the URL is guessable.
+        $this->actingAs($user->fresh())->get('/wiki')->assertNotFound();
+    }
+
+    public function test_the_wiki_area_gets_its_own_sidebar(): void
+    {
+        $user = $this->creator();
+        app(WorkspaceCreator::class)->create($user, [
+            'name' => 'Acme Inc', 'slug' => 'acme-inc', 'company_size' => '2-10',
+            'apps' => ['projects', 'wiki'],
+        ]);
+
+        // "A focused navigation experience" — a different room, not the same room with extra
+        // doors, so the work-item navigation is deliberately absent.
+        $this->actingAs($user->fresh())->get('/wiki')
+            ->assertOk()
+            ->assertSee('New page')
+            ->assertSee('Collections')
+            // Shared, Private and Archived are real screens now, not a roadmap.
+            ->assertSee(route('wiki.section', 'shared'), false)
+            ->assertSee(route('wiki.section', 'private'), false)
+            ->assertSee(route('wiki.section', 'archived'), false)
+            ->assertDontSee('Soon')
+            ->assertDontSee('New work item')
+            // Not "Your work" — the workspace switcher in the topbar mentions it, so that
+            // would assert against a panel this change never touched.
+            ->assertDontSee('Stickies');
+    }
+
+    public function test_the_ordinary_sidebar_is_untouched_outside_the_wiki(): void
+    {
+        $user = $this->creator();
+        app(WorkspaceCreator::class)->create($user, [
+            'name' => 'Acme Inc', 'slug' => 'acme-inc', 'company_size' => '2-10',
+            'apps' => ['projects', 'wiki'],
+        ]);
+
+        // Enabling Wiki must not change how the rest of the application navigates.
+        $this->actingAs($user->fresh())->get(route('projects.index'))
+            ->assertOk()
+            ->assertSee('Stickies')
+            ->assertDontSee('New page');
     }
 }

@@ -269,3 +269,62 @@ input[type="color"].pb-color-input::-moz-color-swatch { border: 1px solid #d1d5d
    No `!important`: the point is to be more specific, not louder.
    --------------------------------------------------------------------------- */
 .pb-icon.hidden { display: none; }
+
+
+/* Tooltip (`data-tip`)
+   ---------------------------------------------------------------------------
+   Here, not in work-items.css, because PB.boot() registers the tooltip handler on EVERY screen
+   it mounts — Settings, Wiki, and anything added next. It lived in the work-item stylesheet and
+   so had no styles anywhere else: `position: fixed` was missing, which meant the element fell
+   into normal flow and the "tooltip" appeared as bare text at the bottom of the page. Nothing
+   errored; it just looked like a rendering glitch on screens nobody had checked.
+   --------------------------------------------------------------------------- */
+.wi-tip {
+  position: fixed;
+  z-index: 200;                 /* above every panel, drawer and dialog */
+  pointer-events: none;         /* never eat the hover it is describing */
+  max-width: 260px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: #23272f;
+  color: #fff;
+  font-size: 11.5px;
+  line-height: 1.4;
+  /* Wraps rather than running off the screen. Most tooltips are a few words and still sit on
+     one line inside max-width; the exception is the At Risk / Off Track label, which carries
+     the whole update comment — the reason to hover it at all. */
+  white-space: normal;
+  overflow-wrap: anywhere;
+  box-shadow: 0 4px 12px rgba(15, 15, 16, .18);
+}
+.wi-tip.hidden { display: none; }
+
+
+/* Wiki page tree
+   ---------------------------------------------------------------------------
+   The page list is a list of lists, not a table: SortableJS nests by moving an element between
+   <ul>s, so the tree has to BE nested markup. The columns are this grid, stated once and used
+   by the header and by every row at every depth — which is what keeps them aligned when a row
+   is two levels deep. A <table> could not do the nesting; nested lists could not align the
+   columns without this.
+   --------------------------------------------------------------------------- */
+.pb-wiki-row {
+  display: grid;
+  grid-template-columns: minmax(0, 2.4fr) minmax(0, 1.3fr) 7rem minmax(0, 1fr) 9.5rem 4.5rem;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem 0.5rem 1rem;
+}
+
+/* Children sit in their parent's <li>, so the indent is the row's own padding — not a margin
+   here, which would push the drop zone away from the row it belongs to. */
+.pb-wiki-children { display: block; }
+.pb-wiki-children:empty { min-height: 4px; }
+
+/* The gap Sortable leaves where the dragged row will land. */
+.pb-drag-ghost > .pb-wiki-row {
+  background: #eef1f4;        /* sel */
+  outline: 1px dashed #1b5f8a; /* brand */
+  outline-offset: -2px;
+}
+.pb-drag-ghost > .pb-wiki-row > * { opacity: 0.35; }

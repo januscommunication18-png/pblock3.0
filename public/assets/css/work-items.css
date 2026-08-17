@@ -319,25 +319,8 @@
    which is no help on a row of icon-only buttons — the meaning of the icon is
    exactly what is not written on it.
    --------------------------------------------------------------------------- */
-.wi-tip {
-  position: fixed;
-  z-index: 200;                 /* above every panel, drawer and dialog */
-  pointer-events: none;         /* never eat the hover it is describing */
-  max-width: 260px;
-  padding: 4px 8px;
-  border-radius: 6px;
-  background: #23272f;
-  color: #fff;
-  font-size: 11.5px;
-  line-height: 1.4;
-  /* Wraps rather than running off the screen. Most tooltips are a few words and still sit on
-     one line inside max-width; the exception is the At Risk / Off Track label, which carries
-     the whole update comment — the reason to hover it at all. */
-  white-space: normal;
-  overflow-wrap: anywhere;
-  box-shadow: 0 4px 12px rgba(15, 15, 16, .18);
-}
-.wi-tip.hidden { display: none; }
+/* .wi-tip now lives in styles.css — the tooltip is registered by PB.boot on EVERY
+   screen, so its styles cannot live in a stylesheet only the work-item screens load. */
 
 /* Description clamp: enough to read the opening of a long description without it
    pushing the sub-tasks, dependencies and conversation off the screen. The fade

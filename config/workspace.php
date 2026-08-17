@@ -99,6 +99,12 @@ return [
         'onboarding', 'workspace', 'workspaces', 'settings', 'billing', 'support', 'help',
         'dashboard', 'home', 'welcome', 'new', 'create', 'about', 'pricing', 'blog',
         'status', 'assets', 'public', 'storage', 'emaillog', 'www', 'mail', 'static',
+        // The application's own top-level paths. A published wiki collection is served from
+        // `/{workspace}/{slug}`, which is matched LAST — but a workspace named `wiki` would
+        // still make `/wiki/...` ambiguous to read, and ambiguity in a URL is a bug waiting
+        // for someone to name their workspace badly.
+        'wiki', 'projects', 'project', 'inbox', 'drafts', 'your-work', 'session', 'access',
+        'invitations', 'account', 'reports',
     ],
 
     /**

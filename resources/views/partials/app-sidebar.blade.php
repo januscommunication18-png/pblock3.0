@@ -8,6 +8,10 @@
      work items and so could never publish one. Resolved defensively like the two above, so
      the partial keeps working on any screen that does not pass it. --}}
 @php($__canDraft = $canDraft ?? (auth()->check() && auth()->user()->can('createDraft', \App\Models\WorkItem::class)))
+{{-- Wiki appears in the rail only once the workspace has enabled it (docs/features/wiki.md).
+     Asked through WorkspaceApps so this and the two Settings screens cannot disagree about
+     whether the app is on. --}}
+@php($__wiki = app(\App\Services\WorkspaceApps::class)->isEnabled($__ws, 'wiki'))
 {{-- Restore the collapsed sidebar before it is parsed, so a collapsed panel never flashes
      into view and slide away on every page load. Inline and synchronous on purpose: these
      are full page navigations, so anything deferred is too late to matter. --}}
@@ -23,10 +27,16 @@
 
 <!-- AppRail -->
 <nav class="hidden lg:flex w-16 shrink-0 border-r border-line bg-[#f6f7f8] flex-col items-center py-3 gap-1">
-  <a href="{{ route('projects.index') }}" class="flex flex-col items-center gap-1 w-full px-0.5 py-2 rounded-lg bg-sel text-brand">
+  <a href="{{ route('projects.index') }}" @class(['flex flex-col items-center gap-1 w-full px-0.5 py-2 rounded-lg', 'text-sub hover:bg-hover hover:text-ink' => request()->is('wiki*'), 'bg-sel text-brand' => ! request()->is('wiki*')])>
     {!! pb_icon('grid', 18) !!}
     <span class="text-[10px] text-center leading-tight">Projects</span>
   </a>
+  @if ($__wiki)
+    <a href="{{ route('wiki.home') }}" @class(['flex flex-col items-center gap-1 w-full px-0.5 py-2 rounded-lg', 'bg-sel text-brand' => request()->is('wiki*'), 'text-sub hover:bg-hover hover:text-ink' => ! request()->is('wiki*')])>
+      {!! pb_icon('file-lines', 18) !!}
+      <span class="text-[10px] text-center leading-tight">Wiki</span>
+    </a>
+  @endif
   <a href="{{ route('settings.general') }}" title="Workspace settings"
      class="mt-auto flex flex-col items-center gap-1 w-full px-0.5 py-2 rounded-lg text-sub hover:bg-hover hover:text-ink">
     {!! pb_icon('gear', 19) !!}
@@ -56,6 +66,12 @@
     </div>
   </div>
   <div class="px-2 overflow-y-auto flex-1">
+    {{-- Inside /wiki the panel becomes the Wiki's own navigation (docs/features/wiki.md).
+         Only the BODY swaps — the rail, header, collapse control and drawer script are the
+         same panel and stay shared, rather than being duplicated into a second sidebar. --}}
+    @if ($__wiki && request()->is('wiki*'))
+      @include('partials.wiki-nav')
+    @else
     {{-- New work item (above Home). The global create action from Work Items §4.3.
          On the Work Items screen its click is intercepted and opens the modal in place;
          anywhere else it navigates to a project's Work Items with ?create=1, which
@@ -143,6 +159,7 @@
         @endforelse
       </div>
     </details>
+    @endif
   </div>
   <style>details[open] > summary .pb-chev { transform: rotate(180deg); }</style>
   <div class="px-4 py-2 border-t border-line text-[12px] text-sub shrink-0">Business trial ends in 13d</div>

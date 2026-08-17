@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Settings;
 
+use App\Services\WorkspaceApps;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -40,6 +41,11 @@ class UpdateWorkspaceGeneralRequest extends FormRequest
                 Rule::unique('tenants', 'slug')->ignore($workspaceId, 'id'),
             ],
             'timezone' => ['required', 'string', 'timezone:all'],
+
+            // Which apps the workspace subscribes to. Validated against what is released AND
+            // actually optional, so neither an unreleased app nor Projects can be changed here.
+            'apps' => ['sometimes', 'array'],
+            'apps.*' => ['string', Rule::in(app(WorkspaceApps::class)->selectable())],
         ];
     }
 

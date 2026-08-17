@@ -229,7 +229,10 @@ class SessionTimeoutTest extends TestCase
         $this->signedIn();
         $this->idleFor(29);
 
-        $this->assertSame(30 * 60, $this->guardPayload(route('welcome'))['remaining']);
+        // Near the full window, not exactly it: the stamp is written and the payload rendered
+        // in the same request, and under a slow suite a second can tick between the two. The
+        // bug was reporting SIXTY seconds — a second of slack cannot hide that.
+        $this->assertGreaterThanOrEqual(30 * 60 - 5, $this->guardPayload(route('welcome'))['remaining']);
     }
 
     public function test_the_browsers_deadline_matches_the_one_the_server_will_enforce(): void

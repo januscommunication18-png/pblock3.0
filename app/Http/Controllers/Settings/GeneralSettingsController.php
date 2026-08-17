@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Settings;
 
 use App\Http\Requests\Settings\UpdateWorkspaceGeneralRequest;
 use App\Http\Requests\Settings\UploadWorkspaceLogoRequest;
+use App\Services\WorkspaceApps;
 use App\Services\WorkspaceDeleter;
 use DateTimeImmutable;
 use DateTimeZone;
@@ -19,7 +20,7 @@ use Illuminate\Support\Facades\Storage;
 class GeneralSettingsController extends SettingsController
 {
     /** GET /settings/general */
-    public function show(): View
+    public function show(WorkspaceApps $apps): View
     {
         $this->guardManage();
         $w = $this->workspace();
@@ -37,6 +38,10 @@ class GeneralSettingsController extends SettingsController
             'teamSizes' => config('workspace.team_sizes'),
             'timezones' => $this->timezoneOptions(),
             'canDelete' => Auth::user()->can('delete', $w),
+            // What this workspace has subscribed to (docs/features/wiki.md). Shown here and
+            // editable alongside the rest of the workspace's identity, because "what can this
+            // workspace do" is the same kind of question as what it is called.
+            'apps' => $apps->all($w),
             'endpoints' => [
                 'update' => route('settings.general.update'),
                 'logo' => route('settings.general.logo'),
@@ -46,7 +51,7 @@ class GeneralSettingsController extends SettingsController
     }
 
     /** PATCH /settings/general */
-    public function update(UpdateWorkspaceGeneralRequest $request): JsonResponse
+    public function update(UpdateWorkspaceGeneralRequest $request, WorkspaceApps $apps): JsonResponse
     {
         $this->guardManage();
         $w = $this->workspace();
@@ -58,6 +63,12 @@ class GeneralSettingsController extends SettingsController
             'timezone' => $request->validated('timezone'),
         ])->save();
 
+        // Only when the form actually sent them: a request that says nothing about apps must
+        // not read as "turn everything off".
+        if ($request->has('apps')) {
+            $apps->sync($w, (array) $request->validated('apps', []));
+        }
+
         return response()->json([
             'ok' => true,
             'workspace' => [
@@ -67,6 +78,7 @@ class GeneralSettingsController extends SettingsController
                 'timezone' => $w->timezone,
                 'initial' => $w->initial(),
             ],
+            'apps' => $apps->all($w),
         ]);
     }
 

@@ -11,26 +11,47 @@ PB.boot('general', {
       },
       urlPrefix: b.urlPrefix, teamSizes: b.teamSizes, timezones: b.timezones,
       canDelete: b.canDelete, endpoints: b.endpoints,
+      apps: (b.apps || []).slice(),
+      // Which optional apps are ticked while editing. Kept apart from `apps` so Cancel can
+      // put the card back exactly as it was.
+      appDraft: [],
       editing: false, saving: false, uploading: false, errors: {},
       confirmOpen: false, confirmText: ''
     };
   },
   computed: {
     logoStyle: function () { return this.ws.logo_url ? { backgroundImage: 'url(' + this.ws.logo_url + ')' } : {}; },
-    canConfirmDelete: function () { return this.confirmText.trim() === this.ws.name; }
+    canConfirmDelete: function () { return this.confirmText.trim() === this.ws.name; },
+    /* Anything released and not a default — the apps that are actually a choice. */
+    optionalApps: function () {
+      return this.apps.filter(function (a) { return a.available && !a.locked; });
+    },
+    enabledApps: function () {
+      return this.apps.filter(function (a) { return a.enabled; });
+    }
   },
   methods: {
     startEdit: function () {
       this.errors = {};
       this.form = { name: this.ws.name, company_size: this.ws.company_size, slug: this.ws.slug, timezone: this.ws.timezone };
+      this.appDraft = this.apps.filter(function (a) { return a.enabled && !a.locked; })
+        .map(function (a) { return a.key; });
       this.editing = true;
     },
     cancel: function () { this.editing = false; this.errors = {}; },
+    toggleApp: function (key, on) {
+      var i = this.appDraft.indexOf(key);
+      if (on && i === -1) this.appDraft.push(key);
+      if (!on && i !== -1) this.appDraft.splice(i, 1);
+    },
+    isAppOn: function (key) { return this.appDraft.indexOf(key) !== -1; },
     save: async function () {
       if (this.saving) return; this.saving = true; this.errors = {};
       try {
-        var resp = await this.$pb.api(this.endpoints.update, { method: 'PATCH', body: this.form });
+        var body = Object.assign({}, this.form, { apps: this.appDraft });
+        var resp = await this.$pb.api(this.endpoints.update, { method: 'PATCH', body: body });
         this.ws = Object.assign(this.ws, resp.workspace);
+        if (resp.apps) this.apps = resp.apps;
         this.editing = false;
         this.$pb.toast('Workspace updated.');
       } catch (e) { this.errors = this.$pb.fieldErrors(e); this.$pb.toast(this.$pb.firstError(e), 'error'); }
@@ -108,6 +129,38 @@ PB.boot('general', {
     '<button class="h-9 px-4 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold disabled:opacity-50" :disabled="saving" @click="save">Update workspace</button>' +
     '<button class="h-9 px-4 rounded-md border border-stroke text-[13px] font-semibold text-ink hover:bg-hover" @click="cancel">Cancel</button>' +
     '</div></div>' +
+
+    // Apps — what this workspace subscribes to (docs/features/wiki.md).
+    '<div class="border border-line rounded-xl p-5 mt-6">' +
+    '<h2 class="text-[15px] font-semibold text-head">Apps</h2>' +
+    '<p class="text-[13px] text-sub mt-1">What this workspace can do. Turn more on as they launch.</p>' +
+
+    '<div class="mt-4 grid gap-3">' +
+    '<div v-for="a in apps" :key="a.key" ' +
+    ':class="[\'flex items-start gap-3 p-4 rounded-lg border\', ' +
+    'a.enabled ? \'border-brand/40 bg-sel/40\' : (a.available ? \'border-stroke\' : \'border-dashed border-stroke bg-hover/40 opacity-70\')]">' +
+
+    '<div class="min-w-0 flex-1">' +
+    '<div class="flex items-center gap-2 flex-wrap">' +
+    '<span class="text-[14px] font-semibold" :class="a.available ? \'text-head\' : \'text-sub\'">{{ a.label }}</span>' +
+    '<span v-if="a.locked" class="text-[10px] uppercase tracking-wide bg-brand/10 text-brand rounded px-1.5 py-0.5">Default</span>' +
+    '<span v-else-if="!a.available" class="text-[10px] uppercase tracking-wide bg-amber-100 text-amber-700 rounded px-1.5 py-0.5">Coming soon</span>' +
+    '<span v-else-if="a.enabled" class="text-[10px] uppercase tracking-wide bg-success/15 text-success rounded px-1.5 py-0.5">Enabled</span>' +
+    '</div>' +
+    '<p class="text-[12px] mt-0.5" :class="a.available ? \'text-sub\' : \'text-faint\'">{{ a.description }}</p>' +
+    '</div>' +
+
+    // Editable only while the rest of the card is. A default app has no control at all —
+    // Projects is what a workspace IS, and a disabled switch invites the question anyway.
+    '<pb-toggle v-if="editing && a.available && !a.locked" :model-value="isAppOn(a.key)" ' +
+    '@update:model-value="on => toggleApp(a.key, on)" />' +
+    '<span v-else-if="a.locked" role="img" aria-label="Always on" class="mt-0.5 shrink-0 text-faint">' +
+    wiIcon('lock', 14) + '</span>' +
+    '</div>' +
+    '</div>' +
+
+    '<p v-if="!editing" class="text-[12px] text-sub mt-3">Use <b>Edit</b> above to change which apps are on.</p>' +
+    '</div>' +
 
     // Danger zone (owner only)
     '<div v-if="canDelete" class="border border-danger/40 rounded-xl p-5 mt-6">' +

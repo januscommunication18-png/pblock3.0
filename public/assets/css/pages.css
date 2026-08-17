@@ -10,6 +10,23 @@
 /* ---- the persistent toolbar ----
    Quill builds the toolbar and <wi-editor> moves it into #pb-page-toolbar, so the styled
    element is a CHILD of the host rather than the host itself. */
+/* The toolbar stays put while the document scrolls.
+   ---------------------------------------------------------------------------
+   Jodit's own `toolbarSticky` is off (page-editor.js) because it detaches and floats the bar
+   relative to the wrong container; the comment there says the page pins it with CSS instead —
+   and nothing ever did. It works on the Pages screen only because the host happens to sit
+   OUTSIDE the scroller, which is layout doing the job by accident.
+
+   Stated here so it holds however the screen around it is arranged: sticky is inert when there
+   is no scrolling ancestor, and pins the bar when there is. `background` matters — a
+   transparent sticky bar has the document sliding visibly underneath it. */
+.pb-page-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: #fff;
+}
+
 .pb-page-toolbar > .ql-toolbar.ql-snow {
   border: 0;
   border-bottom: 1px solid #e5e7eb;

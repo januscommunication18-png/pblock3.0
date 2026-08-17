@@ -18,7 +18,7 @@ use Illuminate\Validation\ValidationException;
  */
 class WorkspaceCreator
 {
-    public function __construct(private readonly WorkspaceSettingsManager $settings) {}
+    public function __construct(private readonly WorkspaceApps $apps) {}
 
     /**
      * @param  array{name:string, slug:string, company_size:string, view_type?:string, timezone?:string|null, apps?:array<int, string>}  $data
@@ -68,25 +68,13 @@ class WorkspaceCreator
     /**
      * Switch on the apps chosen at creation (wiki WIKI-D1/WIKI-D2).
      *
-     * Written to the workspace's own settings row — the SAME flag Settings → Wiki toggles —
-     * rather than to a list of apps kept beside it. Two records of "is Wiki on?" is two records
-     * free to disagree, and the screens would each believe a different one.
-     *
-     * Projects needs nothing switched on: it is what a workspace is (WIKI-D3).
+     * Delegated to WorkspaceApps so creation and Settings → General write the same flags the
+     * same way. Projects needs nothing switched on: it is what a workspace is (WIKI-D3).
      *
      * @param  array<int, string>  $apps
      */
     private function enableApps(Workspace $workspace, array $apps): void
     {
-        $flags = array_filter([
-            'wiki_enabled' => in_array('wiki', $apps, true),
-        ]);
-
-        if ($flags === []) {
-            return;
-        }
-
-        // Provisions the settings row on first use, inside the workspace's tenancy context.
-        $this->settings->for($workspace)->forceFill($flags)->save();
+        $this->apps->sync($workspace, $apps);
     }
 }
