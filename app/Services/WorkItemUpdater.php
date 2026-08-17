@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Mail\WorkItemUpdatedMail;
 use App\Models\Cycle;
 use App\Models\Epic;
 use App\Models\EstimateValue;
@@ -14,6 +15,8 @@ use App\Models\WorkItem;
 use App\Models\WorkItemActivity;
 use App\Models\WorkItemTransition;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 
 /**
  * Applies work-item edits and records what changed (spec §4.2 / §6).
@@ -41,9 +44,18 @@ class WorkItemUpdater
     /**
      * @param  array<string, mixed>  $data  Validated attributes; only keys present are touched.
      */
+    /**
+     * Field changes collected during one update, for the email that reports them.
+     *
+     * @var array<int, array{field: string, old: string, new: string}>
+     */
+    private array $pending = [];
+
     public function update(WorkItem $item, User $actor, array $data): WorkItem
     {
-        return DB::transaction(function () use ($item, $actor, $data) {
+        $this->pending = [];
+
+        $fresh = DB::transaction(function () use ($item, $actor, $data) {
             foreach (self::FIELDS as $field) {
                 if (! array_key_exists($field, $data)) {
                     continue;
@@ -101,6 +113,56 @@ class WorkItemUpdater
 
             return $item->fresh(['state', 'assignees', 'labels', 'parent', 'cycle', 'epic', 'estimateValue', 'modules', 'creator']);
         });
+
+        // AFTER the commit, never inside it: mail dispatched from a transaction that then rolls
+        // back tells people about a change that did not happen.
+        $this->announce($fresh, $actor);
+
+        return $fresh;
+    }
+
+    /**
+     * Tell the assignees and the project lead what moved.
+     *
+     * ONE email listing every field, not one per field: a single edit can change status,
+     * assignee and due date together, and three emails about one action is how people learn to
+     * filter this address away.
+     */
+    private function announce(?WorkItem $item, User $actor): void
+    {
+        if ($this->pending === [] || ! $item) {
+            return;
+        }
+
+        $changes = $this->pending;
+        $this->pending = [];
+
+        $project = $item->project;
+
+        if (! $project) {
+            return;
+        }
+
+        $recipients = collect($item->assignees ?? [])
+            ->push($project->lead)
+            ->filter()
+            // Never the person who just made the change — being told what you yourself did is
+            // the fastest way to teach somebody to ignore this sender.
+            ->reject(fn ($u) => (int) $u->id === (int) $actor->id)
+            ->unique('id')
+            ->filter(fn ($u) => filled($u->email));
+
+        foreach ($recipients as $recipient) {
+            Mail::to($recipient->email)->send(new WorkItemUpdatedMail(
+                identifier: (string) $item->identifier,
+                title: (string) $item->title,
+                projectName: (string) $project->name,
+                updatedBy: $actor->displayName(),
+                updatedAt: now()->toDayDateTimeString(),
+                url: route('projects.work-items.show', ['project' => $project->id, 'workItem' => $item->id]),
+                changes: $changes,
+            ));
+        }
     }
 
     /** Archive / restore (§4.4). Archived items leave the default list but keep their data. */
@@ -192,6 +254,14 @@ class WorkItemUpdater
             $old = $this->richText->excerpt($old);
             $new = $this->richText->excerpt($new);
         }
+
+        // Humanised once, here, where the label for a state / cycle / epic / estimate has
+        // already been resolved — the mailable renders, it does not interpret.
+        $this->pending[] = [
+            'field' => Str::headline($field),
+            'old' => $meta['old_label'] ?? ($old === null || $old === '' ? '—' : (string) $old),
+            'new' => $meta['new_label'] ?? ($new === null || $new === '' ? '—' : (string) $new),
+        ];
 
         $this->activity->record($item, $actor, WorkItemActivity::EVENT_UPDATED, [
             // §6's Transition feed is exactly the rows where field = 'state'.
