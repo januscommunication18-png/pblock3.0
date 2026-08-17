@@ -144,6 +144,16 @@ PB.boot('wiki-collection', {
       pages: b.pages || [],
       canEdit: !!b.canEdit,
       invite: { open: false, userId: '', permission: 'read', saving: false },
+      // External members — the other half of "who can read this".
+      guests: b.guests || [],
+      loginMethods: b.loginMethods || [],
+      guestForm: { open: false, name: '', email: '', login_method: 'magic_link', saving: false, errors: {} },
+      guestBusy: null,
+      // Linked Pages (docs/features/wiki-linked-pages.md) — a project page shown in here.
+      linkForm: {
+        open: false, projectId: '', pageId: '',
+        projects: [], pages: [], loading: false, saving: false, errors: {}
+      },
       adding: { open: false, title: '', parentId: null, parentTitle: '', groupId: null, groupName: '', busy: false, errors: {} },
       addMenu: null,
       groupMenu: null,
@@ -162,6 +172,7 @@ PB.boot('wiki-collection', {
       // The collection's own ⋯ menu, and the one action in it that cannot be undone.
       collectionMenu: false,
       archiveBusy: false,
+      archiveConfirm: false,
       deleteConfirm: { open: false, text: '', busy: false },
       previewUrl: b.previewUrl || null,
       groups: b.groups || [],
@@ -202,6 +213,17 @@ PB.boot('wiki-collection', {
       return this.permissions.map(function (p) { return { value: p.value, label: p.label, desc: p.desc }; });
     },
     canInvite: function () { return !!this.invite.userId && !this.invite.saving; },
+
+    canLink: function () { return !!this.linkForm.projectId && !!this.linkForm.pageId; },
+
+    canInviteGuest: function () {
+      return !!String(this.guestForm.name || '').trim()
+        && !!String(this.guestForm.email || '').trim();
+    },
+
+    loginMethodOptions: function () {
+      return this.loginMethods.map(function (m) { return { value: m.value, label: m.label, desc: m.desc }; });
+    },
 
     /* Deleting asks for the collection's name, the same as deleting a project. Case and
        surrounding space are forgiven — the point is that somebody read the name, not that
@@ -264,8 +286,21 @@ PB.boot('wiki-collection', {
     /* Archiving is reversible, and this same control brings it back. The Archived view is not
        built yet, so without a way back from the collection's own page an archived collection
        would be one nobody could reach again. */
-    toggleArchive: async function () {
+    /* Archiving ASKS; restoring does not.
+       Archiving takes the collection out of every list and — since WIKI-D5 — closes it to
+       everybody invited to it, which is a great deal to happen from one click in a menu.
+       Restoring only ever gives access back, and warning somebody before an additive change
+       teaches them to click through warnings. */
+    toggleArchive: function () {
       this.collectionMenu = false;
+
+      if (this.collection.archived) { this.setArchived(false); return; }
+
+      this.archiveConfirm = true;
+    },
+
+    setArchived: async function (archived) {
+      this.archiveConfirm = false;
 
       if (this.archiveBusy) return;
       this.archiveBusy = true;
@@ -273,7 +308,7 @@ PB.boot('wiki-collection', {
       try {
         var resp = await this.$pb.api(this.endpoints.archive, {
           method: 'PATCH',
-          body: { archived: !this.collection.archived }
+          body: { archived: archived }
         });
         this.collection = resp.collection || this.collection;
         this.$pb.toast(resp.message || 'Saved.');
@@ -893,6 +928,125 @@ PB.boot('wiki-collection', {
       }
     },
 
+    // ---- linked pages (docs/features/wiki-linked-pages.md) ---------------------------------
+    openLinkForm: async function () {
+      this.linkForm = {
+        open: true, projectId: '', pageId: '',
+        projects: [], pages: [], loading: true, saving: false, errors: {}
+      };
+
+      try {
+        // Permission-filtered on the SERVER. The combo only ever sees projects this person may
+        // open, so there is nothing here for a client-side filter to get wrong.
+        var resp = await this.$pb.api(this.endpoints.linkableProjects);
+        this.linkForm.projects = resp.options || [];
+      } catch (e) { this.$pb.toast(this.$pb.firstError(e), 'error'); }
+
+      this.linkForm.loading = false;
+    },
+
+    /* The page list depends on the project, so choosing one clears whatever page was picked
+       under the last: a page id from the previous project would be refused at submission, and
+       having the form carry it that far is the application setting a trap. */
+    onLinkProject: async function (projectId) {
+      this.linkForm.projectId = projectId;
+      this.linkForm.pageId = '';
+      this.linkForm.pages = [];
+
+      if (!projectId) return;
+
+      this.linkForm.loading = true;
+
+      try {
+        var resp = await this.$pb.api(
+          this.endpoints.linkablePages + '?project=' + encodeURIComponent(projectId)
+        );
+        this.linkForm.pages = resp.options || [];
+      } catch (e) { this.$pb.toast(this.$pb.firstError(e), 'error'); }
+
+      this.linkForm.loading = false;
+    },
+
+    saveLink: async function () {
+      if (!this.canLink || this.linkForm.saving) return;
+      this.linkForm.saving = true;
+      this.linkForm.errors = {};
+
+      try {
+        var resp = await this.$pb.api(this.endpoints.linkedPages, { method: 'POST', body: {
+          project_id: Number(this.linkForm.projectId),
+          page_id: Number(this.linkForm.pageId)
+        } });
+        // The row arrives already in place — no reload, the same way adding a page behaves.
+        this.pages = this.pages.concat([resp.page]);
+        this.linkForm.open = false;
+        this.$pb.toast(resp.message || 'Page linked.');
+      } catch (e) {
+        // The already-linked case comes back as a plain message, not a field error, so the
+        // toast is where it belongs.
+        this.linkForm.errors = this.$pb.fieldErrors(e);
+        this.$pb.toast(this.$pb.firstError(e), 'error');
+      }
+
+      this.linkForm.saving = false;
+    },
+
+    // ---- external members (docs/features/wiki-external-guests.md) --------------------------
+    openGuestForm: function () {
+      this.guestForm = {
+        open: true, name: '', email: '',
+        // The default the modal is specified to open on; the only method there is today.
+        login_method: (this.loginMethods[0] && this.loginMethods[0].value) || 'magic_link',
+        saving: false, errors: {}
+      };
+    },
+
+    saveGuest: async function () {
+      if (!this.canInviteGuest || this.guestForm.saving) return;
+      this.guestForm.saving = true;
+      this.guestForm.errors = {};
+
+      try {
+        var resp = await this.$pb.api(this.endpoints.guests, { method: 'POST', body: {
+          name: this.guestForm.name, email: this.guestForm.email,
+          login_method: this.guestForm.login_method
+        } });
+        this.guests = resp.guests || [];
+        this.guestForm.open = false;
+        this.$pb.toast(resp.message || 'Invitation sent.');
+      } catch (e) {
+        // The typed name and address survive a refused save; they are the whole of the form.
+        this.guestForm.errors = this.$pb.fieldErrors(e);
+        this.$pb.toast(this.$pb.firstError(e), 'error');
+      }
+
+      this.guestForm.saving = false;
+    },
+
+    resendGuest: async function (guest) {
+      if (this.guestBusy) return;
+      this.guestBusy = guest.id;
+
+      try {
+        var resp = await this.$pb.api(this.$pb.withId(this.endpoints.guestResend, guest.id), { method: 'POST' });
+        this.guests = resp.guests || [];
+        this.$pb.toast(resp.message || 'A new link has been sent.');
+      } catch (e) { this.$pb.toast(this.$pb.firstError(e), 'error'); }
+
+      this.guestBusy = null;
+    },
+
+    removeGuest: async function (guest) {
+      // Said before the click rather than after: the link dies the moment this returns.
+      if (!window.confirm('Remove ' + guest.name + '? Their link stops working immediately.')) return;
+
+      try {
+        var resp = await this.$pb.api(this.$pb.withId(this.endpoints.guest, guest.id), { method: 'DELETE' });
+        this.guests = resp.guests || [];
+        this.$pb.toast(resp.message || 'External member removed.');
+      } catch (e) { this.$pb.toast(this.$pb.firstError(e), 'error'); }
+    },
+
     openInvite: function () {
       this.invite = { open: true, userId: '', permission: 'read', saving: false };
     },
@@ -990,8 +1144,8 @@ PB.boot('wiki-collection', {
     'class="hidden sm:inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-stroke text-[13px] text-ink hover:bg-hover whitespace-nowrap">' +
     '<span v-html="icon(\'eye\', 14, \'text-faint\')"></span>Preview</a>' +
 
-    '<button type="button" disabled title="Linking a page is being built" ' +
-    'class="hidden sm:inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-stroke text-[13px] text-ink cursor-not-allowed opacity-60 whitespace-nowrap">' +
+    '<button v-if="canEdit" type="button" @click="openLinkForm" ' +
+    'class="hidden sm:inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-stroke text-[13px] text-ink hover:bg-hover whitespace-nowrap">' +
     '<span v-html="icon(\'link\', 14, \'text-faint\')"></span>Link a page</button>' +
 
     '<button v-if="canEdit" type="button" @click="openAddPage(null)" ' +
@@ -1033,20 +1187,28 @@ PB.boot('wiki-collection', {
     '<p v-if="collection.description" class="text-[13px] text-sub">{{ collection.description }}</p>' +
     '<p v-else class="text-[13px] text-faint">No description.</p>' +
 
-    // ---- who can open it (private only) ----
-    //
-    // The heading sits ABOVE the faces rather than beside them: a row of initials needs a label
-    // it clearly belongs to, and inline it read as one more chip in the same line.
-    //
-    // `data-tip`, not `title`. A face shows an initial, so its meaning is precisely what is NOT
-    // written on it — and the native tooltip waits about a second before saying so.
-    // In a card, like Public URL — the two answer the same kind of question ("who can reach
-    // this") and looked like different kinds of thing sitting side by side.
-    '<div v-if="isPrivate" class="mt-6 rounded-xl border border-line p-5">' +
-    '<h2 class="text-[13px] font-semibold text-head">Access</h2>' +
-    '<p class="text-[12px] text-sub mt-0.5">Only these people can open this collection.</p>' +
+    /* ---- who can open it (docs/features/wiki-external-guests.md) ----
+       On EVERY collection now, not only a private one. It was private-only because visibility
+       was the whole answer to "who can read this" — a public collection was open to the
+       workspace and there was nothing else to say. Once a collection can carry members from
+       outside the workspace, visibility stops being the whole answer, so the box that gives the
+       rest of it has to be there to give it.
 
-    '<div class="mt-2.5 flex items-center gap-2 flex-wrap">' +
+       The heading sits ABOVE the faces rather than beside them: a row of initials needs a label
+       it clearly belongs to, and inline it read as one more chip in the same line.
+
+       `data-tip`, not `title`. A face shows an initial, so its meaning is precisely what is NOT
+       written on it — and the native tooltip waits about a second before saying so. */
+    '<div class="mt-6 rounded-xl border border-line p-5">' +
+    '<h2 class="text-[13px] font-semibold text-head">Access</h2>' +
+    '<p v-if="isPrivate" class="text-[12px] text-sub mt-0.5">' +
+    'Only these people can open this collection.</p>' +
+    // A public collection needs the difference spelled out, or the list below reads as the limit.
+    '<p v-else class="text-[12px] text-sub mt-0.5">' +
+    'Everyone in the workspace can read this. These are the people named on it.</p>' +
+
+    '<h3 class="text-[12px] font-semibold text-sub mt-4">Team members</h3>' +
+    '<div class="mt-2 flex items-center gap-2 flex-wrap">' +
     '<span v-for="p in people" :key="p.user.id" class="relative group">' +
     '<span :data-tip="p.user.name + \' — \' + p.permission_label" tabindex="0" ' +
     'class="h-8 w-8 rounded-full grid place-items-center text-[11px] font-semibold text-white bg-cover bg-center ' +
@@ -1057,9 +1219,47 @@ PB.boot('wiki-collection', {
     ':aria-label="\'Remove \' + p.user.name" :data-tip="\'Remove \' + p.user.name" ' +
     'class="hidden group-hover:grid absolute -top-1 -right-1 h-4 w-4 place-items-center rounded-full bg-danger text-white text-[9px]">&times;</button>' +
     '</span>' +
-    '<button v-if="canManage" type="button" @click="openInvite" data-tip="Add people" aria-label="Add people" ' +
-    'class="h-8 w-8 grid place-items-center rounded-full border border-dashed border-stroke text-sub hover:bg-hover" ' +
-    'v-html="icon(\'plus\', 14)"></button>' +
+    '</div>' +
+
+    /* External members are a LIST with the address visible, not faces. An address is the whole
+       identity here — an initial in a circle would not tell you who `t.r@…` is. */
+    '<template v-if="guests.length">' +
+    '<h3 class="text-[12px] font-semibold text-sub mt-5">External members</h3>' +
+    '<ul class="mt-2 divide-y divide-line border border-line rounded-lg">' +
+    '<li v-for="g in guests" :key="g.id" class="flex items-center gap-3 px-3 py-2.5">' +
+    '<span class="h-8 w-8 shrink-0 rounded-full border border-dashed border-stroke grid place-items-center text-faint" ' +
+    'v-html="icon(\'globe\', 14)"></span>' +
+    '<span class="min-w-0 flex-1">' +
+    '<span class="block text-[13px] font-medium text-ink truncate">{{ g.name }}</span>' +
+    '<span class="block text-[12px] text-sub truncate">{{ g.email }}</span></span>' +
+    // The question this list actually gets asked is "did they read it?".
+    '<span class="hidden sm:block text-[12px] shrink-0" :class="g.opened ? \'text-sub\' : \'text-faint\'">' +
+    '{{ g.opened ? \'Opened \' + g.last_seen : \'Never opened\' }}</span>' +
+    '<span v-if="canManage" class="flex items-center gap-1 shrink-0">' +
+    // Resending mints a new token, so it is also how a forwarded link is cut off without
+    // removing the person. The tooltip says so.
+    '<button type="button" @click="resendGuest(g)" :disabled="guestBusy === g.id" ' +
+    'data-tip="Send a new link. The old one stops working." :aria-label="\'Resend to \' + g.name" ' +
+    'class="h-7 w-7 grid place-items-center rounded-md text-sub hover:bg-hover disabled:opacity-50" ' +
+    'v-html="icon(\'rotate\', 14)"></button>' +
+    '<button type="button" @click="removeGuest(g)" :aria-label="\'Remove \' + g.name" ' +
+    'data-tip="Remove" ' +
+    'class="h-7 w-7 grid place-items-center rounded-md text-sub hover:bg-hover hover:text-danger" ' +
+    'v-html="icon(\'trash\', 14)"></button>' +
+    '</span></li></ul></template>' +
+
+    /* The two ways in, named. The dashed "+" that used to sit at the end of the faces is gone:
+       with two kinds of invitation it could only mean one of them, and a control that silently
+       picks is worse than two that say which. Same reason the pencil beside the collection name
+       gave way to the ⋯ menu. */
+    '<div v-if="canManage" class="mt-4 flex flex-wrap items-center gap-2">' +
+    '<button type="button" @click="openInvite" ' +
+    'class="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-md border border-stroke text-[13px] font-semibold text-ink hover:bg-hover">' +
+    '<span v-html="icon(\'users\', 14, \'text-faint\')"></span>Invite team member</button>' +
+
+    '<button type="button" @click="openGuestForm" ' +
+    'class="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-md border border-stroke text-[13px] font-semibold text-ink hover:bg-hover">' +
+    '<span v-html="icon(\'globe\', 14, \'text-faint\')"></span>Invite external member</button>' +
     '</div>' +
     '</div>' +
 
@@ -1431,18 +1631,55 @@ PB.boot('wiki-collection', {
     '</div>' +
 
 
+    // ---- archive the collection ----
+    // Named consequences, not "are you sure?": what changes is that it leaves every list AND
+    // that the people invited to it stop being able to open it, which is the half nobody
+    // expects from a word as gentle as "archive".
+    '<pb-modal :open="archiveConfirm" title="Archive this collection?" width="max-w-[480px]" ' +
+    '@close="archiveConfirm = false">' +
+    '<p class="text-[13px] text-sub leading-relaxed">' +
+    '<b class="text-ink">{{ collection.name }}</b> will leave Collections and move to Archived. ' +
+    'Its pages, groups and settings are all kept.</p>' +
+    '<p class="text-[13px] text-sub leading-relaxed mt-2">' +
+    'Everyone invited to it will <b class="text-ink">lose access</b> until it is restored. ' +
+    'Only you and workspace admins will be able to open it.</p>' +
+    '<p v-if="collection.published" class="text-[12px] text-amber-700 mt-2">' +
+    'It is published — archiving takes its public URL down immediately.</p>' +
+    '<p class="text-[12px] text-faint mt-3">You can restore it from this menu at any time.</p>' +
+    '<template #footer>' +
+    '<button type="button" class="h-9 px-4 rounded-md border border-stroke text-[13px] font-semibold text-ink hover:bg-hover" ' +
+    '@click="archiveConfirm = false">Cancel</button>' +
+    '<button type="button" :disabled="archiveBusy" @click="setArchived(true)" ' +
+    'class="h-9 px-4 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold disabled:opacity-50">' +
+    '{{ archiveBusy ? \'Archiving…\' : \'Archive collection\' }}</button>' +
+    '</template></pb-modal>' +
+
     // ---- delete the collection ----
     // The name is typed, not a button pressed, and the dialog names what goes with it. The
     // pages inside are documents somebody wrote; a click is too small a gesture for that.
-    '<pb-modal :open="deleteConfirm.open" title="Delete collection?" width="max-w-[480px]" ' +
+    '<pb-modal :open="deleteConfirm.open" title="Delete this collection?" width="max-w-[480px]" ' +
     '@close="deleteConfirm.open = false">' +
     '<p class="text-[13px] text-sub leading-relaxed">' +
-    'This permanently deletes <b class="text-ink">{{ collection.name }}</b>, every page in it, ' +
-    'its groups and its access list. This cannot be undone.</p>' +
+    'Deleting <b class="text-ink">{{ collection.name }}</b> will permanently remove the ' +
+    'collection and users will lose access to it. Any external members with access to this ' +
+    'collection will also lose access.</p>' +
+
+    // "Handled according to the product's deletion rules" — ours is that they go with it, by
+    // foreign key. That is the most consequential fact here, so it is stated with a number
+    // rather than left to be discovered.
+    '<p v-if="pages.length" class="text-[13px] text-sub leading-relaxed mt-2">' +
+    'The <b class="text-ink">{{ pages.length }}</b> page<template v-if="pages.length !== 1">s</template> ' +
+    'inside it, its groups and its cover are deleted too. This cannot be undone.</p>' +
+    '<p v-else class="text-[13px] text-sub leading-relaxed mt-2">This cannot be undone.</p>' +
+
+    // The way out, offered where the decision is being made rather than in a help page.
     '<p class="text-[13px] text-sub mt-2">' +
     'To take it out of the lists and keep everything, ' +
     '<button type="button" @click="deleteConfirm.open = false; toggleArchive()" ' +
     'class="text-brand font-semibold hover:underline">archive it instead</button>.</p>' +
+
+    // Typed, not clicked. The pages inside are documents somebody wrote, and this is the one
+    // action in the Wiki that does not come back.
     '<label class="block text-[13px] font-medium text-ink mt-4 mb-1.5">' +
     'Type <b>{{ collection.name }}</b> to confirm</label>' +
     '<input v-model="deleteConfirm.text" class="pb-input" @keyup.enter="deleteCollection" />' +
@@ -1451,7 +1688,7 @@ PB.boot('wiki-collection', {
     '@click="deleteConfirm.open = false">Cancel</button>' +
     '<button type="button" :disabled="!canDeleteCollection || deleteConfirm.busy" @click="deleteCollection" ' +
     'class="h-9 px-4 rounded-md bg-danger text-white text-[13px] font-semibold hover:opacity-90 disabled:opacity-50">' +
-    '{{ deleteConfirm.busy ? \'Deleting…\' : \'Delete collection\' }}</button>' +
+    '{{ deleteConfirm.busy ? \'Deleting…\' : \'Delete Collection\' }}</button>' +
     '</template></pb-modal>' +
 
     // ---- edit the collection itself ----
@@ -1538,6 +1775,81 @@ PB.boot('wiki-collection', {
     '<button type="button" :disabled="!adding.title.trim() || adding.busy" @click="createPage" ' +
     'class="h-9 px-4 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold disabled:opacity-50">' +
     '{{ adding.busy ? \'Creating…\' : \'Continue\' }}</button>' +
+    '</template></pb-modal>' +
+
+    // ---- link a project page in (docs/features/wiki-linked-pages.md) ----
+    '<pb-modal :open="linkForm.open" title="Link a page" width="max-w-[520px]" ' +
+    '@close="linkForm.open = false">' +
+    '<p class="text-[13px] text-sub">' +
+    'Show a page from one of this workspace\'s projects inside this collection. ' +
+    'It stays where it is — both places read the same document.</p>' +
+
+    '<label class="block text-[13px] font-medium text-ink mb-1.5 mt-4">Project</label>' +
+    '<pb-combo :model-value="linkForm.projectId" :options="linkForm.projects" ' +
+    '@update:model-value="onLinkProject" placeholder="Choose a project" />' +
+    '<p v-if="!linkForm.loading && !linkForm.projects.length" class="text-[12px] text-faint mt-1">' +
+    'No projects with Pages switched on that you can open.</p>' +
+
+    '<label class="block text-[13px] font-medium text-ink mb-1.5 mt-4">Page</label>' +
+    '<pb-combo v-model="linkForm.pageId" :options="linkForm.pages" ' +
+    ':placeholder="linkForm.projectId ? \'Choose a page\' : \'Choose a project first\'" />' +
+    // Already-linked pages are absent from the list rather than offered and then refused, so
+    // this is the only thing left to explain.
+    '<p v-if="linkForm.projectId && !linkForm.loading && !linkForm.pages.length" ' +
+    'class="text-[12px] text-faint mt-1">' +
+    'Nothing left to link — every page in this project is already here, or there are none.</p>' +
+
+    // The disclosure is the linker\'s decision, so it is named before the click rather than
+    // discovered afterwards.
+    '<p class="text-[12px] text-amber-700 mt-4">' +
+    'Everyone who can read this collection will be able to read this page.</p>' +
+
+    '<template #footer>' +
+    '<button type="button" class="h-9 px-4 rounded-md border border-stroke text-[13px] font-semibold text-ink hover:bg-hover" ' +
+    '@click="linkForm.open = false">Cancel</button>' +
+    '<button type="button" :disabled="!canLink || linkForm.saving" @click="saveLink" ' +
+    'class="h-9 px-4 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold disabled:opacity-50">' +
+    '{{ linkForm.saving ? \'Linking…\' : \'Link page\' }}</button>' +
+    '</template></pb-modal>' +
+
+    // ---- invite an external member ----
+    '<pb-modal :open="guestForm.open" title="Invite external member" width="max-w-[480px]" ' +
+    '@close="guestForm.open = false">' +
+    '<label class="block text-[13px] font-medium text-ink mb-1.5">Name</label>' +
+    '<input v-model="guestForm.name" maxlength="120" class="pb-input" ' +
+    ':class="{\'is-error\': guestForm.errors.name}" placeholder="Sarah Lee" />' +
+    '<p v-if="guestForm.errors.name" class="text-[12px] text-danger mt-1">{{ guestForm.errors.name[0] }}</p>' +
+
+    '<label class="block text-[13px] font-medium text-ink mb-1.5 mt-4">Email address</label>' +
+    '<input v-model="guestForm.email" type="email" maxlength="255" class="pb-input" ' +
+    ':class="{\'is-error\': guestForm.errors.email}" placeholder="sarah@client.com" ' +
+    '@keyup.enter="saveGuest" />' +
+    '<p v-if="guestForm.errors.email" class="text-[12px] text-danger mt-1">{{ guestForm.errors.email[0] }}</p>' +
+
+    // A real field with one option today. The modal presents it as a choice, and a sentence
+    // that has to become a field later is worse than a field with one entry now.
+    '<label class="block text-[13px] font-medium text-ink mb-1.5 mt-4">Login method</label>' +
+    '<div class="grid gap-2">' +
+    '<label v-for="m in loginMethodOptions" :key="m.value" ' +
+    'class="flex items-start gap-2.5 p-3 rounded-lg border cursor-pointer hover:bg-hover" ' +
+    ':class="guestForm.login_method === m.value ? \'border-brand/40 bg-sel/40\' : \'border-stroke\'">' +
+    '<input type="radio" :value="m.value" v-model="guestForm.login_method" class="mt-0.5 accent-brand" />' +
+    '<span class="min-w-0"><span class="block text-[13px] font-semibold text-ink">{{ m.label }}</span>' +
+    '<span class="block text-[12px] text-sub">{{ m.desc }}</span></span></label>' +
+    '</div>' +
+
+    // A risk somebody chose is different from one nobody mentioned. Said where the link is
+    // created, not in a help page.
+    '<p class="text-[12px] text-amber-700 mt-4">' +
+    'Anyone with the link can read this collection until you remove them. ' +
+    'It gives access to this collection only.</p>' +
+
+    '<template #footer>' +
+    '<button type="button" class="h-9 px-4 rounded-md border border-stroke text-[13px] font-semibold text-ink hover:bg-hover" ' +
+    '@click="guestForm.open = false">Cancel</button>' +
+    '<button type="button" :disabled="!canInviteGuest || guestForm.saving" @click="saveGuest" ' +
+    'class="h-9 px-4 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold disabled:opacity-50">' +
+    '{{ guestForm.saving ? \'Sending…\' : \'Send invitation\' }}</button>' +
     '</template></pb-modal>' +
 
     // ---- invite modal ----

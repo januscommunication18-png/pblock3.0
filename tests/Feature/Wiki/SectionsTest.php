@@ -5,6 +5,7 @@ namespace Tests\Feature\Wiki;
 use App\Models\User;
 use App\Models\WikiCollection;
 use App\Models\WikiCollectionMember;
+use App\Models\WikiPage;
 use App\Models\Workspace;
 use App\Models\WorkspaceMembership;
 use App\Services\WorkspaceApps;
@@ -112,6 +113,88 @@ class SectionsTest extends TestCase
         $this->actingAs($this->owner)->get('/wiki/private')->assertNotFound();
         $this->actingAs($this->owner)->get('/wiki/shared')->assertNotFound();
         $this->actingAs($this->owner)->get('/wiki/archived')->assertNotFound();
+    }
+
+    // ---- the sidebar's "+" -----------------------------------------------------------------
+
+    public function test_the_collections_plus_works_from_every_wiki_screen(): void
+    {
+        $this->setUpWiki();
+        $collection = $this->collection(['visibility' => 'public']);
+
+        $page = WikiPage::create([
+            'tenant_id' => $this->workspace->id,
+            'wiki_collection_id' => $collection->id,
+            'title' => 'Escalation process',
+            'created_by' => $this->owner->id, 'updated_by' => $this->owner->id, 'position' => 1,
+        ]);
+
+        /*
+         * The modal is mounted by wiki.js, which only loads on the list screens — so on a
+         * collection or a page the "+" used to be a control that did nothing. It is a link now:
+         * where the modal exists the click is intercepted, and where it does not the browser
+         * goes to /wiki?create=1 and it opens on arrival.
+         */
+        $target = e(route('wiki.home').'?create=1');
+
+        foreach ([
+            '/wiki',
+            '/wiki/private',
+            "/wiki/collections/{$collection->id}",
+            "/wiki/collections/{$collection->id}/pages/{$page->id}",
+        ] as $url) {
+            $this->actingAs($this->owner)->get($url)
+                ->assertOk()
+                ->assertSee('id="wiki-new-collection"', false)
+                ->assertSee($target, false);
+        }
+    }
+
+    public function test_new_page_works_from_every_wiki_screen_too(): void
+    {
+        $this->setUpWiki();
+        $collection = $this->collection(['visibility' => 'public']);
+
+        $target = e(route('wiki.home').'?newpage=1');
+
+        foreach (['/wiki', '/wiki/archived', "/wiki/collections/{$collection->id}"] as $url) {
+            $this->actingAs($this->owner)->get($url)
+                ->assertOk()
+                ->assertSee('id="wiki-new-page"', false)
+                ->assertSee($target, false)
+                // It was hard-disabled with this title until the modal existed to open.
+                ->assertDontSee('Pages are being built', false);
+        }
+    }
+
+    public function test_the_new_page_modal_is_offered_only_collections_you_can_write(): void
+    {
+        $this->setUpWiki();
+        $mine = $this->collection(['name' => 'Runbooks', 'visibility' => 'public']);
+
+        $sarah = $this->mate();
+
+        // Readable, because it is public — but not writable, because reading is not writing.
+        $bootstrap = $this->actingAs($sarah)->get('/wiki')->assertOk()->viewData('bootstrap');
+
+        $this->assertSame([], $bootstrap['writableCollections']);
+
+        // Offering a collection the create would refuse is a trap, so the picker asks
+        // writableBy rather than merely what is visible.
+        $bootstrap = $this->actingAs($this->owner)->get('/wiki')->assertOk()->viewData('bootstrap');
+
+        $this->assertSame(
+            [['value' => (string) $mine->id, 'label' => 'Runbooks']],
+            $bootstrap['writableCollections'],
+        );
+    }
+
+    public function test_arriving_with_create_in_the_address_is_an_ordinary_screen(): void
+    {
+        $this->setUpWiki();
+
+        // The query string only tells the client to open a dialog; the server owes it nothing.
+        $this->actingAs($this->owner)->get('/wiki?create=1')->assertOk();
     }
 
     // ---- Private -------------------------------------------------------------------------

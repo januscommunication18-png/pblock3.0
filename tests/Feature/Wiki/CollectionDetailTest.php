@@ -314,6 +314,57 @@ class CollectionDetailTest extends TestCase
             ->assertStatus(422)->assertJsonValidationErrors('name');
     }
 
+    // ---- the Access box (docs/features/wiki-external-guests.md) ------------------------------
+
+    /*
+     * The box itself is drawn by Vue, so its markup is the browser suite's to assert
+     * (tests/Browser/WikiCollectionsTest.php). What the SERVER owes it is the payload the two
+     * invitations are gated on, and that is what these check.
+     */
+    public function test_the_access_payload_reaches_a_public_collection_too(): void
+    {
+        $this->setUpWiki();
+        $collection = $this->collection('public');
+        $sarah = $this->mate();
+        // A second workspace member, so `candidates` still has somebody left to offer once
+        // Sarah is on the collection — an empty picker would prove nothing either way.
+        $this->mate('tom@example.com');
+
+        $this->actingAs($this->owner)->postJson("/wiki/collections/{$collection->id}/members", [
+            'user_id' => $sarah->id, 'permission' => 'read',
+        ])->assertOk();
+
+        // The box was private-only, because visibility was the whole answer to "who can read
+        // this". A collection that can carry people from outside the workspace needs the rest of
+        // it, so the payload has to arrive on a public collection as well.
+        $bootstrap = $this->actingAs($this->owner)
+            ->get("/wiki/collections/{$collection->id}")->assertOk()->viewData('bootstrap');
+
+        $this->assertTrue($bootstrap['canManage']);
+        $this->assertCount(1, $bootstrap['members']);
+        $this->assertNotEmpty($bootstrap['candidates']);
+        $this->assertNotEmpty($bootstrap['permissions']);
+    }
+
+    public function test_a_member_who_cannot_manage_is_offered_neither_invitation(): void
+    {
+        $this->setUpWiki();
+        $collection = $this->collection();
+        $sarah = $this->mate();
+
+        WikiCollectionMember::create([
+            'tenant_id' => $this->workspace->id, 'wiki_collection_id' => $collection->id,
+            'user_id' => $sarah->id, 'permission' => 'edit',
+        ]);
+
+        // Deciding who may read is not an editorial act.
+        $bootstrap = $this->actingAs($sarah)
+            ->get("/wiki/collections/{$collection->id}")->assertOk()->viewData('bootstrap');
+
+        $this->assertFalse($bootstrap['canManage']);
+        $this->assertTrue($bootstrap['canEdit']);
+    }
+
     // ---- archive, and the way back ----------------------------------------------------------
 
     private function page(WikiCollection $collection, string $title = 'Escalation process'): WikiPage

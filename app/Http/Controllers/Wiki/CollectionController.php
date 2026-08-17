@@ -7,6 +7,7 @@ use App\Http\Requests\Wiki\StoreCollectionRequest;
 use App\Models\User;
 use App\Models\WikiCollection;
 use App\Models\WikiCollectionGroup;
+use App\Models\WikiCollectionGuest;
 use App\Models\WikiCollectionMember;
 use App\Models\WikiCover;
 use App\Models\WikiLabel;
@@ -334,12 +335,25 @@ class CollectionController extends Controller
                 ['value' => WikiCollectionMember::PERMISSION_EDIT, 'label' => 'Can edit',
                     'desc' => 'Create and update pages in this collection.'],
             ],
+            // External members — the other half of "who can read this"
+            // (docs/features/wiki-external-guests.md).
+            'guests' => WikiCollectionGuest::query()
+                ->where('wiki_collection_id', $collection->id)
+                ->orderBy('name')
+                ->get()
+                ->map(fn (WikiCollectionGuest $g) => $g->toCard())
+                ->all(),
+            'loginMethods' => [
+                ['value' => WikiCollectionGuest::LOGIN_MAGIC_LINK, 'label' => 'Magic Link Login',
+                    'desc' => 'They receive a secure link and never set a password.'],
+            ],
             'canManage' => $this->canManage($collection),
             'canEdit' => $this->canEdit($collection),
             'pages' => WikiPage::query()
                 ->where('wiki_collection_id', $collection->id)
                 ->active()
                 ->withCount('children')
+                ->withSource()
                 ->with(['creator', 'editor', 'labels', 'parent'])
                 ->orderBy('position')
                 ->get()
@@ -393,12 +407,18 @@ class CollectionController extends Controller
                 'collection' => route('wiki.collections.update', $collection),
                 'status' => route('wiki.collections.status', $collection),
                 'archive' => route('wiki.collections.archive', $collection),
+                'guests' => route('wiki.guests.store', $collection),
+                'guest' => route('wiki.guests.destroy', ['collection' => $collection->id, 'guest' => '__ID__']),
+                'guestResend' => route('wiki.guests.resend', ['collection' => $collection->id, 'guest' => '__ID__']),
                 'deleteCollection' => route('wiki.collections.destroy', $collection),
                 'publicUrl' => route('wiki.collections.public-url', $collection),
                 'pages' => route('wiki.pages.store', $collection),
                 'pageDetails' => route('wiki.pages.details', ['collection' => $collection->id, 'page' => '__ID__']),
                 'pageRemove' => route('wiki.pages.destroy', ['collection' => $collection->id, 'page' => '__ID__']),
                 'pagesReorder' => route('wiki.pages.reorder', $collection),
+                'linkedPages' => route('wiki.linked-pages.store', $collection),
+                'linkableProjects' => route('wiki.linkable.projects', $collection),
+                'linkablePages' => route('wiki.linkable.pages', $collection),
                 'cover' => route('wiki.cover.update', $collection),
                 'groups' => route('wiki.groups.store', $collection),
                 'group' => route('wiki.groups.update', ['collection' => $collection->id, 'group' => '__ID__']),

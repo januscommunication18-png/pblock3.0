@@ -12,15 +12,19 @@
      along with the shared sidebar on every Wiki screen, and the collections list has to be
      permission-filtered in one place rather than in each of the four that render it. --}}
 
-{{-- New Page. The prominent create action the requirements ask for, in the same slot the
-     work-item button occupies elsewhere. Disabled until pages exist — shown rather than
-     hidden, because its absence would read as "the Wiki cannot create anything". --}}
-<button type="button" disabled
-        title="Pages are being built"
-        class="w-full flex items-center justify-center gap-2 px-2 h-9 rounded-md bg-brand/40 text-white text-[13px] font-semibold mb-2 cursor-not-allowed">
+{{-- New page. The prominent create action, in the same slot the work-item button occupies
+     elsewhere.
+
+     An ANCHOR for the same reason the Collections "+" below is one: the modal is mounted by
+     wiki.js, which only loads on the list screens. Where it exists the click is intercepted and
+     opens it in place; where it does not, the browser comes here and it opens on arrival. A page
+     needs a collection, and the modal is where that is chosen — which is why this can be a
+     global action at all. --}}
+<a href="{{ route('wiki.home') }}?newpage=1" id="wiki-new-page"
+   class="w-full flex items-center justify-center gap-2 px-2 h-9 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold mb-2 transition-colors">
   {!! pb_icon('plus', 15) !!}
   New page
-</button>
+</a>
 
 {{-- Every section is a real screen now, so one row template rather than the three-way fork this
      had while Shared, Private and Archived were still a roadmap. The Collections row is dropped
@@ -45,10 +49,18 @@
     <span class="text-[11px] font-semibold text-faint uppercase tracking-wide">Collections</span>
     {!! pb_icon('chevron-down', 14, 'pb-chev ml-auto text-faint transition-transform') !!}
   </summary>
-  <button type="button" id="wiki-new-collection" title="New collection" aria-label="New collection"
-          class="absolute right-7 top-1 h-6 w-6 grid place-items-center rounded hover:bg-line text-sub">
+  {{-- An ANCHOR, not a button, and the same shape the Projects "+" already uses.
+
+       The create modal is mounted by wiki.js, which only loads on the four list screens — so on
+       a collection or a page this used to be a control that did nothing. The href is the answer:
+       everywhere the modal exists the click is intercepted and it opens in place; everywhere it
+       does not, the browser goes to /wiki?create=1 and it opens on arrival. Working without JS
+       falls out of the same decision. --}}
+  <a href="{{ route('wiki.home') }}?create=1" id="wiki-new-collection"
+     title="New collection" aria-label="New collection"
+     class="absolute right-7 top-1 h-6 w-6 grid place-items-center rounded hover:bg-line text-sub">
     {!! pb_icon('plus', 14) !!}
-  </button>
+  </a>
   <div class="mt-0.5 space-y-0.5" data-wiki-collections>
     @forelse ($wikiCollections as $__collection)
       <a href="{{ $__collection['url'] }}"
@@ -57,11 +69,11 @@
         <span class="truncate">{{ $__collection['name'] }}</span>
       </a>
     @empty
-      <button type="button" id="wiki-collections-nav"
-              class="w-full flex items-center gap-2 px-2 h-8 rounded-md text-sub hover:bg-hover text-[12px]">
+      <a href="{{ route('wiki.home') }}?create=1" id="wiki-collections-nav"
+         class="flex items-center gap-2 px-2 h-8 rounded-md text-sub hover:bg-hover text-[12px]">
         {!! pb_icon('plus', 14) !!}
         Create your first collection
-      </button>
+      </a>
     @endforelse
   </div>
 </details>

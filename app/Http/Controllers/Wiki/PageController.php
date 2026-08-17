@@ -325,6 +325,7 @@ class PageController extends Controller
             ->where('wiki_collection_id', $collection->id)
             ->active()
             ->withCount('children')
+            ->withSource()
             ->with(['creator', 'editor', 'labels', 'parent'])
             ->orderBy('position')
             ->get()

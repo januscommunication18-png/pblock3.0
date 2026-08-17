@@ -106,7 +106,7 @@ it('opens a collection from the sidebar and shows its details', function () {
         ->assertNoJavascriptErrors();
 });
 
-it('does not show an access list on a public collection', function () {
+it('explains access differently on a public collection', function () {
     [$owner, $workspace] = wikiWorkspace('wiki-public');
 
     $workspace->run(fn () => WikiCollection::create([
@@ -116,12 +116,51 @@ it('does not show an access list on a public collection', function () {
 
     $this->actingAs($owner);
 
-    // Everyone in the workspace can already read it, so a row of avatars would answer a
-    // question nobody asked and imply the list was the limit.
+    /*
+     * The box used to be hidden here: everyone in the workspace could already read a public
+     * collection, so a row of avatars answered a question nobody asked. Once a collection can
+     * carry members from OUTSIDE the workspace, visibility stops being the whole answer — so
+     * the box shows, and says which part of the answer it is giving.
+     */
     visit('/wiki')
         ->click('Company Handbook')
         ->assertSee('Public')
-        ->assertDontSee('Access')
+        ->assertSee('Access')
+        ->assertSee('Everyone in the workspace can read this')
+        ->assertDontSee('Only these people can open this collection')
+        ->assertNoJavascriptErrors();
+});
+
+it('offers both kinds of invitation in the Access box', function () {
+    // e2eWorkspace + a teammate, not wikiWorkspace: with nobody else in the workspace the invite
+    // modal correctly says "Everyone in this workspace already has access" and never draws the
+    // picker this test is about.
+    [$owner, $workspace, $project] = e2eWorkspace('wiki-access-invites');
+    e2eTeammate($workspace, $project, 'Sarah Johnson', 'sarah-'.uniqid().'@example.com');
+
+    $collection = $workspace->run(function () use ($workspace, $owner) {
+        app(WorkspaceSettingsManager::class)->for($workspace);
+        WorkspaceSettings::query()->first()->forceFill(['wiki_enabled' => true])->save();
+
+        return WikiCollection::create([
+            'tenant_id' => $workspace->id, 'name' => 'Help Desk Software',
+            'visibility' => 'private', 'created_by' => $owner->id, 'position' => 1,
+        ]);
+    });
+
+    $this->actingAs($owner);
+
+    // Two ways in, each saying which. The dashed "+" that used to sit at the end of the faces
+    // could only have meant one of them, and a control that silently picks is worse than two
+    // that say so.
+    visit("/wiki/collections/{$collection->id}")
+        ->assertSee('Team members')
+        ->assertSee('Invite team member')
+        // Rendered plainly unavailable until Slice 2 rather than as a control that goes nowhere.
+        ->assertSee('Invite external member')
+        ->click('Invite team member')
+        ->assertSee('Add people')
+        ->assertSee('What they can do')
         ->assertNoJavascriptErrors();
 });
 
@@ -389,4 +428,85 @@ it('adds a sub-group from the section it belongs to', function () {
         ->assertSee('New sub-group')
         ->assertSee('This section will sit inside')
         ->assertNoJavascriptErrors();
+});
+
+it('opens the New page modal from the sidebar', function () {
+    [$owner, $workspace] = wikiWorkspace('wiki-newpage');
+
+    $workspace->run(fn () => WikiCollection::create([
+        'tenant_id' => $workspace->id, 'name' => 'Company Handbook',
+        'visibility' => 'public', 'created_by' => $owner->id, 'position' => 1,
+    ]));
+
+    $this->actingAs($owner);
+
+    // The modal is where the collection is chosen, which is what lets New page be a global
+    // action at all — a page needs one and the sidebar does not know which.
+    visit('/wiki')
+        ->click('New page')
+        ->assertSee('Page name')
+        ->assertSee('Collection')
+        ->assertSee('You can write the content once the page opens')
+        ->assertNoJavascriptErrors();
+});
+
+it('asks before archiving, and names what archiving costs', function () {
+    [$owner, $workspace] = wikiWorkspace('wiki-archive-confirm');
+
+    $collection = $workspace->run(fn () => WikiCollection::create([
+        'tenant_id' => $workspace->id, 'name' => 'Help Desk Software',
+        'visibility' => 'private', 'created_by' => $owner->id, 'position' => 1,
+    ]));
+
+    $this->actingAs($owner);
+
+    // Archiving closes the collection to everybody invited to it (WIKI-D5), which is far more
+    // than the word suggests — so the dialog says so rather than asking "are you sure?".
+    visit("/wiki/collections/{$collection->id}")
+        ->click('[aria-label="Collection actions"]')
+        ->click('Archive collection')
+        ->assertSee('Archive this collection?')
+        ->assertSee('lose access')
+        ->assertSee('Its pages, groups and settings are all kept')
+        ->assertNoJavascriptErrors();
+
+    // Cancelling leaves it exactly where it was.
+    expect($workspace->run(fn () => WikiCollection::find($collection->id)->archived_at))->toBeNull();
+});
+
+it('asks before deleting, and says who loses access', function () {
+    [$owner, $workspace] = wikiWorkspace('wiki-delete-confirm');
+
+    $collection = $workspace->run(function () use ($workspace, $owner) {
+        $c = WikiCollection::create([
+            'tenant_id' => $workspace->id, 'name' => 'Help Desk Software',
+            'visibility' => 'private', 'created_by' => $owner->id, 'position' => 1,
+        ]);
+
+        WikiPage::create([
+            'tenant_id' => $workspace->id, 'wiki_collection_id' => $c->id,
+            'title' => 'Escalation process',
+            'created_by' => $owner->id, 'updated_by' => $owner->id, 'position' => 1,
+        ]);
+
+        return $c;
+    });
+
+    $this->actingAs($owner);
+
+    visit("/wiki/collections/{$collection->id}")
+        ->click('[aria-label="Collection actions"]')
+        ->click('Delete collection')
+        ->assertSee('Delete this collection?')
+        ->assertSee('users will lose access to it')
+        ->assertSee('Any external members with access to this collection will also lose access')
+        // Our deletion rule is that the pages go with it, so the dialog counts them.
+        ->assertSee('page')
+        ->assertSee('This cannot be undone')
+        // A way out, offered where the decision is made.
+        ->assertSee('archive it instead')
+        ->assertNoJavascriptErrors();
+
+    // Nothing happens until the name is typed and Delete Collection is pressed.
+    expect($workspace->run(fn () => WikiCollection::find($collection->id)))->not->toBeNull();
 });

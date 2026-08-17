@@ -370,6 +370,15 @@ read as two different actions.
 All three are behind `canManage`, not the looser page-editing gate. Renaming a collection,
 retiring it and destroying it are decisions about what the collection IS.
 
+**Archive asks first, and names what it costs.** Not *"are you sure?"* — the dialog says the
+collection leaves Collections for Archived, that its pages, groups and settings are all kept, and
+that **everyone invited to it loses access until it is restored**. That last part is the half
+nobody expects from a word as gentle as "archive", and it is the reason the confirmation exists at
+all. A published collection is told that its public URL goes down immediately.
+
+**Restoring does not ask.** It only ever gives access back, and warning somebody before an
+additive change is how people learn to click through warnings without reading them.
+
 **Archive** is `archived_at`, and the same control **restores** it. The Archived view is still
 not built, so a one-way archive would be the last thing anybody could ever do to a collection —
 its own page stays open to the people on it, which is how somebody gets back to undo it. An
@@ -436,6 +445,32 @@ Two boundaries held deliberately:
 - The sidebar's collection list stays **active-only**. An archived collection you are reading is
   not highlighted there; the Archived row above is. Putting it back would undo the one thing
   archiving does.
+
+**New page works from anywhere in the Wiki**, and is no longer the disabled button it had been
+since Slice 1. It opens a modal asking for a **page name** and a **collection** — and the
+collection field is the reason this can be a global action at all: a page needs one, and the
+sidebar does not know which. Both fields are required and Create stays down until both are
+answered, so *which collection?* cannot be settled by accident.
+
+- The picker asks **`writableBy`**, not merely what is visible. Offering a collection the create
+  would refuse is a trap; `visibleTo` narrows it in SQL and `writableBy` answers per row, which is
+  a query per collection and fine for a list somebody scrolls.
+- With **one** writable collection it is pre-chosen — a list of one is a question with no
+  information in it. With **none**, the field is replaced by *"There is no collection you can add
+  a page to yet. Create one first"*, wired to the collection modal, rather than an empty combo
+  that reads as a bug.
+- Creating lands **straight in the editor**, the flow Project Pages already use.
+- It reuses `POST /wiki/collections/{collection}/pages` unchanged. The collection is in the path,
+  so the client is handed the shape and fills in whichever was chosen — the same `__ID__`
+  convention the collection screen's endpoints already use. No new endpoint.
+
+**The Collections "+" works from anywhere in the Wiki.** It is an `<a href="/wiki?create=1">` now,
+not a button — the create modal is mounted by `wiki.js`, which only loads on the four list
+screens, so on a collection or a page it was a control that did nothing. Where the modal exists
+the click is intercepted and it opens in place; where it does not, the browser goes to Wiki home
+and it opens on arrival, which also makes it work without JavaScript. `create` is taken back out
+of the address on arrival, or a refresh reopens a dialog nobody asked for. The same shape the
+Projects "+" in `app-sidebar.blade.php` has always used.
 
 The sidebar's inline `WikiCollection::query()` moved into `App\Services\WikiNavigation`, bound by
 a **view composer** — the partial rides along with the shared sidebar on every Wiki screen across

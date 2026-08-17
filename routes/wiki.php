@@ -1,11 +1,14 @@
 <?php
 
 use App\Http\Controllers\Wiki\CollectionController;
+use App\Http\Controllers\Wiki\CollectionGuestController;
 use App\Http\Controllers\Wiki\CoverController;
 use App\Http\Controllers\Wiki\GroupController;
+use App\Http\Controllers\Wiki\LinkedPageController;
 use App\Http\Controllers\Wiki\PageController;
 use App\Http\Controllers\Wiki\PublicCollectionController;
 use App\Http\Controllers\Wiki\WikiController;
+use App\Http\Controllers\Wiki\WikiGuestController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -51,6 +54,15 @@ Route::middleware(['auth', 'workspace.tenancy'])
             ->whereNumber('collection')->name('collections.destroy');
         Route::post('/collections/{collection}/public-url', [CollectionController::class, 'generatePublicUrl'])
             ->whereNumber('collection')->name('collections.public-url');
+        // External members — somebody outside the workspace, reading one collection
+        // (docs/features/wiki-external-guests.md).
+        Route::post('/collections/{collection}/guests', [CollectionGuestController::class, 'store'])
+            ->whereNumber('collection')->name('guests.store');
+        Route::post('/collections/{collection}/guests/{guest}/resend', [CollectionGuestController::class, 'resend'])
+            ->whereNumber(['collection', 'guest'])->name('guests.resend');
+        Route::delete('/collections/{collection}/guests/{guest}', [CollectionGuestController::class, 'destroy'])
+            ->whereNumber(['collection', 'guest'])->name('guests.destroy');
+
         Route::post('/collections/{collection}/members', [CollectionController::class, 'storeMember'])
             ->whereNumber('collection')->name('collections.members.store');
         Route::delete('/collections/{collection}/members/{member}', [CollectionController::class, 'destroyMember'])
@@ -74,6 +86,16 @@ Route::middleware(['auth', 'workspace.tenancy'])
         Route::patch('/collections/{collection}/pages/{page}/group', [GroupController::class, 'assign'])
             ->whereNumber(['collection', 'page'])->name('pages.group');
 
+        // Linked Pages — a Project Page shown inside a collection
+        // (docs/features/wiki-linked-pages.md). The two searches feed the modal's combo boxes;
+        // both are server-side, because a workspace's pages cannot be preloaded.
+        Route::get('/collections/{collection}/linkable/projects', [LinkedPageController::class, 'projects'])
+            ->whereNumber('collection')->name('linkable.projects');
+        Route::get('/collections/{collection}/linkable/pages', [LinkedPageController::class, 'pages'])
+            ->whereNumber('collection')->name('linkable.pages');
+        Route::post('/collections/{collection}/linked-pages', [LinkedPageController::class, 'store'])
+            ->whereNumber('collection')->name('linked-pages.store');
+
         // Pages inside a collection.
         Route::post('/collections/{collection}/pages', [PageController::class, 'store'])
             ->whereNumber('collection')->name('pages.store');
@@ -89,6 +111,20 @@ Route::middleware(['auth', 'workspace.tenancy'])
         Route::delete('/collections/{collection}/pages/{page}', [PageController::class, 'destroy'])
             ->whereNumber(['collection', 'page'])->name('pages.destroy');
     });
+
+/*
+| The guest's door: /wiki/guest/{token}.
+|
+| NO auth and NO tenancy middleware — whoever follows this link has no account at all. The token
+| says which workspace and which collection; everything else is read inside that workspace's own
+| context. Registered outside the group above so the auth middleware never sees it.
+|
+| Two segments under /wiki, so it cannot be confused with /wiki/{section} (one) or with any of
+| the /wiki/collections/{id} routes.
+*/
+Route::get('/wiki/guest/{token}', [WikiGuestController::class, 'show'])
+    ->where('token', '[A-Za-z0-9]{64}')
+    ->name('wiki.guest');
 
 /*
 | The public address of a published collection: /{workspace}/{slug}.

@@ -30,6 +30,9 @@ class WikiReader
         $pages = WikiPage::query()
             ->where('wiki_collection_id', $collection->id)
             ->active()
+            // Linked rows resolve their title through the source; without this the navigation
+            // is one query per link.
+            ->withSource()
             ->orderBy('position')
             ->get();
 

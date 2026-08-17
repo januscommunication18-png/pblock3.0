@@ -89,6 +89,15 @@ class WikiController extends Controller
                 'icon' => $copy['icon'],
                 'collections' => $this->collections($section),
                 'emptyState' => $copy['empty'],
+                // Where a new page may go. Filtered by `writableBy`, not merely by what is
+                // visible: offering a collection the create would refuse is a trap.
+                'writableCollections' => $this->writableCollections(),
+                'endpointTemplates' => [
+                    // The collection is part of the path, so the client is given the shape and
+                    // fills in whichever one was chosen — the same `__ID__` convention the
+                    // collection screen's own endpoints already use.
+                    'pageStore' => route('wiki.pages.store', ['collection' => '__ID__']),
+                ],
                 'visibilities' => WikiCollection::visibilityOptions(),
                 'endpoints' => [
                     'collections' => route('wiki.collections.store', ['section' => $section]),
@@ -145,6 +154,30 @@ class WikiController extends Controller
             ->map(fn (WikiCollection $c) => $c->toCard() + [
                 'url' => route('wiki.collections.show', $c),
             ])
+            ->all();
+    }
+
+    /**
+     * The collections this person may add a page to.
+     *
+     * `visibleTo` narrows it in SQL; `writableBy` then answers per row, because writing depends
+     * on a membership permission and is not expressible in the same scope. That is a query per
+     * collection, which is fine for a list somebody scrolls and would not be for a page table.
+     *
+     * @return array<int, array<string, string>>
+     */
+    private function writableCollections(): array
+    {
+        $user = Auth::user();
+
+        return WikiCollection::query()
+            ->active()
+            ->visibleTo($user)
+            ->orderBy('position')
+            ->get()
+            ->filter(fn (WikiCollection $c) => $c->writableBy($user))
+            ->map(fn (WikiCollection $c) => ['value' => (string) $c->id, 'label' => $c->name])
+            ->values()
             ->all();
     }
 

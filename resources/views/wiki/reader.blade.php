@@ -14,12 +14,16 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{{ $current?->title ?? ($cover['is_enabled'] ? ($cover['title'] ?: $collection->name) : $collection->name) }} — {{ $collection->name }}</title>
-  @unless ($preview)
-    <meta name="description" content="{{ $collection->description }}" />
-  @else
+  @if (($guest ?? null))
+    {{-- A shared document is not a public one: it must not turn up in a search result because
+         somebody's crawler followed a forwarded link. --}}
+    <meta name="robots" content="noindex, nofollow" />
+  @elseif ($preview)
     {{-- A preview is a working copy of something not published; it has no business in an index. --}}
     <meta name="robots" content="noindex" />
-  @endunless
+  @else
+    <meta name="description" content="{{ $collection->description }}" />
+  @endif
 
   <link rel="stylesheet" href="{{ pb_asset('assets/css/tailwind.css') }}" />
   <link rel="stylesheet" href="{{ pb_asset('assets/css/inter.css') }}" />
@@ -31,6 +35,15 @@
      `min-h-screen` was letting the whole document scroll as one, which took the navigation
      away with it. --}}
 <body class="bg-white text-ink text-[13px] h-screen flex flex-col overflow-hidden">
+
+  @if (($guest ?? null))
+    {{-- Says whose document this is and how they came to be reading it. A guest has no
+         navigation and no account; without this the page is a document from nowhere. --}}
+    <div class="bg-hover border-b border-line px-5 sm:px-8 py-2 text-[12px] text-sub">
+      Shared with you by <b class="text-ink">{{ $workspace->name }}</b>.
+      You have access to this document only.
+    </div>
+  @endif
 
   @if ($preview)
     <div class="bg-amber-50 border-b border-amber-200 px-5 sm:px-8 py-2 text-[12px] text-amber-900">

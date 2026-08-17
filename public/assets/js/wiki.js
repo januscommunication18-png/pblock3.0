@@ -20,6 +20,10 @@ PB.boot('wiki', {
       empty: b.emptyState || {},
       visibilities: b.visibilities || [],
       endpoints: b.endpoints || {},
+      endpointTemplates: b.endpointTemplates || {},
+      // New page — a page needs a collection, and this is where one is chosen.
+      writableCollections: b.writableCollections || [],
+      pageForm: { open: false, title: '', collectionId: '', saving: false, errors: {} },
       open: false,
       saving: false,
       errors: {},
@@ -30,12 +34,33 @@ PB.boot('wiki', {
     visibilityOptions: function () {
       return this.visibilities.map(function (v) { return { value: v.value, label: v.label, desc: v.desc }; });
     },
-    canSubmit: function () { return !!String(this.form.name || '').trim() && !this.saving; }
+    canSubmit: function () { return !!String(this.form.name || '').trim() && !this.saving; },
+
+    // Both fields, or the button stays down — asked for, and it is also the only way to keep
+    // "which collection?" from being answered by accident.
+    canCreatePage: function () {
+      return !!String(this.pageForm.title || '').trim() && !!this.pageForm.collectionId;
+    }
   },
   mounted: function () {
     var self = this;
 
     this.bindCreateTriggers();
+
+    /* Arrived from a screen where the modal does not exist — a collection, a page — whose "+"
+       is a link to here. Open it, then take `create` back out of the address, or a refresh or a
+       shared URL reopens a dialog nobody asked for. */
+    try {
+      var params = new URLSearchParams(window.location.search);
+
+      if (params.get('create') === '1' || params.get('newpage') === '1') {
+        if (params.get('newpage') === '1') { this.showPageForm(); } else { this.show(); }
+        params.delete('create');
+        params.delete('newpage');
+        var query = params.toString();
+        window.history.replaceState({}, '', window.location.pathname + (query ? '?' + query : ''));
+      }
+    } catch (e) {}
 
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape' && self.open && !self.saving) self.open = false;
@@ -57,6 +82,13 @@ PB.boot('wiki', {
         el.dataset.pbBound = '1';
         el.addEventListener('click', function (e) { e.preventDefault(); self.show(); });
       });
+
+      var newPage = document.getElementById('wiki-new-page');
+
+      if (newPage && !newPage.dataset.pbBound) {
+        newPage.dataset.pbBound = '1';
+        newPage.addEventListener('click', function (e) { e.preventDefault(); self.showPageForm(); });
+      }
     },
 
     /**
@@ -81,9 +113,9 @@ PB.boot('wiki', {
         // An empty list used to leave the previous rows on screen forever. Restore the same
         // button the server renders for @empty, and re-bind it: innerHTML just destroyed the
         // node mounted() bound to.
-        host.innerHTML = '<button type="button" id="wiki-collections-nav" ' +
-          'class="w-full flex items-center gap-2 px-2 h-8 rounded-md text-sub hover:bg-hover text-[12px]">' +
-          wiIcon('plus', 14) + 'Create your first collection</button>';
+        host.innerHTML = '<a href="' + (this.endpoints.home || '/wiki') + '?create=1" id="wiki-collections-nav" ' +
+          'class="flex items-center gap-2 px-2 h-8 rounded-md text-sub hover:bg-hover text-[12px]">' +
+          wiIcon('plus', 14) + 'Create your first collection</a>';
         this.bindCreateTriggers();
 
         return;
@@ -110,6 +142,37 @@ PB.boot('wiki', {
     /* `visibility` is an argument so the Private screen's own empty state can open the modal
        already set to Private — offering "create a private collection" and defaulting to Public
        would be the screen contradicting itself. */
+    // ---- new page ---------------------------------------------------------------------------
+    showPageForm: function () {
+      this.pageForm = {
+        open: true, title: '',
+        // Pre-chosen when there is only one place it could go: making somebody pick from a list
+        // of one is a question with no information in it.
+        collectionId: this.writableCollections.length === 1 ? this.writableCollections[0].value : '',
+        saving: false, errors: {}
+      };
+    },
+
+    createPage: async function () {
+      if (!this.canCreatePage || this.pageForm.saving) return;
+      this.pageForm.saving = true;
+      this.pageForm.errors = {};
+
+      try {
+        var url = this.$pb.withId(this.endpointTemplates.pageStore, this.pageForm.collectionId);
+        var resp = await this.$pb.api(url, { method: 'POST', body: {
+          title: String(this.pageForm.title).trim()
+        } });
+        // Straight into the editor: creating a document and then having to find it in a list is
+        // a step nobody wants, and it is the flow Project Pages already use.
+        window.location.href = resp.url;
+      } catch (e) {
+        this.pageForm.errors = this.$pb.fieldErrors(e);
+        this.$pb.toast(this.$pb.firstError(e), 'error');
+        this.pageForm.saving = false;
+      }
+    },
+
     show: function (visibility) {
       this.errors = {};
       this.form = { name: '', description: '', visibility: visibility || 'public' };
@@ -193,6 +256,36 @@ PB.boot('wiki', {
     '<a v-else :href="endpoints.home" class="mt-4 inline-block text-[13px] font-semibold text-brand hover:underline">' +
     'Browse collections</a>' +
     '</div>' +
+
+    // ---- new page ----
+    // Its own dialog, not a variant of the collection one: they ask different questions, and a
+    // modal that changes what it wants depending on how it was opened is two modals sharing a
+    // frame.
+    '<pb-modal :open="pageForm.open" title="New page" width="max-w-[480px]" ' +
+    '@close="pageForm.open = false">' +
+    '<label class="block text-[13px] font-medium text-ink mb-1.5">Page name</label>' +
+    '<input v-model="pageForm.title" maxlength="200" class="pb-input" ' +
+    ':class="{\'is-error\': pageForm.errors.title}" placeholder="Escalation process" ' +
+    '@keyup.enter="createPage" />' +
+    '<p v-if="pageForm.errors.title" class="text-[12px] text-danger mt-1">{{ pageForm.errors.title[0] }}</p>' +
+
+    '<label class="block text-[13px] font-medium text-ink mb-1.5 mt-4">Collection</label>' +
+    '<pb-combo v-if="writableCollections.length" v-model="pageForm.collectionId" ' +
+    ':options="writableCollections" placeholder="Choose a collection" />' +
+    // Not an empty combo: a picker with nothing in it reads as a bug rather than as an answer.
+    '<p v-else class="text-[13px] text-sub">' +
+    'There is no collection you can add a page to yet. ' +
+    '<button type="button" @click="pageForm.open = false; show()" ' +
+    'class="text-brand font-semibold hover:underline">Create one first</button>.</p>' +
+    '<p class="text-[12px] text-faint mt-2">You can write the content once the page opens.</p>' +
+
+    '<template #footer>' +
+    '<button type="button" class="h-9 px-4 rounded-md border border-stroke text-[13px] font-semibold text-ink hover:bg-hover" ' +
+    '@click="pageForm.open = false">Cancel</button>' +
+    '<button type="button" :disabled="!canCreatePage || pageForm.saving" @click="createPage" ' +
+    'class="h-9 px-4 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold disabled:opacity-50">' +
+    '{{ pageForm.saving ? \'Creating…\' : \'Create page\' }}</button>' +
+    '</template></pb-modal>' +
 
     // ---- the modal ----
     '<pb-modal :open="open" title="New collection" width="max-w-[520px]" @close="open = false">' +
