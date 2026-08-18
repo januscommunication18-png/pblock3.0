@@ -1556,6 +1556,11 @@ var WorkItemsScreen = {
     /**
      * `fromUrl` marks an open that the address bar asked for (Back/Forward, or the deep link on
      * first paint). Those must not write history back — the entry already exists.
+     *
+     * Tested with `=== true`, never for truthiness. These are bound straight to DOM handlers
+     * (`@click="closeDrawer"`), and Vue hands such a binding the MouseEvent as its first
+     * argument — a truthy value that would read as "the URL asked for this" and silently skip
+     * the history write, leaving ?item= behind on a closed panel.
      */
     openDrawer: function (item, fromUrl) {
       if (!item) return;
@@ -1565,7 +1570,7 @@ var WorkItemsScreen = {
       this.loadStructure();
       this.loadAttachments();
       this.loadFeed();
-      if (!fromUrl) this.syncUrl(true);
+      if (fromUrl !== true) this.syncUrl(true);
     },
     closeDrawer: function (fromUrl) {
       // On the per-item page there is nothing behind the panel — closing means going back to
@@ -1574,7 +1579,7 @@ var WorkItemsScreen = {
       this.drawer.open = false;
       this.drawer.id = null;
       this.feed = null;
-      if (!fromUrl) this.syncUrl(true);
+      if (fromUrl !== true) this.syncUrl(true);
     },
 
     // ---------- Collaboration tabs (§4-§11) ----------
