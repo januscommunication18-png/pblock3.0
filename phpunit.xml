@@ -42,6 +42,12 @@
         <env name="FILESYSTEM_DISK" value="local"/>
         <env name="PROFILE_DISK" value="local"/>
         <env name="MEDIA_DISK" value="local"/>
+        <!--
+            Scout's in-memory driver. Without pinning it, .env wins and the suite runs against
+            whatever engine local dev is pointed at — a MySQL-specific driver against the
+            sqlite test database, or worse, a real Meilisearch index shared with development.
+        -->
+        <env name="SCOUT_DRIVER" value="collection"/>
         <env name="AVATAR_DISK" value="assets"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>

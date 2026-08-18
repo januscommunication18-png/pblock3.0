@@ -28,13 +28,18 @@
     <button type="button" data-ws-open class="inline-flex items-center h-7 px-2.5 rounded-md border border-brand text-[12px] text-brand hover:bg-hover whitespace-nowrap">Switch workspace</button>
   </div>
 
-  {{-- Search --}}
+  {{-- Search (docs/features/global-search.md). The control is a doorway: focusing it raises
+       the command palette, which is where the typing happens. global-search.js binds that, and
+       the Cmd/Ctrl+K shortcut, and is loaded here so it exists on every screen the topbar does
+       rather than only the ones that boot Vue. --}}
   <div class="flex-1 flex justify-center px-2">
     <div class="relative w-full max-w-md">
       {!! pb_icon('magnifying-glass', 15, 'absolute left-3 top-1/2 -translate-y-1/2 text-faint') !!}
-      <input type="search" id="pb-topbar-search" name="q" autocomplete="off" placeholder="Search" class="w-full h-9 rounded-md bg-hover pl-9 pr-3 text-[13px] text-ink placeholder:text-faint outline outline-1 -outline-offset-1 outline-transparent focus:bg-white focus:outline-stroke" />
+      <input type="search" id="pb-topbar-search" name="q" autocomplete="off" placeholder="Search" aria-label="Search your workspace" class="w-full h-9 rounded-md bg-hover pl-9 pr-9 text-[13px] text-ink placeholder:text-faint outline outline-1 -outline-offset-1 outline-transparent focus:bg-white focus:outline-stroke cursor-pointer" />
+      <kbd class="hidden sm:block absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] font-sans text-faint pointer-events-none">⌘K</kbd>
     </div>
   </div>
+  <script defer src="{{ pb_asset('assets/js/global-search.js') }}"></script>
 
   {{-- Actions --}}
   <div class="flex items-center gap-1.5 shrink-0">

@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Laravel\Scout\Searchable;
 use Stancl\Tenancy\Database\Concerns\BelongsToTenant;
 
 /**
@@ -16,7 +17,25 @@ use Stancl\Tenancy\Database\Concerns\BelongsToTenant;
  */
 class WikiCollection extends Model
 {
-    use BelongsToTenant;
+    use BelongsToTenant, Searchable;
+
+    /**
+     * What global search stores for a collection (docs/features/global-search.md).
+     *
+     * `id` is here as a FILTER: the query is narrowed to the collections the asker may open,
+     * resolved through visibleTo(), before anything is ranked (§12).
+     *
+     * @return array<string, mixed>
+     */
+    public function toSearchableArray(): array
+    {
+        return [
+            'id' => (int) $this->id,
+            'tenant_id' => (string) $this->tenant_id,
+            'name' => (string) $this->name,
+            'description' => (string) $this->description,
+        ];
+    }
 
     public const VISIBILITY_PUBLIC = 'public';
 

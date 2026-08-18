@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Laravel\Scout\Searchable;
 use Stancl\Tenancy\Database\Concerns\BelongsToTenant;
 
 /**
@@ -15,7 +16,50 @@ use Stancl\Tenancy\Database\Concerns\BelongsToTenant;
  */
 class WikiPage extends Model
 {
-    use BelongsToTenant, SoftDeletes;
+    use BelongsToTenant, Searchable, SoftDeletes;
+
+    /**
+     * What global search stores for a page (docs/features/global-search.md).
+     *
+     * `title` and `content` are read through their accessors, so a LINKED row is indexed with
+     * the text it actually displays rather than the nulls it stores. Note the limitation this
+     * leaves under Scout's `database` driver: that engine queries the columns directly, where
+     * a linked row's title really is null, so linked pages are findable in production
+     * (meilisearch, which indexes what we hand it) but not locally. Recorded as decision G7.
+     *
+     * `wiki_collection_id` is the filter — a page is readable exactly when its collection is.
+     *
+     * @return array<string, mixed>
+     */
+    public function toSearchableArray(): array
+    {
+        return [
+            'id' => (int) $this->id,
+            'tenant_id' => (string) $this->tenant_id,
+            'wiki_collection_id' => (int) $this->wiki_collection_id,
+            'title' => (string) $this->title,
+            'content' => $this->plainContent(),
+        ];
+    }
+
+    /**
+     * Archived pages, and linked rows whose source has gone, stay out of the index.
+     *
+     * A linked row with a missing source renders as "Unavailable page" — a result that leads
+     * nowhere, which §12 would rather did not exist than existed and disappointed.
+     */
+    public function shouldBeSearchable(): bool
+    {
+        return $this->archived_at === null && ! $this->sourceIsMissing();
+    }
+
+    /** The body with its markup removed, for indexing and for snippets. */
+    public function plainContent(): string
+    {
+        $text = strip_tags((string) $this->content);
+
+        return trim(html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+    }
 
     /** A linked page stands for a project page (docs/features/wiki-linked-pages.md). */
     public const SOURCE_PROJECT_PAGE = 'project_page';

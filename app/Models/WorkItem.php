@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Laravel\Scout\Searchable;
 use Stancl\Tenancy\Database\Concerns\BelongsToTenant;
 
 /**
@@ -33,7 +34,7 @@ use Stancl\Tenancy\Database\Concerns\BelongsToTenant;
 #[ObservedBy(WorkItemCapacityObserver::class)]
 class WorkItem extends Model
 {
-    use BelongsToTenant, StampsPivotTenant;
+    use BelongsToTenant, Searchable, StampsPivotTenant;
 
     public const PRIORITY_NONE = 'none';
 
@@ -202,6 +203,55 @@ class WorkItem extends Model
     public function scopeActive(Builder $query): Builder
     {
         return $query->whereNull('archived_at');
+    }
+
+    // ---------- Global search (docs/features/global-search.md) ----------
+
+    /**
+     * What the engine stores for this item.
+     *
+     * `tenant_id` and `project_id` are here as FILTERS, not as text to match: every query is
+     * narrowed to the workspace and to the projects the asker can reach before relevance is
+     * considered at all (§12). Without them a search would be ranking rows it must never
+     * return.
+     *
+     * The description is indexed as plain text. It is stored as HTML, and indexing the markup
+     * would match documents on their tag names — a search for "strong" hitting every item that
+     * merely has bold text in it.
+     *
+     * @return array<string, mixed>
+     */
+    public function toSearchableArray(): array
+    {
+        return [
+            'id' => (int) $this->id,
+            'tenant_id' => (string) $this->tenant_id,
+            'project_id' => (int) $this->project_id,
+            'identifier' => (string) $this->identifier,
+            'title' => (string) $this->title,
+            'description' => $this->plainDescription(),
+            'updated_at' => optional($this->updated_at)->timestamp,
+        ];
+    }
+
+    /**
+     * Archived items stay out of the index.
+     *
+     * Drafts need no mention here: the ExcludesDrafts global scope already keeps them out of
+     * the query Scout imports from, and a draft is private to its author (§4) — precisely the
+     * sort of row §12 says must never surface in a search.
+     */
+    public function shouldBeSearchable(): bool
+    {
+        return $this->archived_at === null;
+    }
+
+    /** The description with its markup removed, for indexing and for snippets. */
+    public function plainDescription(): string
+    {
+        $text = strip_tags((string) $this->description);
+
+        return trim(html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
     }
 
     /**

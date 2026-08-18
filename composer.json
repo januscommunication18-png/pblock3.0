@@ -10,10 +10,13 @@
     "license": "MIT",
     "require": {
         "php": "^8.3",
+        "http-interop/http-factory-guzzle": "^1.2",
         "laravel/framework": "^13.8",
         "laravel/reverb": "^1.11",
+        "laravel/scout": "^11.5",
         "laravel/tinker": "^3.0",
         "league/flysystem-aws-s3-v3": "^3.35",
+        "meilisearch/meilisearch-php": "^1.17",
         "stancl/tenancy": "^3.10",
         "symfony/html-sanitizer": "^7.4"
     },
