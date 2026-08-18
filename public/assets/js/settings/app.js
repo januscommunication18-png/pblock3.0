@@ -303,7 +303,26 @@
           this.open = false;
         },
         onKey: function (e) { if (e.key === 'Escape') this.open = false; },
-        onReflow: function () { if (this.open) this.open = false; }
+
+        /**
+         * The page moved under the menu — close it, because a teleported menu positioned once
+         * would otherwise be left pointing at nothing.
+         *
+         * Except when the scroll came from INSIDE the menu. The option list is its own scroll
+         * container (`max-h-56 overflow-y-auto`), and its scroll events reach this capture-phase
+         * listener on window like any other — so scrolling down a long list of people closed the
+         * very list being read, and only the first handful of options could ever be picked.
+         */
+        onReflow: function (e) {
+          if (!this.open) return;
+
+          if (e && e.type === 'scroll') {
+            var m = this.$refs.menu;
+            if (m && e.target && (m === e.target || (m.contains && m.contains(e.target)))) return;
+          }
+
+          this.open = false;
+        }
       },
       mounted: function () {
         document.addEventListener('click', this.onDoc);
