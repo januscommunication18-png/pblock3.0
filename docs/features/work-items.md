@@ -513,9 +513,11 @@ treated as empty and discarded. It now treats those as content.
 | `projects.media.mimes` | jpg, jpeg, png, webp, gif |
 | `projects.media.gallery_size` | 60 |
 
-Deferred: attaching files to a work item as *attachments* (§4.4's paperclip) is a different
-feature from images inside a description, and media is not garbage-collected when an image is
-removed from the text — an orphan sweep belongs with attachments.
+Attaching files to a work item as *attachments* (§4.4's paperclip) is a different feature from
+images inside a description, and now ships separately — see
+`docs/features/work-item-attachments.md`. Still deferred: media is not garbage-collected when an
+image is removed from the description text. Attachments delete their own file on delete, so they
+do not add to that debt, but the media orphan sweep remains outstanding.
 
 ## Slice 3 — Structure: sub-tasks, dependencies, relations, links
 

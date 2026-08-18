@@ -857,12 +857,22 @@ var WorkItemsScreen = {
       picker: { open: false, mode: '', type: '', title: '', query: '', allProjects: false, results: [], selected: [], busy: false },
       // Add / edit an external link (§38).
       linkModal: { open: false, id: null, url: '', title: '', busy: false, error: '' },
+      // Attachments (docs/features/work-item-attachments.md).
+      //
+      // `attachments` is what the detail page lists. The modal holds only STAGED files —
+      // chosen but not yet sent — so Cancel is a real cancel: nothing has been written, and
+      // Save is the single point at which anything reaches the server.
+      attachments: [],
+      attachmentsLoading: false,
+      // `error` lives on the modal rather than a toast: an upload that failed is something to
+      // fix while the modal is still open and the file is still picked.
+      attachModal: { open: false, staged: [], busy: false, error: '' },
       // Which "add" dropdown is open — in the action row or in a section header.
       addMenu: '',
       // Sections collapse independently. Dependencies and Relations start CLOSED: they are
       // reference material about other work items, and expanded by default they push the
       // description and the conversation below the fold on every open.
-      secOpen: { subtasks: true, dependencies: false, relations: false, links: true, pages: true },
+      secOpen: { subtasks: true, dependencies: false, relations: false, links: true, pages: true, attachments: true },
       // The linked-pages picker. Its own dialog rather than the work item picker's: it
       // searches documentation, not work items, and the rows read nothing alike.
       pagePicker: { open: false, query: '', results: [], selected: [], busy: false, loaded: false },
@@ -1148,6 +1158,7 @@ var WorkItemsScreen = {
       else if (self.rowMenu.open) { self.closeRowMenu(); }
       else if (self.commentModal.open) { self.closeCommentModal(); }
       else if (self.linkModal.open) { self.linkModal.open = false; }
+      else if (self.attachModal.open) { self.cancelAttachments(); }
       else if (self.picker.open) { self.closePicker(); }
       else if (self.addMenu) { self.addMenu = ''; }
       else if (self.parentOpen) { self.closeParent(); }
@@ -1214,9 +1225,17 @@ var WorkItemsScreen = {
         var match = this.items.find(function (i) {
           return String(i.identifier) === wanted || String(i.id) === wanted;
         });
-        if (match) this.openDrawer(match);
+        // `true`: this entry is the one we are already standing on. Pushing would add a second
+        // identical entry and Back would appear to do nothing the first time it is pressed.
+        if (match) this.openDrawer(match, true);
       }
     } catch (e) {}
+
+    // Back / Forward move between the list and an open item without a load, so the panel
+    // follows the URL. Registered last, after the initial state has been applied, or the
+    // handler could fire against a half-built screen.
+    this._onPopState = function () { self.applyUrlState(); };
+    window.addEventListener('popstate', this._onPopState);
   },
   beforeUnmount: function () {
     if (this._onResize) { window.removeEventListener('resize', this._onResize); this._onResize = null; }
@@ -1232,6 +1251,10 @@ var WorkItemsScreen = {
     if (this._onDocClick) {
       document.removeEventListener('click', this._onDocClick);
       this._onDocClick = null;
+    }
+    if (this._onPopState) {
+      window.removeEventListener('popstate', this._onPopState);
+      this._onPopState = null;
     }
   },
   methods: {
@@ -1530,23 +1553,28 @@ var WorkItemsScreen = {
 
     // ---------- Detail view: drawer + page mode (§4.4) ----------
     /** Open the detail for an item. Same call from a grid row, a mobile card or a deep link. */
-    openDrawer: function (item) {
+    /**
+     * `fromUrl` marks an open that the address bar asked for (Back/Forward, or the deep link on
+     * first paint). Those must not write history back — the entry already exists.
+     */
+    openDrawer: function (item, fromUrl) {
       if (!item) return;
       this.drawer.id = item.id;
       this.drawer.open = true;
       this.syncDraft();
       this.loadStructure();
+      this.loadAttachments();
       this.loadFeed();
-      this.syncUrl();
+      if (!fromUrl) this.syncUrl(true);
     },
-    closeDrawer: function () {
+    closeDrawer: function (fromUrl) {
       // On the per-item page there is nothing behind the panel — closing means going back to
       // the list, not hiding the only content on screen.
       if (this.pageMode) { window.location.href = this.endpoints.list || '/'; return; }
       this.drawer.open = false;
       this.drawer.id = null;
       this.feed = null;
-      this.syncUrl();
+      if (!fromUrl) this.syncUrl(true);
     },
 
     // ---------- Collaboration tabs (§4-§11) ----------
@@ -1575,7 +1603,14 @@ var WorkItemsScreen = {
      * `replaceState`, not `pushState`: a tab click is not a navigation, and Back should leave
      * the screen rather than walk the tabs.
      */
-    syncUrl: function () {
+    /**
+     * `push` writes a NEW history entry; without it the current one is rewritten in place.
+     *
+     * Opening and closing the drawer push, so Back undoes exactly the last thing the user did.
+     * Everything else (switching tabs inside an open item) replaces, or a single visit would
+     * bury the list under one entry per tab click and Back would walk them all.
+     */
+    syncUrl: function (push) {
       // The per-item page already IS the URL for the item; it only carries the tab.
       if (this.pageMode) {
         this.writeParams({ tab: this.tab });
@@ -1585,18 +1620,52 @@ var WorkItemsScreen = {
 
       this.writeParams(this.drawer.open && this.drawer.id
         ? { item: this.drawer.id, tab: this.tab }
-        : { item: null, tab: null });
+        : { item: null, tab: null }, push);
     },
     /** Set or delete query params on the current URL. */
-    writeParams: function (params) {
+    writeParams: function (params, push) {
       try {
         var url = new URL(window.location.href);
         Object.keys(params).forEach(function (key) {
           if (params[key] === null || params[key] === undefined || params[key] === '') url.searchParams.delete(key);
           else url.searchParams.set(key, params[key]);
         });
-        window.history.replaceState({}, '', url);
+        // Nothing to record if the URL is already what we were about to write — pushing here
+        // would stack duplicate entries that Back appears to skip over.
+        if (push && url.href !== window.location.href) window.history.pushState({}, '', url);
+        else window.history.replaceState({}, '', url);
       } catch (e) { /* history is unavailable — the screen still works */ }
+    },
+    /**
+     * Bring the drawer into line with whatever the URL now says.
+     *
+     * The popstate handler: Back and Forward change the URL without a load, so the panel has to
+     * follow the address bar rather than the other way round. `fromUrl` suppresses the write
+     * back to history — re-pushing here would fight the navigation that triggered it.
+     */
+    applyUrlState: function () {
+      if (this.pageMode) return;
+
+      var params = new URLSearchParams(window.location.search);
+      var wanted = params.get('item');
+      var tab = params.get('tab');
+
+      if (tab && this.tabList().some(function (t) { return t.key === tab; })) this.tab = tab;
+
+      if (!wanted) {
+        if (this.drawer.open) this.closeDrawer(true);
+
+        return;
+      }
+
+      if (this.drawer.open && String(this.drawer.id) === String(wanted)) return;
+
+      var match = this.items.find(function (i) {
+        return String(i.identifier) === wanted || String(i.id) === wanted;
+      });
+      // Not in the loaded set — a filter or page since changed under this history entry. The
+      // list is left alone rather than reloaded; the URL is honoured as far as it can be.
+      if (match) this.openDrawer(match, true);
     },
     loadFeed: async function () {
       var it = this.drawerItem;
@@ -1861,6 +1930,11 @@ var WorkItemsScreen = {
      * invisible — the section inside it was correct and simply never reached.
      */
     hasStructure: function () {
+      // Attachments count even though they are not part of `structure`: they render as a
+      // section of the same card, and without this an item whose ONLY addition is a file
+      // shows an empty detail with the file nowhere on it.
+      if (this.attachments.length) return true;
+
       var s = this.structure;
       if (!s) return false;
       return !!(s.subtasks.items.length || s.dependencies.blocking.length || s.dependencies.blocked_by.length ||
@@ -2134,6 +2208,85 @@ var WorkItemsScreen = {
         this.applyStructure(await this.$pb.api(this.structureUrl('links') + '/' + link.id, { method: 'DELETE' }));
       } catch (e) { this.$pb.toast(this.$pb.firstError(e), 'error'); }
     },
+    /**
+     * Attachments (docs/features/work-item-attachments.md).
+     *
+     * The list is loaded with the drawer, because it is a section of the detail rather than
+     * something only the modal shows. The modal exists to ADD, and stages its files until Save.
+     */
+    loadAttachments: async function () {
+      if (!this.structureUrl('attachments')) { this.attachments = []; return; }
+      this.attachmentsLoading = true;
+      try {
+        var resp = await this.$pb.api(this.structureUrl('attachments'));
+        this.attachments = resp.result || [];
+      } catch (e) { this.attachments = []; }
+      this.attachmentsLoading = false;
+    },
+    openAttachments: function () {
+      this.addMenu = '';
+      if (!this.structureUrl('attachments')) return;
+      this.attachModal = { open: true, staged: [], busy: false, error: '' };
+    },
+    /** Chosen, not sent. Appends so picking twice adds to the batch rather than replacing it. */
+    stageAttachments: function (event) {
+      var input = event.target;
+      var files = input.files || [];
+      for (var i = 0; i < files.length; i++) this.attachModal.staged.push(files[i]);
+      // Cleared, or picking the SAME file again fires no change event and looks broken.
+      input.value = '';
+      this.attachModal.error = '';
+    },
+    unstageAttachment: function (index) {
+      this.attachModal.staged.splice(index, 1);
+    },
+    /** The only place anything is written. Nothing staged means nothing to do. */
+    saveAttachments: async function () {
+      if (this.attachModal.busy || !this.attachModal.staged.length) return;
+      this.attachModal.busy = true; this.attachModal.error = '';
+
+      var form = new FormData();
+      this.attachModal.staged.forEach(function (f, i) { form.append('file-' + i, f); });
+
+      var count = this.attachModal.staged.length;
+
+      try {
+        var resp = await this.$pb.api(this.structureUrl('attachments'), { method: 'POST', body: form });
+        this.attachments = resp.result || [];
+        this.attachModal.open = false;
+        this.attachModal.staged = [];
+        // Counted from what was staged, not from the response: the modal closes on save, so
+        // this is the only confirmation that the files actually landed.
+        this.$pb.toast(count === 1 ? 'Attachment uploaded.' : count + ' attachments uploaded.');
+      } catch (e) {
+        // Left open with the staging list intact, so a rejected file can be removed and the
+        // rest retried without picking everything again.
+        this.attachModal.error = this.$pb.firstError(e);
+      }
+      this.attachModal.busy = false;
+    },
+    cancelAttachments: function () {
+      this.attachModal.open = false;
+      this.attachModal.staged = [];
+      this.attachModal.error = '';
+    },
+    deleteAttachment: async function (row) {
+      try {
+        var resp = await this.$pb.api(this.structureUrl('attachments') + '/' + row.id, { method: 'DELETE' });
+        this.attachments = resp.result || [];
+        // Named, not just "Removed.": the row vanishes from a list that may hold several, and
+        // the file it took with it is the one thing worth confirming.
+        this.$pb.toast('"' + row.name + '" was removed.');
+      } catch (e) { this.$pb.toast(this.$pb.firstError(e), 'error'); }
+    },
+    /** Bytes as something a person reads. */
+    attachSize: function (bytes) {
+      var n = Number(bytes) || 0;
+      if (n < 1024) return n + ' B';
+      if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+      return (n / (1024 * 1024)).toFixed(1) + ' MB';
+    },
+
     /** A related work item's own page, so every row is openable (§26/§32). */
     rowUrl: function (row) {
       return this.endpoints.item ? this.$pb.withId(this.endpoints.item, row.id) : '';
@@ -2813,10 +2966,10 @@ var WorkItemsScreen = {
     '<button type="button" @click="openLinkModal(null)" data-tip="Add link" aria-label="Add link" class="relative -ml-px inline-flex items-center justify-center h-9 w-9 text-sub ring-1 ring-inset ring-stroke hover:bg-hover focus:z-10">' +
     '' + wiIcon('link', 15) + '</button>' +
 
-    // Attachments are drawn but inert until they ship (§42) — a dead control that silently
-    // does nothing is worse than one that says why.
-    '<span data-tip="Attachments — coming soon" aria-label="Attachments — coming soon" class="relative -ml-px inline-flex items-center justify-center h-9 w-9 text-faint ring-1 ring-inset ring-stroke cursor-not-allowed">' +
-    '' + wiIcon('paperclip', 15) + '</span>' +
+    // Attachments (docs/features/work-item-attachments.md). Live for readers as well as
+    // editors: the modal lists the files either way, and only Upload/Delete are gated.
+    '<button type="button" @click="openAttachments" data-tip="Attachments" aria-label="Attachments" class="relative -ml-px inline-flex items-center justify-center h-9 w-9 text-sub ring-1 ring-inset ring-stroke hover:bg-hover focus:z-10">' +
+    '' + wiIcon('paperclip', 15) + '</button>' +
 
     // Link pages. Live where the project has Pages on, and saying why where it does not.
     '<button v-if="pagesEnabled" type="button" @click="openPagePicker" data-tip="Link pages" aria-label="Link pages" ' +
@@ -2958,6 +3111,31 @@ var WorkItemsScreen = {
     '' + wiIcon('clone', 14) + '</button>' +
     '<button v-if="canEdit" type="button" @click="openStructMenu(\'link\', l, $event)" class="h-6 w-6 grid place-items-center rounded text-faint hover:bg-line shrink-0" data-tip="More" aria-label="More">' +
     '' + wiIcon('ellipsis-small', 15) + '</button>' +
+    '</li></ul></div>' +
+
+    // ---- Attachments. Files that belong to the item, as line items on the detail. ----
+    // Same shape as Links, and hidden when empty for the same reason: an always-present empty
+    // section is noise on every item that has none. The paperclip in the action row is how an
+    // item with no attachments yet gets its first.
+    '<div v-if="attachments.length" class="p-3 sm:p-4">' +
+    '<div class="flex items-center gap-2">' +
+    '<button type="button" @click="toggleSection(\'attachments\')" class="h-6 w-6 grid place-items-center rounded text-faint hover:bg-hover shrink-0">' +
+    '' + wiIcon('chevron-down', 15, 'transition-transform') + '</button>' +
+    '<span class="text-[13px] font-semibold text-head">Attachments</span>' +
+    '<span class="text-[12px] text-sub">{{ attachments.length }}</span>' +
+    '<button v-if="canEdit" type="button" @click="openAttachments" data-tip="Add attachment" aria-label="Add attachment" class="ml-auto h-7 w-7 grid place-items-center rounded text-sub hover:bg-hover">' +
+    '' + wiIcon('plus', 16) + '</button>' +
+    '</div>' +
+    '<ul v-show="secOpen.attachments" class="mt-1 space-y-1">' +
+    '<li v-for="a in attachments" :key="a.id" class="flex items-center gap-2.5 px-2.5 h-11 rounded-md border border-line">' +
+    '' + wiIcon('paperclip', 15, 'text-faint shrink-0') + '' +
+    // A plain link, not a fetch: the route answers with Content-Disposition: attachment, so
+    // the browser saves it under its original name without any JS.
+    '<a :href="a.url" class="text-[13px] text-ink truncate hover:underline">{{ a.name }}</a>' +
+    '<span class="text-[12px] text-faint shrink-0">{{ attachSize(a.size) }}</span>' +
+    '<span class="ml-auto text-[12px] text-faint shrink-0 hidden sm:inline">{{ relativeTime(a.created_at) }}</span>' +
+    '<button v-if="canEdit" type="button" @click="deleteAttachment(a)" data-tip="Remove" aria-label="Remove" class="h-6 w-6 grid place-items-center rounded text-faint hover:bg-line hover:text-danger shrink-0">' +
+    '' + wiIcon('trash', 14) + '</button>' +
     '</li></ul></div>' +
 
     // ---- Linked pages. The documentation this work item points at. ----
@@ -3692,6 +3870,44 @@ var WorkItemsScreen = {
     '<button type="button" @click="linkModal.open = false" class="h-9 px-4 rounded-md border border-stroke text-[13px] font-semibold text-ink hover:bg-hover">Cancel</button>' +
     '<button type="button" @click="saveLink" :disabled="!linkModal.url.trim() || linkModal.busy" ' +
     'class="h-9 px-4 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold disabled:opacity-50">{{ linkModal.id ? \'Save\' : \'Add link\' }}</button>' +
+    '</div></div></div>' +
+
+    // ===== Add attachments (docs/features/work-item-attachments.md) =====
+    // Staging modal: files are chosen here but only written by Save, so Cancel leaves the item
+    // exactly as it was. The saved list lives on the detail page, not in here.
+    '<div v-if="attachModal.open" class="fixed inset-0 z-[95] flex items-start justify-center p-4 sm:pt-28">' +
+    '<div class="absolute inset-0 bg-black/40" @mousedown="backdropDown" @click="backdropClick($event, function () { cancelAttachments(); })"></div>' +
+    '<div class="relative w-full max-w-[520px] bg-white rounded-xl shadow-xl flex flex-col max-h-[70vh]">' +
+
+    '<div class="px-5 py-4 border-b border-line shrink-0">' +
+    '<h2 class="text-[15px] font-semibold text-head">Add attachments</h2></div>' +
+
+    '<div class="px-5 py-4 overflow-y-auto">' +
+    '<div v-if="attachModal.error" class="mb-3 rounded-lg border border-danger/40 bg-danger/5 px-3 py-2 text-[13px] text-danger">{{ attachModal.error }}</div>' +
+
+    '<input ref="attachFile" type="file" multiple class="hidden" @change="stageAttachments" />' +
+    '<button type="button" @click="$refs.attachFile.click()" :disabled="attachModal.busy" ' +
+    'class="w-full h-20 rounded-lg border border-dashed border-stroke text-[13px] text-sub hover:border-brand hover:text-brand disabled:opacity-50 flex flex-col items-center justify-center gap-1">' +
+    '<span>' + wiIcon('paperclip', 16) + '</span><span>Choose files</span></button>' +
+
+    '<div v-if="attachModal.staged.length" class="mt-3 divide-y divide-line">' +
+    '<div v-for="(f, i) in attachModal.staged" :key="i" class="flex items-center gap-3 py-2">' +
+    '<div class="min-w-0 flex-1">' +
+    '<div class="truncate text-[13px] text-ink">{{ f.name }}</div>' +
+    '<div class="text-[11px] text-faint">{{ attachSize(f.size) }}</div></div>' +
+    '<button type="button" @click="unstageAttachment(i)" :disabled="attachModal.busy" ' +
+    'class="h-7 w-7 grid place-items-center rounded text-sub hover:bg-hover hover:text-danger disabled:opacity-40 shrink-0" data-tip="Remove" aria-label="Remove">' +
+    '' + wiIcon('xmark', 14) + '</button>' +
+    '</div></div>' +
+    '<p v-else class="mt-3 text-center text-[12px] text-faint">Nothing selected yet.</p>' +
+    '</div>' +
+
+    '<div class="px-5 py-3 border-t border-line flex justify-end gap-2 shrink-0">' +
+    '<button type="button" @click="cancelAttachments" :disabled="attachModal.busy" ' +
+    'class="h-9 px-4 rounded-md border border-stroke text-[13px] font-semibold text-ink hover:bg-hover disabled:opacity-50">Cancel</button>' +
+    '<button type="button" @click="saveAttachments" :disabled="!attachModal.staged.length || attachModal.busy" ' +
+    'class="h-9 px-4 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold disabled:opacity-50">' +
+    '{{ attachModal.busy ? \'Saving…\' : \'Save\' }}</button>' +
     '</div></div></div>' +
 
     // ===== Row chip pickers + action menu (§4.2 / §4.4) =====

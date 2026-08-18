@@ -9,6 +9,7 @@ use App\Models\WorkspaceMembership;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -29,6 +30,17 @@ class ProfileController extends Controller
 {
     /** Where each image lives on the user's row. The only two kinds that exist. */
     private const KINDS = ['avatar' => 'avatar_url', 'cover' => 'cover_url'];
+
+    /**
+     * The disk these images live on — local in a bare checkout, DigitalOcean Spaces once
+     * PROFILE_DISK says so. Read through a helper rather than inlined at each call site so
+     * a write, its cleanup delete, and the later read can never disagree about the disk:
+     * storing on Spaces while deleting from local is how orphans and 404s get made.
+     */
+    private function disk(): string
+    {
+        return (string) config('filesystems.profile_disk', 'local');
+    }
 
     /** PATCH /account/profile — the Profile tab's Save changes. */
     public function update(UpdateProfileRequest $request): JsonResponse
@@ -68,13 +80,47 @@ class ProfileController extends Controller
         $column = self::KINDS[$data['kind']];
         // The RAW column: the accessor answers with the serving URL, and Storage wants the path.
         $previous = $user->getRawOriginal($column);
+        $disk = $this->disk();
 
-        $path = $request->file('image')->store("account/{$user->id}", 'local');
+        // 'private' is explicit because the `spaces` disk defaults writes to public-read.
+        // Inheriting that default would publish every profile image to an unauthenticated
+        // URL and quietly undo the access check in image().
+        try {
+            $path = $request->file('image')->store(
+                "account/{$user->id}",
+                ['disk' => $disk, 'visibility' => 'private'],
+            );
+        } catch (\Throwable $e) {
+            // The row is left pointing at the OLD image: a failed upload must not blank an
+            // avatar that is still perfectly good.
+            Log::error('Profile image upload failed', [
+                'disk' => $disk,
+                'bucket' => config("filesystems.disks.{$disk}.bucket"),
+                'user_id' => $user->id,
+                'kind' => $data['kind'],
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'ok' => false,
+                'message' => "Upload failed: could not write to the '{$disk}' disk. ".$e->getMessage(),
+            ], 500);
+        }
+
+        // store() returns false rather than throwing on a disk configured with throw=false.
+        if ($path === false) {
+            Log::error('Profile image upload returned no path', ['disk' => $disk, 'user_id' => $user->id]);
+
+            return response()->json([
+                'ok' => false,
+                'message' => "Upload failed: the '{$disk}' disk rejected the file without an error.",
+            ], 500);
+        }
 
         $user->forceFill([$column => $path])->save();
 
         if ($previous && $previous !== $path) {
-            Storage::disk('local')->delete($previous);
+            Storage::disk($disk)->delete($previous);
         }
 
         return response()->json(['ok' => true, 'profile' => $this->payload($user->fresh())]);
@@ -92,7 +138,7 @@ class ProfileController extends Controller
         $column = self::KINDS[$kind];
 
         if ($user->getRawOriginal($column)) {
-            Storage::disk('local')->delete($user->getRawOriginal($column));
+            Storage::disk($this->disk())->delete($user->getRawOriginal($column));
             $user->forceFill([$column => null])->save();
         }
 
@@ -115,9 +161,19 @@ class ProfileController extends Controller
         abort_unless($viewer !== null && $this->maySee($viewer, $user), 404);
 
         $path = $user->getRawOriginal(self::KINDS[$kind]);
-        abort_unless($path && Storage::disk('local')->exists($path), 404);
+        $disk = $this->disk();
 
-        return Storage::disk('local')->response($path, null, [
+        if ($path && ! Storage::disk($disk)->exists($path)) {
+            // A row pointing at a file the disk does not have is a migration that missed
+            // something, not a missing avatar. It renders as a silent 404, so say so.
+            Log::warning('Profile image missing from disk', [
+                'disk' => $disk, 'user_id' => $user->id, 'kind' => $kind, 'path' => $path,
+            ]);
+        }
+
+        abort_unless($path && Storage::disk($disk)->exists($path), 404);
+
+        return Storage::disk($disk)->response($path, null, [
             // Private, because the response depends on who is asking: a shared cache handing
             // this to the next viewer would be handing it to someone who may not see it.
             'Cache-Control' => 'private, max-age=300',

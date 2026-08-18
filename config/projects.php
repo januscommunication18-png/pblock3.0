@@ -50,6 +50,16 @@ return [
         'gallery_size' => 60,
     ],
 
+    /*
+     * Work item attachments (docs/features/work-item-attachments.md). Wider than `media`
+     * because an attachment is a document, not an inlined image — but still an ALLOW-list:
+     * accepting arbitrary executables into shared project storage is not a risk this needs.
+     */
+    'attachments' => [
+        'max_kb' => 5120,
+        'mimes' => ['jpg', 'jpeg', 'png', 'webp', 'gif', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'txt', 'zip'],
+    ],
+
     'cover' => [
         'max_kb' => 5120,
         'mimes' => ['jpg', 'jpeg', 'png', 'webp', 'gif'],

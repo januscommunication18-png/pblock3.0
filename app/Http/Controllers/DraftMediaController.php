@@ -8,6 +8,7 @@ use App\Models\WorkItemMedia;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -65,14 +66,40 @@ class DraftMediaController extends Controller
                 return $this->failure($validator->errors()->first());
             }
 
+            $disk = (string) config('filesystems.media_disk', 'local');
+
             // Filed under the uploader rather than a project, because there is no project yet.
-            $path = $file->store("work-item-media/{$tenantId}/drafts/".Auth::id(), 'local');
+            // 'private' is explicit for the same reason as the work-item path: the `spaces`
+            // disk would otherwise default these to public-read.
+            try {
+                $path = $file->store(
+                    "work-item-media/{$tenantId}/drafts/".Auth::id(),
+                    ['disk' => $disk, 'visibility' => 'private'],
+                );
+            } catch (\Throwable $e) {
+                Log::error('Draft media upload failed', [
+                    'disk' => $disk,
+                    'bucket' => config("filesystems.disks.{$disk}.bucket"),
+                    'user_id' => Auth::id(),
+                    'file' => $file->getClientOriginalName(),
+                    'error' => $e->getMessage(),
+                ]);
+
+                return $this->failure("Upload failed: could not write to the '{$disk}' disk. ".$e->getMessage());
+            }
+
+            if ($path === false) {
+                Log::error('Draft media upload returned no path', ['disk' => $disk, 'user_id' => Auth::id()]);
+
+                return $this->failure("Upload failed: the '{$disk}' disk rejected the file without an error.");
+            }
 
             /** @var WorkItemMedia $media */
             $media = WorkItemMedia::create([
                 'project_id' => null,
                 'uploaded_by' => Auth::id(),
-                'disk' => 'local',
+                // Recorded, not assumed — show() streams from whatever this says.
+                'disk' => $disk,
                 'path' => $path,
                 'name' => $file->getClientOriginalName(),
                 'mime' => $file->getMimeType() ?: 'application/octet-stream',

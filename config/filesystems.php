@@ -6,6 +6,23 @@ return [
 
     'avatar_disk' => env('AVATAR_DISK', 'assets'),
 
+    /*
+     * Disk for account profile images (avatar + cover), written and streamed by
+     * Account\ProfileController. These are PRIVATE objects served through an authorising
+     * route, never a public URL — see that controller's docblock. Kept separate from
+     * `avatar_disk` because that one holds public onboarding avatars; the two differ in
+     * visibility, so one switch must not silently flip the other.
+     */
+    'profile_disk' => env('PROFILE_DISK', 'local'),
+
+    /*
+     * Disk for work-item and draft attachments ("Add files"), written by
+     * WorkItemMediaController and DraftMediaController. Also PRIVATE and streamed behind the
+     * project's `view` ability. Each row records the disk it was written to, so changing this
+     * only affects NEW uploads — existing rows keep streaming from wherever they already are.
+     */
+    'media_disk' => env('MEDIA_DISK', 'local'),
+
     'disks' => [
 
         'local' => [
@@ -55,8 +72,13 @@ return [
             'endpoint' => env('DO_SPACES_ENDPOINT'),
             'url' => env('DO_SPACES_URL'),
             'use_path_style_endpoint' => false,
+            // Default for writes that do not name a visibility. Callers storing private
+            // objects (profile images) pass 'private' explicitly and override this.
             'visibility' => 'public',
-            'throw' => false,
+            // Loud on purpose. With `false`, a rejected PutObject returns as though it
+            // succeeded and the upload silently never lands in the bucket — which is
+            // exactly how a read-only key went unnoticed here.
+            'throw' => true,
         ],
 
     ],

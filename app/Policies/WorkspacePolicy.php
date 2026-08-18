@@ -55,6 +55,71 @@ class WorkspacePolicy
         return $this->update($user, $workspace);
     }
 
+    /**
+     * May this person act on THAT member — change their role, remove them, deactivate them?
+     *
+     * Three rules, in order, and all of them server-side (§14):
+     *   1. the actor must administer the workspace at all;
+     *   2. they must strictly OUTRANK the target, so an admin cannot act on another admin and
+     *      certainly not on an owner;
+     *   3. the last owner is untouchable, even by themselves.
+     *
+     * An owner acting on another owner is allowed only while a third owner remains — which
+     * rule 3 already expresses, so it is not restated here.
+     */
+    public function manageMember(User $user, Workspace $workspace, WorkspaceMembership $target): bool
+    {
+        $actor = $this->membership($user, $workspace);
+
+        if ($actor === null || ! $this->invite($user, $workspace)) {
+            return false;
+        }
+
+        if ($target->isLastOwner()) {
+            return false;
+        }
+
+        // Acting on yourself is not management — leaving and self-demotion are their own rules.
+        if ((int) $actor->id === (int) $target->id) {
+            return false;
+        }
+
+        /*
+         * An OWNER may act on anyone, including another owner — §11 lets an owner assign every
+         * role, and the only thing protecting an owner is the last-owner rule already applied
+         * above. Everybody else must STRICTLY outrank the target, so an admin cannot act on
+         * another admin.
+         */
+        return $actor->isOwner() || $actor->outranks($target);
+    }
+
+    /**
+     * May this person hand out that role?
+     *
+     * Only an owner may create another owner (§11). Everybody else may assign roles strictly
+     * below their own, so an admin can make a member or a guest and never another admin.
+     */
+    public function assignRole(User $user, Workspace $workspace, string $role): bool
+    {
+        $actor = $this->membership($user, $workspace);
+
+        if ($actor === null || ! $this->invite($user, $workspace)) {
+            return false;
+        }
+
+        if ($role === WorkspaceMembership::ROLE_OWNER) {
+            return $actor->isOwner();
+        }
+
+        return $actor->rank() > WorkspaceMembership::rankOf($role);
+    }
+
+    /** Transferring the workspace is owner-only (§4), like deleting it. */
+    public function transferOwnership(User $user, Workspace $workspace): bool
+    {
+        return $this->delete($user, $workspace);
+    }
+
     private function membership(User $user, Workspace $workspace): ?WorkspaceMembership
     {
         return WorkspaceMembership::query()

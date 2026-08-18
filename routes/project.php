@@ -17,6 +17,7 @@ use App\Http\Controllers\Project\ProjectViewController;
 use App\Http\Controllers\Project\ProjectViewGridController;
 use App\Http\Controllers\Project\WorkItemCollaborationController;
 use App\Http\Controllers\Project\WorkItemController;
+use App\Http\Controllers\Project\WorkItemAttachmentController;
 use App\Http\Controllers\Project\WorkItemMediaController;
 use App\Http\Controllers\Project\WorkItemReactionController;
 use App\Http\Controllers\Project\WorkItemStructureController;
@@ -69,6 +70,18 @@ Route::middleware(['auth', 'workspace.tenancy'])
             ->whereNumber('project')->name('work-items.media.index');
         Route::get('/{project}/work-items/media/{media}', [WorkItemMediaController::class, 'show'])
             ->whereNumber(['project', 'media'])->name('work-items.media.show');
+
+        // Work item attachments (docs/features/work-item-attachments.md). These DO nest under
+        // /{workItem} — an attachment belongs to one item, unlike editor media, which is
+        // uploaded before an item necessarily exists.
+        Route::post('/{project}/work-items/{workItem}/attachments', [WorkItemAttachmentController::class, 'store'])
+            ->whereNumber(['project', 'workItem'])->middleware('throttle:60,1')->name('work-items.attachments.store');
+        Route::get('/{project}/work-items/{workItem}/attachments', [WorkItemAttachmentController::class, 'index'])
+            ->whereNumber(['project', 'workItem'])->name('work-items.attachments.index');
+        Route::get('/{project}/work-items/{workItem}/attachments/{attachment}', [WorkItemAttachmentController::class, 'show'])
+            ->whereNumber(['project', 'workItem', 'attachment'])->name('work-items.attachments.show');
+        Route::delete('/{project}/work-items/{workItem}/attachments/{attachment}', [WorkItemAttachmentController::class, 'destroy'])
+            ->whereNumber(['project', 'workItem', 'attachment'])->name('work-items.attachments.destroy');
 
         // The quick-create modal's pickers for one project. Above the /{workItem} routes so
         // "options" is never read as a work item id.

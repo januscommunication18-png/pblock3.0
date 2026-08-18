@@ -259,6 +259,9 @@ class WorkItemScreenPayload
             'mentionUsers' => route('projects.mentionable-users', $project),
             'mediaUpload' => route('projects.work-items.media.store', $project),
             'mediaGallery' => route('projects.work-items.media.index', $project),
+            // Attachments (docs/features/work-item-attachments.md). `__ID__` is swapped for the
+            // open item's id client-side, the same way every other per-item URL here is.
+            'attachments' => $withId('projects.work-items.attachments.index'),
         ];
     }
 

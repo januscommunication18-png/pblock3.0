@@ -9,6 +9,7 @@ use App\Models\WorkItemMedia;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -61,13 +62,41 @@ class WorkItemMediaController extends Controller
                 return $this->failure($validator->errors()->first());
             }
 
-            $path = $file->store("work-item-media/{$project->tenant_id}/{$project->id}", 'local');
+            $disk = (string) config('filesystems.media_disk', 'local');
+
+            // 'private' is explicit: the `spaces` disk defaults writes to public-read, and
+            // inheriting that would publish project attachments to an unauthenticated URL,
+            // bypassing the `view` ability that show() enforces.
+            try {
+                $path = $file->store(
+                    "work-item-media/{$project->tenant_id}/{$project->id}",
+                    ['disk' => $disk, 'visibility' => 'private'],
+                );
+            } catch (\Throwable $e) {
+                Log::error('Work item media upload failed', [
+                    'disk' => $disk,
+                    'bucket' => config("filesystems.disks.{$disk}.bucket"),
+                    'project_id' => $project->id,
+                    'file' => $file->getClientOriginalName(),
+                    'error' => $e->getMessage(),
+                ]);
+
+                return $this->failure("Upload failed: could not write to the '{$disk}' disk. ".$e->getMessage());
+            }
+
+            if ($path === false) {
+                Log::error('Work item media upload returned no path', ['disk' => $disk, 'project_id' => $project->id]);
+
+                return $this->failure("Upload failed: the '{$disk}' disk rejected the file without an error.");
+            }
 
             /** @var WorkItemMedia $media */
             $media = WorkItemMedia::create([
                 'project_id' => $project->id,
                 'uploaded_by' => Auth::id(),
-                'disk' => 'local',
+                // The disk is RECORDED, not assumed: show() streams from whatever this says,
+                // so rows written before a disk switch keep resolving to their old home.
+                'disk' => $disk,
                 'path' => $path,
                 'name' => $file->getClientOriginalName(),
                 'mime' => $file->getMimeType() ?: 'application/octet-stream',

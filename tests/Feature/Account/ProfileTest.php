@@ -187,6 +187,47 @@ class ProfileTest extends TestCase
         $this->assertContains('auth', app('router')->getRoutes()->getByName('account.image')->gatherMiddleware());
     }
 
+    /**
+     * The disk is whatever `filesystems.profile_disk` says, and the write is private.
+     *
+     * Both halves matter. The disk was hardcoded to 'local' in four places, so setting
+     * PROFILE_DISK=spaces moved nothing and uploads silently stayed on the local box. And the
+     * `spaces` disk defaults writes to public-read, so a store() that does not say 'private'
+     * publishes every face in the account table to an unauthenticated URL — undoing the access
+     * check that test_a_profile_image_is_visible_to_workspace_peers_and_nobody_else asserts.
+     */
+    public function test_profile_images_honour_the_configured_disk_and_stay_private(): void
+    {
+        config(['filesystems.profile_disk' => 'profile_test']);
+        Storage::fake('profile_test');
+        Storage::fake('local');
+
+        $user = User::factory()->create();
+
+        $this->actingAs($user)->post(route('account.profile.image.store'), [
+            'kind' => 'avatar',
+            'image' => UploadedFile::fake()->image('me.jpg'),
+        ])->assertOk();
+
+        $path = $user->refresh()->getRawOriginal('avatar_url');
+
+        Storage::disk('profile_test')->assertExists($path);
+        Storage::disk('local')->assertMissing($path);
+        $this->assertSame('private', Storage::disk('profile_test')->getVisibility($path));
+
+        // The read path must follow the same disk, or a migrated image 404s behind a URL the
+        // rest of the app is still rendering.
+        $this->actingAs($user)
+            ->get(route('account.image', ['user' => $user->id, 'kind' => 'avatar']))
+            ->assertOk();
+
+        // …and so must the delete, or switching disks starts leaking orphans into the bucket.
+        $this->actingAs($user)
+            ->deleteJson(route('account.profile.image.destroy'), ['kind' => 'avatar'])
+            ->assertOk();
+        Storage::disk('profile_test')->assertMissing($path);
+    }
+
     /** @return array{0: User, 1: Workspace} */
     private function workspaceOwner(): array
     {
