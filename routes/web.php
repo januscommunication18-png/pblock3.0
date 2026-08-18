@@ -8,6 +8,7 @@ require __DIR__.'/drafts.php';
 require __DIR__.'/your-work.php';
 require __DIR__.'/inbox.php';
 require __DIR__.'/search.php';
+require __DIR__.'/help-desk.php';
 require __DIR__.'/quick-create.php';
 require __DIR__.'/settings.php';
 require __DIR__.'/account.php';

@@ -83,11 +83,12 @@ class EnableWikiTest extends TestCase
     {
         $user = $this->creator();
 
-        // Help Desk is not released. The screen shows it as Coming Soon and offers no control,
+        // Client Hub is not released. The screen shows it as Coming Soon and offers no control,
         // so this can only arrive from a crafted request — refused, not quietly ignored.
+        // (It used to be Help Desk; that shipped — docs/features/help-desk.md slice 1.)
         $this->actingAs($user)->post(route('onboarding.workspace.store'), [
             'name' => 'Acme Inc', 'slug' => 'acme-inc', 'team_size' => '2-10',
-            'apps' => ['helpdesk'],
+            'apps' => ['clienthub'],
         ])->assertSessionHasErrors('apps.0');
 
         $this->assertSame(0, Workspace::query()->count());
@@ -164,7 +165,7 @@ class EnableWikiTest extends TestCase
         $this->assertFalse($apps['wiki']['locked']);
 
         // Unreleased apps are listed so people can see what is coming, but not as a choice.
-        $this->assertFalse($apps['helpdesk']['available']);
+        $this->assertFalse($apps['clienthub']['available']);
     }
 
     public function test_wiki_can_be_switched_on_from_the_general_screen(): void
@@ -221,7 +222,7 @@ class EnableWikiTest extends TestCase
         ]);
 
         $this->actingAs($user->fresh())->patchJson('/settings/general', $this->generalPayload([
-            'apps' => ['helpdesk'],
+            'apps' => ['clienthub'],
         ]))->assertStatus(422)->assertJsonValidationErrors('apps.0');
     }
 

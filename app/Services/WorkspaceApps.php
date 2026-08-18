@@ -21,6 +21,11 @@ class WorkspaceApps
     /** app key => the `workspace_settings` column that records it. */
     private const FLAGS = [
         'wiki' => 'wiki_enabled',
+        // docs/features/help-desk.md FR-1.1. Switching the app on is only that: it makes Help
+        // Desk exist for the workspace and puts it in the rail. It grants nobody access to it —
+        // Help Desk has its own membership, and enabling is a workspace setting rather than a
+        // Help Desk permission (decision H5).
+        'helpdesk' => 'help_desk_enabled',
     ];
 
     public function __construct(private readonly WorkspaceSettingsManager $settings) {}

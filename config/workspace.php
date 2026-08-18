@@ -54,7 +54,7 @@ return [
         'helpdesk' => [
             'label' => 'Help Desk',
             'description' => 'Manage customer support requests, tickets, conversations, assignments, SLAs, and resolution workflows.',
-            'available' => false,
+            'available' => true,
         ],
         'clienthub' => [
             'label' => 'Client Hub',

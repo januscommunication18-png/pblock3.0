@@ -12,6 +12,12 @@
      Asked through WorkspaceApps so this and the two Settings screens cannot disagree about
      whether the app is on. --}}
 @php($__wiki = app(\App\Services\WorkspaceApps::class)->isEnabled($__ws, 'wiki'))
+{{-- Help Desk (docs/features/help-desk.md, FR-1.2). Not the same test as Wiki's: the app being
+     enabled is only half of it — "Help Desk appears in the left navigation only for members
+     with Help Desk access" (§4), so this asks whether THIS person may open it, not merely
+     whether the workspace has switched it on. The rail entry is still only the doorway:
+     /help-desk refuses on its own, because hiding a link is not authorization (§13). --}}
+@php($__helpdesk = app(\App\Services\HelpDesk\HelpDeskAccess::class)->canOpen(auth()->user(), $__ws))
 {{-- Restore the collapsed sidebar before it is parsed, so a collapsed panel never flashes
      into view and slide away on every page load. Inline and synchronous on purpose: these
      are full page navigations, so anything deferred is too late to matter. --}}
@@ -35,6 +41,12 @@
     <a href="{{ route('wiki.home') }}" @class(['flex flex-col items-center gap-1 w-full px-0.5 py-2 rounded-lg', 'bg-sel text-brand' => request()->is('wiki*'), 'text-sub hover:bg-hover hover:text-ink' => ! request()->is('wiki*')])>
       {!! pb_icon('file-lines', 18) !!}
       <span class="text-[10px] text-center leading-tight">Wiki</span>
+    </a>
+  @endif
+  @if ($__helpdesk)
+    <a href="{{ route('help-desk.index') }}" @class(['flex flex-col items-center gap-1 w-full px-0.5 py-2 rounded-lg', 'bg-sel text-brand' => request()->is('help-desk*'), 'text-sub hover:bg-hover hover:text-ink' => ! request()->is('help-desk*')])>
+      {!! pb_icon('inbox', 18) !!}
+      <span class="text-[10px] text-center leading-tight">Help Desk</span>
     </a>
   @endif
   <a href="{{ route('settings.general') }}" title="Workspace settings"
@@ -71,6 +83,10 @@
          same panel and stay shared, rather than being duplicated into a second sidebar. --}}
     @if ($__wiki && request()->is('wiki*'))
       @include('partials.wiki-nav')
+    {{-- The same swap inside /help-desk (docs/features/help-desk.md, FR-1.2): the Help Desk
+         gets its own navigation instead of the workspace's project list. --}}
+    @elseif ($__helpdesk && request()->is('help-desk*'))
+      @include('partials.help-desk-nav')
     @else
     {{-- New work item (above Home). The global create action from Work Items §4.3.
          On the Work Items screen its click is intercepted and opens the modal in place;
