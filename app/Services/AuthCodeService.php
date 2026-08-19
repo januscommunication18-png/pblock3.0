@@ -8,6 +8,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Throwable;
 
 /**
  * Issues and verifies short-lived, single-use 6-digit email codes (spec D-A3).
@@ -49,10 +50,35 @@ class AuthCodeService
             'attempts' => 0,
         ]);
 
-        Mail::to($email)->send(new LoginCodeMail($code, self::TTL_MINUTES));
+        /*
+         * Sent synchronously and NOT swallowed.
+         *
+         * The code row is already written, so a silent failure here is the worst outcome
+         * available: the user is told to check their email, no email exists, and nothing
+         * anywhere records why. WorkspaceInviter deliberately reports-rather-than-throws
+         * because an invitation is recoverable from the Members screen — a signup code is not
+         * recoverable from anywhere, so this one fails loudly.
+         *
+         * The catch exists only to LOG the reason before rethrowing. Without it the sole log
+         * line is `auth.code.issued`, which is written after the send and so is simply absent
+         * on failure — leaving "the account exists but no email arrived" with no trail at all.
+         */
+        try {
+            Mail::to($email)->send(new LoginCodeMail($code, self::TTL_MINUTES));
+        } catch (Throwable $e) {
+            Log::channel(config('logging.default'))->error('auth.code.send_failed', [
+                'email' => $email,
+                'purpose' => $purpose,
+                'mailer' => config('mail.default'),
+                'from' => config('mail.from.address'),
+                'error' => $e->getMessage(),
+            ]);
+
+            throw $e;
+        }
 
         Log::channel(config('logging.default'))->info('auth.code.issued', [
-            'email' => $email, 'purpose' => $purpose,
+            'email' => $email, 'purpose' => $purpose, 'mailer' => config('mail.default'),
         ]);
     }
 
