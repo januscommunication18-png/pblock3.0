@@ -40,6 +40,33 @@ class CreateWorkspaceTest extends TestCase
             ->assertSee('Coming soon', false);
     }
 
+    /**
+     * "Choose your view" is announced and operated as a radio group.
+     *
+     * It used to be a row of plain buttons whose selected state lived only in classes the
+     * script rewrote — nothing named the group, nothing said which option was chosen, and the
+     * arrow keys did nothing. The state now lives in `aria-checked`, which is also what the
+     * stylesheet paints from, so this guards the visual and the announced state at once.
+     */
+    public function test_the_view_chooser_is_a_radio_group(): void
+    {
+        $html = $this->actingAs($this->activeUser())
+            ->get(route('workspaces.create'))
+            ->assertOk()
+            ->getContent();
+
+        $this->assertStringContainsString('role="radiogroup"', $html);
+        $this->assertStringContainsString('aria-labelledby="view-label"', $html);
+        $this->assertStringContainsString('role="radio" aria-checked="false"', $html);
+
+        // Classic is Coming Soon: it must not be offered as a selectable option (WS-VIEW-002).
+        $this->assertSame(1, substr_count($html, 'role="radio"'));
+
+        // The tick sits on a brand-blue circle and is a currentColor glyph under the Font
+        // Awesome icon set, so it has to be told to be white or it renders dark on blue.
+        $this->assertStringContainsString('bg-brand text-white', $html);
+    }
+
     public function test_additional_agile_workspace_can_be_created(): void
     {
         $user = $this->activeUser();

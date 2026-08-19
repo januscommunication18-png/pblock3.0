@@ -44,23 +44,32 @@
         </div>
         @error('team_size') <p class="text-[12px] text-danger mt-1.5">{{ $message }}</p> @enderror
 
-        <label class="block text-[13px] font-medium text-ink mb-1.5 mt-6">Choose your view <span class="text-danger">*</span></label>
+        {{-- "Choose your view" is a radio group, so it says so.
+
+             It used to be a row of plain <button>s whose selected state existed only as classes
+             the script rewrote: nothing announced the group, nothing announced which option was
+             chosen, and arrow keys did nothing. The state now lives in `aria-checked` — one
+             attribute that the accessibility tree and the stylesheet both read, so the two
+             cannot disagree about which view is selected. --}}
+        <label id="view-label" class="block text-[13px] font-medium text-ink mb-1.5 mt-6">Choose your view <span class="text-danger">*</span></label>
         <input type="hidden" name="view_type" id="view_type" value="{{ old('view_type') }}" />
-        <div id="view-list" class="grid sm:grid-cols-2 gap-3">
+        <div id="view-list" role="radiogroup" aria-labelledby="view-label" class="grid sm:grid-cols-2 gap-3">
           @php
             $viewIcons = ['classic' => 'M4 6h16M4 12h16M4 18h10', 'agile' => 'M13 2L4.5 13H11l-1 9 8.5-11H12l1-9z'];
           @endphp
           @foreach ($views as $key => $view)
             @php $available = $view['available'] && ($key !== 'classic' || $classicEnabled); @endphp
             @if ($available)
-              <button type="button" data-view="{{ $key }}"
-                class="view-card w-full flex items-start gap-3 p-4 rounded-lg border text-left border-stroke hover:bg-hover">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" class="mt-0.5 shrink-0 text-sub view-icon"><path d="{{ $viewIcons[$key] ?? '' }}" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <button type="button" data-view="{{ $key }}" role="radio" aria-checked="false"
+                class="_moretogether-viewcard view-card w-full flex items-start gap-3 p-4 rounded-lg border border-stroke text-left hover:bg-hover">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" class="_moretogether-viewcard__icon mt-0.5 shrink-0"><path d="{{ $viewIcons[$key] ?? '' }}" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 <div class="min-w-0">
-                  <div class="text-[14px] font-medium text-ink view-title">{{ $view['label'] }}</div>
+                  <div class="_moretogether-viewcard__title text-[14px] font-medium">{{ $view['label'] }}</div>
                   <div class="text-[12px] text-sub mt-0.5">{{ $view['description'] }}</div>
                 </div>
-                <span class="view-check ml-auto h-5 w-5 rounded-full bg-brand grid place-items-center shrink-0 hidden">{!! pb_icon('check-on-brand', 11) !!}</span>
+                {{-- `text-white`, because under the Font Awesome icon set this tick is a glyph
+                     inheriting currentColor — without it, a dark check on a brand-blue circle. --}}
+                <span class="_moretogether-viewcard__check ml-auto h-5 w-5 rounded-full bg-brand text-white grid place-items-center shrink-0">{!! pb_icon('check-thin', 11) !!}</span>
               </button>
             @else
               {{-- Classic — Coming Soon: visible but disabled, never selectable (WS-VIEW-002) --}}
@@ -79,49 +88,24 @@
         </div>
         @error('view_type') <p class="text-[12px] text-danger mt-1.5">{{ $message }}</p> @enderror
 
-        {{-- Enable apps (multi-select). Projects is on today; the rest are Coming Soon. --}}
+        {{-- Enable apps (multi-select) — ONE copy, from the shared partial.
+
+             There used to be a second, hard-coded copy of this section below it, left behind
+             when the partial was extracted. It was not merely a repeat: it rendered every
+             available app as a locked "Default" with a hidden apps[] input, so Wiki and Help
+             Desk were submitted as on whatever the real checkboxes above said. --}}
         <label class="block text-[13px] font-medium text-ink mb-1.5 mt-6">Enable apps <span class="text-danger">*</span></label>
         <p class="text-[12px] text-sub mb-3">Choose what this workspace can do. You can turn more on later as they launch.</p>
         @include('partials.workspace-apps')
-        @error('view_type') <p class="text-[12px] text-danger mt-1.5">{{ $message }}</p> @enderror
-
-        {{-- Enable apps (multi-select). Projects is on today; the rest are Coming Soon. --}}
-        <label class="block text-[13px] font-medium text-ink mb-1.5 mt-6">Enable apps <span class="text-danger">*</span></label>
-        <p class="text-[12px] text-sub mb-3">Choose what this workspace can do. You can turn more on later as they launch.</p>
-        <div class="grid gap-3">
-          @foreach (config('workspace.apps') as $appKey => $app)
-            @if ($app['available'])
-              <div class="w-full flex items-start gap-3 p-4 rounded-lg border border-brand/40 bg-sel/40 text-left cursor-default" title="Projects is the default app and can’t be turned off">
-                <span class="mt-0.5 h-5 w-5 rounded-md bg-brand grid place-items-center shrink-0">{!! pb_icon('check-on-brand', 12) !!}</span>
-                <div class="min-w-0">
-                  <div class="flex items-center gap-2">
-                    <span class="text-[14px] font-semibold text-head">{{ $app['label'] }}</span>
-                    <span class="text-[10px] uppercase tracking-wide bg-brand/10 text-brand rounded px-1.5 py-0.5">Default</span>
-                  </div>
-                  <div class="text-[12px] text-sub mt-0.5">{{ $app['description'] }}</div>
-                </div>
-                <span role="img" aria-label="Read only" class="ml-auto mt-0.5 shrink-0 text-faint">{!! pb_icon('lock', 14) !!}</span>
-                <input type="hidden" name="apps[]" value="{{ $appKey }}" />
-              </div>
-            @else
-              <div class="w-full flex items-start gap-3 p-4 rounded-lg border border-dashed border-stroke bg-hover/40 text-left opacity-70 cursor-not-allowed select-none" aria-disabled="true">
-                <span class="mt-0.5 h-5 w-5 rounded-md border border-line shrink-0"></span>
-                <div class="min-w-0">
-                  <div class="flex items-center gap-2">
-                    <span class="text-[14px] font-medium text-sub">{{ $app['label'] }}</span>
-                    <span class="text-[10px] uppercase tracking-wide bg-amber-100 text-amber-700 rounded px-1.5 py-0.5">Coming soon</span>
-                  </div>
-                  <div class="text-[12px] text-faint mt-0.5">{{ $app['description'] }}</div>
-                </div>
-              </div>
-            @endif
-          @endforeach
-        </div>
 
         <div class="flex items-center gap-3 mt-8">
           <button id="create" type="submit" disabled class="h-10 px-5 rounded-md text-[14px] font-semibold bg-hover text-faint cursor-not-allowed transition-colors">Create workspace</button>
           <a href="{{ route('welcome') }}" class="h-10 px-5 grid place-items-center rounded-md border border-stroke text-[14px] font-semibold text-ink hover:bg-hover">Go back</a>
         </div>
+        {{-- Why the button is off. It waits for the four required fields, which is right — but a
+             disabled control with no reason beside it reads as a broken page rather than as an
+             unfinished form. --}}
+        <p id="create-hint" class="text-[12px] text-sub mt-2"></p>
       </form>
     </div>
   </main>
@@ -133,32 +117,75 @@
       var sizeEl = document.getElementById('team_size');
       var viewEl = document.getElementById('view_type');
       var create = document.getElementById('create');
+      var hint = document.getElementById('create-hint');
       var slugTouched = {{ old('slug') ? 'true' : 'false' }};
 
       function gate() {
-        var ok = nameEl.value.trim().length > 0 && slugEl.value.trim().length > 0 && !!sizeEl.value && !!viewEl.value;
+        // Named one by one so the hint can say WHICH one is still missing. "Fill in the
+        // required fields" on a form this long is a hint that makes the reader hunt.
+        var missing = [];
+        if (!nameEl.value.trim()) missing.push('a name');
+        if (!slugEl.value.trim()) missing.push('a URL');
+        if (!sizeEl.value) missing.push('a team size');
+        if (!viewEl.value) missing.push('a view');
+
+        var ok = missing.length === 0;
         create.disabled = !ok;
         create.className = 'h-10 px-5 rounded-md text-[14px] font-semibold transition-colors ' +
           (ok ? 'bg-brand hover:bg-brand-dark text-white cursor-pointer' : 'bg-hover text-faint cursor-not-allowed');
+        hint.textContent = ok ? '' : 'Still needed: ' + missing.join(', ') + '.';
       }
       function slugify(v) { return v.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
       nameEl.addEventListener('input', function () { if (!slugTouched) slugEl.value = slugify(nameEl.value); gate(); });
       slugEl.addEventListener('input', function () { slugTouched = true; slugEl.value = slugify(slugEl.value); gate(); });
 
-      // View selection (only available cards are selectable)
+      /*
+       * View selection — a radio group (only available cards are selectable).
+       *
+       * The whole visual state is one attribute: `aria-checked`. The stylesheet paints from it
+       * (see ._moretogether-viewcard in styles.css), so what a screen reader announces and what
+       * the eye sees are the same fact rather than two copies of it that can drift.
+       *
+       * `tabindex` is roving, which is what makes a radio group behave like one: the group is a
+       * single tab stop and the arrow keys move within it.
+       */
+      var viewCards = Array.prototype.slice.call(document.querySelectorAll('#view-list .view-card'));
+
       function paintViews() {
-        document.querySelectorAll('#view-list .view-card').forEach(function (card) {
+        var anySelected = false;
+        viewCards.forEach(function (card) {
           var sel = card.getAttribute('data-view') === viewEl.value;
-          card.className = 'view-card w-full flex items-start gap-3 p-4 rounded-lg border text-left ' +
-            (sel ? 'border-brand ring-1 ring-brand' : 'border-stroke hover:bg-hover');
-          card.querySelector('.view-title').className = 'text-[14px] font-medium view-title ' + (sel ? 'text-brand' : 'text-ink');
-          card.querySelector('.view-icon').classList.toggle('text-brand', sel);
-          card.querySelector('.view-icon').classList.toggle('text-sub', !sel);
-          card.querySelector('.view-check').classList.toggle('hidden', !sel);
+          card.setAttribute('aria-checked', sel ? 'true' : 'false');
+          card.tabIndex = sel ? 0 : -1;
+          if (sel) anySelected = true;
         });
+        // Nothing chosen yet: the first option holds the tab stop, or the group would be
+        // unreachable by keyboard entirely.
+        if (!anySelected && viewCards.length) viewCards[0].tabIndex = 0;
       }
-      document.querySelectorAll('#view-list .view-card').forEach(function (card) {
-        card.addEventListener('click', function () { viewEl.value = card.getAttribute('data-view'); paintViews(); gate(); });
+
+      function selectView(card) {
+        viewEl.value = card.getAttribute('data-view');
+        paintViews();
+        gate();
+      }
+
+      viewCards.forEach(function (card, i) {
+        card.addEventListener('click', function () { selectView(card); });
+        card.addEventListener('keydown', function (e) {
+          // Arrows move AND select, which is how a radio group behaves; Space picks the one
+          // you are on. Enter is left to the form.
+          var step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+          if (step) {
+            e.preventDefault();
+            var next = viewCards[(i + step + viewCards.length) % viewCards.length];
+            selectView(next);
+            next.focus();
+          } else if (e.key === ' ' || e.key === 'Spacebar') {
+            e.preventDefault();
+            selectView(card);
+          }
+        });
       });
 
       // Range combobox

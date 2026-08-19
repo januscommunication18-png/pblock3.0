@@ -415,6 +415,90 @@
         '<div class="mt-4 flex justify-center"><slot/></div></div>'
     });
 
+    /* A free-text multi-value field: type a value, press Enter or comma, get a removable chip.
+       ------------------------------------------------------------------
+       For fields where the set of valid answers belongs to the reader rather than to us — a
+       space's types, for instance. <pb-combo> is the opposite tool: it offers a list somebody
+       chose in advance. Both exist because "pick one of these" and "tell us yours" are
+       different questions, and a dropdown asked to do the second becomes a list nobody's
+       answer is on.
+
+       `suggestions` are offered as one-press chips and nothing more. They keep the common
+       spellings consistent across rows without making them the only allowed answers.
+
+       Committing on BLUR as well as on Enter is deliberate: text left in the box when somebody
+       reaches for Save is a value they typed and meant, and silently dropping it is the
+       classic way a tag field loses work. */
+    app.component('pb-tags', {
+      props: {
+        modelValue: { type: Array, default: function () { return []; } },
+        suggestions: { type: Array, default: function () { return []; } },
+        placeholder: { type: String, default: 'Type a value and press Enter' },
+        max: { type: Number, default: 8 },
+        maxLength: { type: Number, default: 40 }
+      },
+      emits: ['update:modelValue'],
+      data: function () { return { draft: '' }; },
+      computed: {
+        values: function () { return this.modelValue || []; },
+        full: function () { return this.values.length >= this.max; },
+        // Only the ones not already chosen — offering a chip that does nothing is a dead control.
+        offered: function () {
+          var lower = this.values.map(function (v) { return String(v).toLowerCase(); });
+          return this.suggestions.filter(function (s) {
+            return lower.indexOf(String(s).toLowerCase()) === -1;
+          });
+        }
+      },
+      methods: {
+        add: function (raw) {
+          var self = this;
+          // A pasted "a, b, c" is three values, not one — splitting here means paste behaves
+          // the same way typing does.
+          String(raw).split(',').forEach(function (part) {
+            var value = part.replace(/\s+/g, ' ').trim().slice(0, self.maxLength);
+            if (!value || self.full) return;
+            var exists = self.values.some(function (v) {
+              return String(v).toLowerCase() === value.toLowerCase();
+            });
+            if (!exists) self.$emit('update:modelValue', self.values.concat([value]));
+          });
+          this.draft = '';
+        },
+        remove: function (index) {
+          var next = this.values.slice();
+          next.splice(index, 1);
+          this.$emit('update:modelValue', next);
+        },
+        onKey: function (e) {
+          if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); this.add(this.draft); return; }
+          // Backspace on an empty box takes the last chip back, which is what every tag field
+          // does and what fingers expect.
+          if (e.key === 'Backspace' && !this.draft && this.values.length) this.remove(this.values.length - 1);
+        },
+        commit: function () { if (this.draft.trim()) this.add(this.draft); }
+      },
+      template:
+        '<div>' +
+        '<div class="pb-input _moretogether-tags" @click="$refs.box.focus()">' +
+        '<span v-for="(v, i) in values" :key="v" class="_moretogether-tag">' +
+        '<span>{{ v }}</span>' +
+        '<button type="button" class="_moretogether-tag__x" :aria-label="\'Remove \' + v" ' +
+        'data-tip="Remove" @click.stop="remove(i)">' + wiIcon('xmark', 11) + '</button>' +
+        '</span>' +
+        '<input ref="box" v-model="draft" class="_moretogether-tags__field" ' +
+        ':placeholder="values.length ? \'\' : placeholder" :disabled="full" ' +
+        '@keydown="onKey" @blur="commit"/>' +
+        '</div>' +
+        '<div v-if="offered.length && !full" class="mt-2 flex flex-wrap gap-1.5">' +
+        '<button type="button" v-for="s in offered" :key="s" ' +
+        'class="h-6 px-2 rounded-full border border-line text-[12px] text-sub hover:bg-hover hover:text-ink" ' +
+        '@click="add(s)">+ {{ s }}</button>' +
+        '</div>' +
+        '<p v-if="full" class="text-[12px] text-faint mt-1.5">That is the most this field holds.</p>' +
+        '</div>'
+    });
+
     // Section title + description block.
     app.component('pb-section-head', {
       props: { title: String, desc: String },

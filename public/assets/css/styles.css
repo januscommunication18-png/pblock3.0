@@ -328,3 +328,237 @@ input[type="color"].pb-color-input::-moz-color-swatch { border: 1px solid #d1d5d
   outline-offset: -2px;
 }
 .pb-drag-ghost > .pb-wiki-row > * { opacity: 0.35; }
+
+/* ------------------------------------------------------------------
+   App choice cards — the "Enable apps" step on both workspace-creation
+   screens (partials/workspace-apps.blade.php)
+   ------------------------------------------------------------------
+   Hand-written rather than composed from Tailwind state variants, and for a
+   specific reason: `group-has-[:checked]:block` compiles to an unconditional
+   `display:block` in the shipped tailwind.css, and it lands after `.hidden`,
+   so the tick was painted on every card whether or not it was selected — a
+   checkbox that could not say whether it was checked.
+
+   The real <input> is `sr-only` and still carries the state, so screen readers
+   and keyboard users get an ordinary checkbox; these rules only draw it.
+   Namespaced per CLAUDE.md §14. Brand colours are literal here, as they are
+   everywhere else in this file. */
+._moretogether-appcard__box {
+  background: #fff;
+  border-color: #e5e7eb;          /* line */
+  color: transparent;             /* the tick inherits this */
+  transition: background-color .12s ease, border-color .12s ease, color .12s ease;
+}
+
+._moretogether-appcard input:checked ~ ._moretogether-appcard__box {
+  background: #1b5f8a;            /* brand */
+  border-color: #1b5f8a;
+  color: #fff;
+}
+
+/* Checked cards read as chosen at a glance, not only by the 20px box. */
+._moretogether-appcard:has(input:checked) {
+  border-color: rgba(27, 95, 138, .4);
+  background: rgba(238, 241, 244, .4);   /* sel */
+}
+
+/* The input is visually hidden, so the box has to show the focus ring for it —
+   without this, tabbing through the step lands nowhere visible. */
+._moretogether-appcard input:focus-visible ~ ._moretogether-appcard__box {
+  box-shadow: 0 0 0 2px rgba(27, 95, 138, .45);
+}
+
+/* ------------------------------------------------------------------
+   View choice cards — "Choose your view" on the workspace-creation screen
+   ------------------------------------------------------------------
+   A radio group, painted from `aria-checked` rather than from classes the
+   script rewrites. One attribute, read by the accessibility tree and by these
+   rules, so what is announced and what is drawn cannot disagree — and the
+   script that used to re-stringify five class lists on every repaint now sets
+   one attribute. */
+._moretogether-viewcard__icon { color: #6b7280; }        /* sub */
+._moretogether-viewcard__title { color: #111827; }       /* ink */
+._moretogether-viewcard__check { opacity: 0; transition: opacity .12s ease; }
+
+._moretogether-viewcard[aria-checked="true"] {
+  border-color: #1b5f8a;                                 /* brand */
+  box-shadow: 0 0 0 1px #1b5f8a;                         /* the ring, without a ring utility */
+}
+._moretogether-viewcard[aria-checked="true"] ._moretogether-viewcard__icon,
+._moretogether-viewcard[aria-checked="true"] ._moretogether-viewcard__title { color: #1b5f8a; }
+._moretogether-viewcard[aria-checked="true"] ._moretogether-viewcard__check { opacity: 1; }
+
+/* The group is one tab stop with roving tabindex, so the focused card has to
+   be obvious — otherwise arrowing through it moves an invisible cursor. */
+._moretogether-viewcard:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(27, 95, 138, .45);
+}
+._moretogether-viewcard[aria-checked="true"]:focus-visible {
+  box-shadow: 0 0 0 1px #1b5f8a, 0 0 0 4px rgba(27, 95, 138, .3);
+}
+
+/* ------------------------------------------------------------------
+   Multi-value chip field (<pb-tags>)
+   ------------------------------------------------------------------
+   A .pb-input that holds chips and a text box instead of one value, so a
+   field the reader fills in freely still looks like every other field on the
+   form. The height has to give — .pb-input is a fixed 2.75rem, and a field
+   holding six chips is two rows tall — so `height` becomes a minimum here.
+
+   Written in this file rather than as utilities for the reason the note above
+   .pb-input--compact gives: styles.css loads after tailwind.css, so a single
+   utility class loses to .pb-input every time. */
+._moretogether-tags {
+  height: auto;
+  min-height: 2.75rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.5rem;
+  cursor: text;
+}
+
+._moretogether-tags:focus-within { outline-color: #1b5f8a; }   /* brand */
+
+/* The box grows into whatever room is left on the row, so a half-typed value
+   never wraps to a line of its own mid-word. */
+._moretogether-tags__field {
+  flex: 1 1 8rem;
+  min-width: 6rem;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font-size: 14px;
+  color: #23272f;                  /* ink */
+  padding: 0.125rem 0.25rem;
+}
+._moretogether-tags__field::placeholder { color: #9ca3af; }    /* faint */
+._moretogether-tags__field:disabled { cursor: not-allowed; }
+
+._moretogether-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  max-width: 100%;
+  padding: 0 0.25rem 0 0.5rem;
+  height: 1.5rem;
+  border-radius: 9999px;
+  background: #eef1f4;             /* sel */
+  color: #23272f;                  /* ink */
+  font-size: 12px;
+  line-height: 1;
+}
+._moretogether-tag > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+._moretogether-tag__x {
+  display: inline-grid;
+  place-items: center;
+  height: 1rem;
+  width: 1rem;
+  border-radius: 9999px;
+  color: #6b7280;                  /* sub */
+  flex-shrink: 0;
+}
+._moretogether-tag__x:hover { background: rgba(0, 0, 0, .08); color: #ef4444; }  /* danger */
+._moretogether-tag__x:focus-visible { outline: 2px solid rgba(27, 95, 138, .45); outline-offset: 1px; }
+
+/* Read-only chips — the same shape without the × , for lists and headers. */
+._moretogether-tag--static { padding: 0 0.5rem; }
+
+/* ------------------------------------------------------------------
+   Icon-only row actions (edit / archive / restore)
+   ------------------------------------------------------------------
+   A 28px hit target with a tooltip, replacing the word it used to be. Icons
+   alone are only usable if they are reachable and named: every one of these
+   carries `data-tip` for the pointer and `aria-label` for everything else. */
+._moretogether-iconbtn {
+  display: inline-grid;
+  place-items: center;
+  height: 1.75rem;
+  width: 1.75rem;
+  border-radius: 0.375rem;
+  color: #6b7280;                  /* sub */
+  transition: background-color .12s ease, color .12s ease;
+}
+._moretogether-iconbtn:hover { background: #f3f4f6; color: #23272f; }   /* hover / ink */
+._moretogether-iconbtn:focus-visible { outline: 2px solid rgba(27, 95, 138, .45); outline-offset: 1px; }
+._moretogether-iconbtn--danger:hover { background: rgba(239, 68, 68, .1); color: #ef4444; }
+._moretogether-iconbtn[disabled] { opacity: .5; cursor: not-allowed; }
+
+/* ------------------------------------------------------------------
+   Setup stepper (Help Desk › Continue to Setup Inbox)
+   ------------------------------------------------------------------
+   Four states in one control: the step you are on, the ones you have done
+   (clickable, so going back to change a name is one press), and the ones you
+   have not reached (disabled, because the flow will not let a required step
+   be skipped). */
+._moretogether-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  height: 1.75rem;
+  padding: 0 0.625rem;
+  border-radius: 9999px;
+  font-size: 12px;
+  color: #6b7280;                  /* sub */
+  max-width: 12rem;
+}
+._moretogether-step__n {
+  display: inline-grid;
+  place-items: center;
+  height: 1.125rem;
+  width: 1.125rem;
+  border-radius: 9999px;
+  background: #e5e7eb;             /* line */
+  color: #6b7280;
+  font-size: 11px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+._moretogether-step.is-done { color: #23272f; }                       /* ink */
+._moretogether-step.is-done ._moretogether-step__n { background: #1b5f8a; color: #fff; }
+._moretogether-step.is-current { background: #eef1f4; color: #1b5f8a; font-weight: 600; }
+._moretogether-step.is-current ._moretogether-step__n { background: #1b5f8a; color: #fff; }
+._moretogether-step:not([disabled]):hover { background: #f3f4f6; }
+._moretogether-step[disabled] { cursor: default; opacity: .55; }
+._moretogether-step:focus-visible { outline: 2px solid rgba(27, 95, 138, .45); outline-offset: 1px; }
+
+/* ------------------------------------------------------------------
+   Help Desk odds and ends that have no compiled utility
+   ------------------------------------------------------------------
+   Written here because public/assets/css/tailwind.css is a BUILT file: a class
+   that has not been compiled into it does nothing at all, silently. These are
+   the handful the Help Desk screens need — status badges at 10% tints, the
+   amber "needs attention" panel, and a wrap rule for long email addresses —
+   none of which survive as utilities today. */
+._moretogether-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 1.25rem;
+  padding: 0 0.5rem;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 600;
+  background: #f3f4f6;             /* hover */
+  color: #6b7280;                  /* sub */
+}
+._moretogether-badge--ok { background: rgba(16, 185, 129, .12); color: #059669; }
+._moretogether-badge--wait { background: rgba(27, 95, 138, .1); color: #1b5f8a; }
+._moretogether-badge--error { background: rgba(239, 68, 68, .1); color: #ef4444; }
+._moretogether-badge--off { background: #f3f4f6; color: #9ca3af; }
+
+/* A panel for something that needs attention but is not an error — an inbox
+   nobody has filed, a forward nobody has set up. */
+._moretogether-notice {
+  border: 1px solid rgba(217, 119, 6, .4);
+  background: rgba(217, 119, 6, .06);
+  border-radius: 0.75rem;
+}
+
+/* Email addresses are long, unspaced and have to fit a column. */
+._moretogether-break { overflow-wrap: anywhere; word-break: break-word; }
+
+/* A stack with room to breathe, for the long single-column forms. */
+._moretogether-stack > * + * { margin-top: 1.5rem; }

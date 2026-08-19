@@ -5,7 +5,12 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Help Desk enablement (docs/features/help-desk.md, FR-1.1).
+ * Help Desk enablement (legacy/help-desk/docs/help-desk.md, FR-1.1).
+ *
+ * DELIBERATELY still active while the rest of that module sits in legacy/help-desk: this adds a
+ * column to `workspace_settings`, which is a workspace table. WorkspaceApps reads it and the
+ * workspace-creation form offers it, so removing it would break a feature that has nothing to do
+ * with the Help Center.
  *
  * One boolean beside the other app flags, because that is what an app being switched on IS in
  * this codebase — `WorkspaceApps` maps an app key to its column, and the create form, Settings

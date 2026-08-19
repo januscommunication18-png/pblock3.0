@@ -12,7 +12,10 @@
     @if ($app['available'] && $isDefault)
       {{-- Projects: what a workspace IS, so it is shown but not offered (WIKI-D3). --}}
       <div class="w-full flex items-start gap-3 p-4 rounded-lg border border-brand/40 bg-sel/40 text-left cursor-default" title="Projects is the default app and can’t be turned off">
-        <span class="mt-0.5 h-5 w-5 rounded-md bg-brand grid place-items-center shrink-0">{!! pb_icon('check-on-brand', 12) !!}</span>
+        {{-- `text-white` is explicit: under the Font Awesome icon set the tick is a glyph that
+             inherits currentColor, so without it a dark check sits on the brand-blue box. The
+             legacy SVG hard-codes white and is unaffected either way. --}}
+        <span class="mt-0.5 h-5 w-5 rounded-md bg-brand text-white grid place-items-center shrink-0">{!! pb_icon('check-thin', 12) !!}</span>
         <div class="min-w-0">
           <div class="flex items-center gap-2">
             <span class="text-[14px] font-semibold text-head">{{ $app['label'] }}</span>
@@ -26,13 +29,21 @@
 
     @elseif ($app['available'])
       {{-- A real choice. Until Wiki shipped, `apps[]` was submitted and no controller read it,
-           so this whole step looked like a decision and changed nothing. --}}
-      <label class="group w-full flex items-start gap-3 p-4 rounded-lg border border-stroke text-left cursor-pointer hover:bg-hover has-[:checked]:border-brand/40 has-[:checked]:bg-sel/40">
-        <input type="checkbox" name="apps[]" value="{{ $appKey }}" class="sr-only peer" @checked($wasChosen) />
-        <span class="mt-0.5 h-5 w-5 rounded-md border border-line grid place-items-center shrink-0 peer-checked:bg-brand peer-checked:border-brand">
-          {{-- `group-has-`, not `peer-checked:` — this sits a level below the input, and
-               peer variants only reach siblings. --}}
-          <span class="hidden group-has-[:checked]:block">{!! pb_icon('check-on-brand', 12) !!}</span>
+           so this whole step looked like a decision and changed nothing.
+
+           The checked/unchecked appearance is driven by `_moretogether-appcard*` in styles.css
+           rather than by Tailwind's `peer-checked:` and `group-has-[:checked]:` variants. Those
+           were what this used to do, and one of them does not survive the build: the shipped
+           tailwind.css compiles `group-has-[:checked]:block` to an unconditional
+           `display:block`, which sits AFTER `.hidden` in the file — so the tick was drawn on
+           every card, ticked or not, and the control said nothing about its own state. State
+           this load-bearing does not belong in a utility that can be silently dropped by a
+           rebuild (CLAUDE.md §14 is the escape hatch, and this is what it is for). --}}
+      <label class="_moretogether-appcard w-full flex items-start gap-3 p-4 rounded-lg border border-stroke text-left cursor-pointer hover:bg-hover">
+        <input type="checkbox" name="apps[]" value="{{ $appKey }}" class="sr-only" @checked($wasChosen) />
+        <span class="_moretogether-appcard__box mt-0.5 h-5 w-5 rounded-md border grid place-items-center shrink-0">
+          {{-- Inherits the box's colour, so one rule decides both the fill and the tick. --}}
+          <span class="_moretogether-appcard__tick grid place-items-center">{!! pb_icon('check-thin', 12) !!}</span>
         </span>
         <span class="min-w-0">
           <span class="block text-[14px] font-semibold text-head">{{ $app['label'] }}</span>

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Events\WorkspaceInvitationAccepted;
 use App\Models\OnboardingProfile;
 use App\Models\User;
 use App\Models\Workspace;
@@ -66,6 +67,10 @@ class WorkspaceInvitationAccepter
                     'accepted_at' => $invitation->accepted_at ?? now(),
                     'user_id' => $user->id,
                 ])->save();
+
+                // Only when this call is what retired the invitation — a repeat click on an
+                // already-accepted link must not fire the side effects a second time.
+                WorkspaceInvitationAccepted::dispatch($invitation, $user, $workspace, $existing);
             }
 
             return ['ok' => true, 'workspace' => $workspace, 'membership' => $existing];
@@ -123,6 +128,13 @@ class WorkspaceInvitationAccepter
         }
 
         $this->settleUser($user, $workspace);
+
+        /*
+         * Anything that is not the workspace itself reacts here rather than being called from
+         * inside this service (CLAUDE.md §6). The Help Desk's listener is what turns an invited
+         * coworker into a Help Desk member (FR-1.5); this flow does not have to know that.
+         */
+        WorkspaceInvitationAccepted::dispatch($invitation, $user, $workspace, $membership);
 
         Log::info('workspace.invitation.accepted', [
             'invitation_id' => $invitation->id,

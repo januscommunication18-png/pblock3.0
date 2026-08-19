@@ -51,8 +51,13 @@ return [
             'description' => 'Create internal documentation, knowledge bases, guides, policies, SOPs, and shared team knowledge.',
             'available' => true,
         ],
+        /*
+         * The KEY stays `helpdesk` and its flag stays `help_desk_enabled` (HC-D2): both carry
+         * live data, and renaming them would be a migration over production rows to change a
+         * string nobody sees. The label is what people read, and it says Help Center.
+         */
         'helpdesk' => [
-            'label' => 'Help Desk',
+            'label' => 'Help Center',
             'description' => 'Manage customer support requests, tickets, conversations, assignments, SLAs, and resolution workflows.',
             'available' => true,
         ],

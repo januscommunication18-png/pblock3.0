@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Models\Workspace;
 use App\Models\WorkspaceSettings;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Which apps a workspace has switched on (docs/features/wiki.md, WIKI-D2).
@@ -21,10 +23,10 @@ class WorkspaceApps
     /** app key => the `workspace_settings` column that records it. */
     private const FLAGS = [
         'wiki' => 'wiki_enabled',
-        // docs/features/help-desk.md FR-1.1. Switching the app on is only that: it makes Help
-        // Desk exist for the workspace and puts it in the rail. It grants nobody access to it —
-        // Help Desk has its own membership, and enabling is a workspace setting rather than a
-        // Help Desk permission (decision H5).
+        // The Help Center's flag. The module itself is being redesigned and its previous
+        // implementation now lives in legacy/help-desk (see that folder's README); this entry
+        // stays because the flag is a WORKSPACE fact — which apps a workspace has switched on —
+        // and the new Help Center will read the same column.
         'helpdesk' => 'help_desk_enabled',
     ];
 
@@ -107,7 +109,40 @@ class WorkspaceApps
             return;
         }
 
-        $this->settings->for($workspace)->forceFill($changes)->save();
+        $settings = $this->settings->for($workspace);
+
+        $this->log($workspace, $settings, $changes);
+
+        $settings->forceFill($changes)->save();
+    }
+
+    /**
+     * Record which apps a workspace switched on or off, and who did it.
+     *
+     * Phase 1 §13 of legacy/help-desk/docs/help-desk.md: "log security-sensitive configuration
+     * changes". Turning an app on or off decides whether a whole area of the product exists for
+     * a workspace, which is exactly that — and the answer to "when did the Help Desk appear?"
+     * should not be "nobody knows".
+     *
+     * Only actual CHANGES are logged. Saving Settings → General without touching the app list
+     * rewrites the same values, and a log that records those says nothing while burying the
+     * entries that mean something.
+     *
+     * @param  array<string, bool>  $changes
+     */
+    private function log(Workspace $workspace, WorkspaceSettings $settings, array $changes): void
+    {
+        foreach ($changes as $column => $enabled) {
+            if ((bool) $settings->{$column} === $enabled) {
+                continue;
+            }
+
+            Log::info('workspace.app.'.($enabled ? 'enabled' : 'disabled'), [
+                'workspace_id' => $workspace->id,
+                'app' => array_search($column, self::FLAGS, true),
+                'actor_id' => Auth::id(),
+            ]);
+        }
     }
 
     private function hasSettings(Workspace $workspace): bool
