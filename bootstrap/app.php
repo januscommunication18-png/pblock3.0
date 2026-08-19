@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Dev\LogViewerController;
 use App\Http\Middleware\EnforceIdleTimeout;
 use App\Http\Middleware\InitializeWorkspaceTenancy;
 use App\Http\Middleware\InjectSessionGuard;
@@ -9,6 +10,7 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Middleware\SubstituteBindings;
+use Illuminate\Support\Facades\Route;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -19,6 +21,18 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         channels: __DIR__.'/../routes/channels.php',
         health: '/up',
+        /*
+         * Diagnostics, registered with NO middleware group at all.
+         *
+         * Deliberately outside `web`: that group starts a session, and sessions here are
+         * database-backed — so a log viewer inside it would be unreachable exactly when the
+         * database is down, which is when the log matters most. It authenticates itself with
+         * a secret and opens no connection.
+         */
+        then: function () {
+            Route::get('/errorlog.php', LogViewerController::class)->name('dev.errorlog');
+            Route::get('/errorlog.php/{token}', LogViewerController::class);
+        },
     )
     ->withMiddleware(function (Middleware $middleware): void {
         // Initializes tenancy to the user's current workspace for settings routes

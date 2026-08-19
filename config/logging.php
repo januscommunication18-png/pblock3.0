@@ -9,6 +9,22 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Log viewer secret
+    |--------------------------------------------------------------------------
+    | Guards the over-HTTP log reader at /errorlog.php. Compared in constant time
+    | against a token in the URL.
+    |
+    | EMPTY MEANS THE ROUTE 404s. That is deliberate: the log holds email
+    | addresses, SQL with live values, tokens and stack traces, and a viewer that
+    | defaulted to open on a public domain would hand all of it to anyone who
+    | guessed the path.
+    */
+
+    'viewer_secret' => env('LOG_VIEWER_SECRET', ''),
+
+
+    /*
+    |--------------------------------------------------------------------------
     | Default Log Channel
     |--------------------------------------------------------------------------
     |
