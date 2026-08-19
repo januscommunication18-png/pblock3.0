@@ -74,6 +74,24 @@ return [
             'ignore_exceptions' => false,
         ],
 
+        /*
+         * LaraBug (https://larabug.com), which reports through a Monolog driver rather than
+         * the exception handler — so every unhandled exception is forwarded without touching
+         * application code.
+         *
+         * Defined but NOT in the stack. Adding a channel to `LOG_STACK` before
+         * `larabug/larabug` is installed breaks logging outright, because the `larabug` driver
+         * would not be registered; with the package present it is one .env change:
+         *
+         *     LOG_STACK=single,larabug
+         *
+         * `single` stays first on purpose: local file logging must keep working even when
+         * LaraBug is unreachable or its keys are wrong.
+         */
+        'larabug' => [
+            'driver' => 'larabug',
+        ],
+
         'single' => [
             'driver' => 'single',
             'path' => storage_path('logs/laravel.log'),

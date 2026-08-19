@@ -562,3 +562,22 @@ input[type="color"].pb-color-input::-moz-color-swatch { border: 1px solid #d1d5d
 
 /* A stack with room to breathe, for the long single-column forms. */
 ._moretogether-stack > * + * { margin-top: 1.5rem; }
+
+/* The inbound test's loading indicator (docs/features/help-center.md, P7). A test can run for
+   two minutes, so the card needs something that visibly keeps moving rather than a static
+   "please wait". */
+._moretogether-spinner {
+  display: inline-block;
+  width: 13px; height: 13px;
+  border: 2px solid #d1d5db;          /* stroke */
+  border-top-color: #1b5f8a;          /* brand */
+  border-radius: 50%;
+  animation: _moretogether-spin .7s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes _moretogether-spin { to { transform: rotate(360deg); } }
+
+/* Respect a reduced-motion preference: keep the ring, drop the rotation. */
+@media (prefers-reduced-motion: reduce) {
+  ._moretogether-spinner { animation: none; }
+}

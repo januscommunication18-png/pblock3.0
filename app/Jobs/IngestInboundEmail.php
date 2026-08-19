@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Services\HelpCenter\Inbound\InboundIngestor;
 use App\Services\HelpCenter\Inbound\InboundRouter;
+use App\Services\HelpCenter\Inbound\InboundTestRunner;
 use App\Services\HelpCenter\Inbound\PostmarkPayload;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -31,8 +32,11 @@ class IngestInboundEmail implements ShouldQueue
     /** @param  array<string, mixed>  $payload */
     public function __construct(private readonly array $payload) {}
 
-    public function handle(InboundRouter $router, InboundIngestor $ingestor): void
-    {
+    public function handle(
+        InboundRouter $router,
+        InboundIngestor $ingestor,
+        InboundTestRunner $tests,
+    ): void {
         $payload = PostmarkPayload::from($this->payload);
 
         $inbox = $router->resolve($payload->routableAddresses());
@@ -69,7 +73,22 @@ class IngestInboundEmail implements ShouldQueue
             return;
         }
 
-        $workspace->run(function () use ($ingestor, $inbox, $payload) {
+        $workspace->run(function () use ($ingestor, $tests, $inbox, $payload) {
+            /*
+             * A returning TEST probe completes its test and stops there (P7).
+             *
+             * Deliberately not also ingested: the probe is a message we sent to ourselves, and
+             * turning it into a conversation would put a fake customer at the top of the
+             * Unassigned queue every time somebody checked their configuration.
+             */
+            $test = $tests->match($payload);
+
+            if ($test !== null) {
+                $tests->pass($test, $payload);
+
+                return;
+            }
+
             $conversation = $ingestor->ingest($inbox, $payload);
 
             if ($conversation !== null) {

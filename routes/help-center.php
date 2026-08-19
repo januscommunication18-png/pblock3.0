@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\HelpCenter\EmailAddressController;
 use App\Http\Controllers\HelpCenter\HelpCenterController;
+use App\Http\Controllers\HelpCenter\InboundTestController;
 use App\Http\Controllers\HelpCenter\InboxController;
 use App\Http\Controllers\HelpCenter\SetupController;
 use App\Http\Controllers\HelpCenter\SpaceController;
@@ -86,6 +87,16 @@ Route::middleware(['auth', 'workspace.tenancy'])
 
         Route::get('/spaces/{space}', [SpaceController::class, 'show'])
             ->whereNumber('space')->name('spaces.show');
+
+        // The Space Overview's inbound test (P7): start one, and poll the latest.
+        Route::post('/spaces/{space}/inbound-test', [InboundTestController::class, 'store'])
+            ->whereNumber('space')->name('spaces.inbound-test.store');
+        Route::get('/spaces/{space}/inbound-test', [InboundTestController::class, 'show'])
+            ->whereNumber('space')->name('spaces.inbound-test.show');
+
+        // Edit an existing Space — an UPDATE against this id only (P3 §5, §26).
+        Route::patch('/spaces/{space}', [SpaceController::class, 'update'])
+            ->whereNumber('space')->name('spaces.update');
 
         // Archive is reversible and touches only this Space; delete takes everything under it.
         Route::patch('/spaces/{space}/archive', [SpaceController::class, 'archive'])

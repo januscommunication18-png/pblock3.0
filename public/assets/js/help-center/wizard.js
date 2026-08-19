@@ -293,6 +293,36 @@ PB.boot('help-center-setup', {
       if (!this.canContinue) return;
       if (this.step === 6) return this.create();
 
+      /*
+       * Commit anything typed into a row form but not yet "Add"-ed.
+       *
+       * Steps 2 and 3 both build a LIST from a small form, and the payload only ever carried
+       * the list. So typing an address, then pressing Continue instead of Add, silently threw
+       * it away — the Inbox was created with no customer-facing address at all, and the first
+       * sign of it was the inbound test having nothing to send to.
+       *
+       * Adding it here rather than warning: the user has typed the thing and asked to move on,
+       * and that is not ambiguous. A validation failure still stops the step, so a bad address
+       * surfaces its error instead of being swallowed.
+       */
+      if (this.step === 3 && String(this.addressForm.email || '').trim()) {
+        await this.addAddress();
+
+        if (this.addressError) return;
+      }
+
+      if (this.step === 2 && String(this.memberForm.email || '').trim()) {
+        if (!this.memberForm.role) {
+          this.memberError = 'Choose a role for this coworker, or clear the field to continue.';
+
+          return;
+        }
+
+        this.addMember();
+
+        if (this.memberError) return;
+      }
+
       this.saving = true;
       this.errors = {};
 

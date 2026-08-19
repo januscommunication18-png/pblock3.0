@@ -22,11 +22,27 @@
       <span class="_moretogether-badge _moretogether-badge--off shrink-0">Archived</span>
     @endif
     <div class="ml-auto flex items-center gap-1.5 sm:gap-2">
+      @if ($spaceEdit['can'])
+        {{-- Sibling of the dialog's Vue root, bound by id — the same pattern the sidebar's
+             create actions use, so the header does not have to know the dialog exists. --}}
+        <button type="button" id="help-center-edit-space"
+                class="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-stroke text-[13px] text-ink hover:bg-hover whitespace-nowrap">
+          {!! pb_icon('pen', 13) !!} Edit Space
+        </button>
+      @endif
       <a href="{{ route('help-center.spaces.index') }}"
          class="inline-flex items-center h-8 px-3 rounded-md border border-stroke text-[13px] text-ink hover:bg-hover whitespace-nowrap">
         All Spaces
       </a>
     </div>
+
+    {{-- The dialog's root. Teleports to <body>, so it only has to exist. --}}
+    @if ($spaceEdit['can'])
+      <div id="help-center-space-edit" data-bootstrap="{{ json_encode($spaceEdit) }}"></div>
+      @push('scripts')
+        <script defer src="{{ pb_asset('assets/js/help-center/space-edit.js') }}"></script>
+      @endpush
+    @endif
   </div>
 
   {{-- The same six sections as the sidebar, as tabs — so a Space can be moved through without
@@ -80,6 +96,32 @@
         <div class="flex gap-4 px-4 py-3"><dt class="w-44 shrink-0 text-[12px] text-sub">Workflow</dt>
           <dd class="text-[13px] text-ink">{{ $space->statuses->pluck('name')->implode(' → ') ?: '—' }}</dd></div>
       </dl>
+
+      {{-- The gap that actually stops the inbound test working, called out where it is noticed
+           rather than left as a silent zero. --}}
+      @if ($inbox && $inbox->emailAddresses->isEmpty())
+        <div class="mt-6 max-w-[720px] _moretogether-notice px-4 py-3">
+          <div class="text-[13px] font-semibold text-ink">No customer-facing email address</div>
+          <p class="mt-1 text-[12px] text-sub">
+            This Inbox has no address for customers to write to, so there is nothing to forward
+            from and the inbound test cannot run. Add the address your forwarding rule sits on.
+          </p>
+          <a href="{{ route('help-center.inboxes') }}"
+             class="inline-flex items-center h-8 px-3 mt-2 rounded-md border border-stroke bg-white text-[13px] font-semibold text-ink hover:bg-hover">
+            Add email address
+          </a>
+        </div>
+      @endif
+
+      {{-- Inbound email testing (P7). Only where there is an Inbox to test through. --}}
+      @if ($inbox)
+        <div id="help-center-inbound-test" data-bootstrap="{{ json_encode($inboundTest) }}">
+          <div class="mt-6 max-w-[720px] rounded-lg border border-line px-4 py-6 text-[13px] text-sub">Loading…</div>
+        </div>
+        @push('scripts')
+          <script defer src="{{ pb_asset('assets/js/help-center/inbound-test.js') }}"></script>
+        @endpush
+      @endif
 
     {{-- ============ Conversations ============ --}}
     @elseif ($panel === 'conversations')

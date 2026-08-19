@@ -5,8 +5,11 @@ namespace App\Http\Controllers\HelpCenter;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\HelpCenter\Concerns\GuardsHelpCenter;
 use App\Http\Requests\HelpCenter\StoreSpaceRequest;
+use App\Http\Requests\HelpCenter\UpdateSpaceRequest;
+use App\Models\HelpCenterInboundTest;
 use App\Models\HelpCenterSpace;
 use App\Models\User;
+use App\Services\HelpCenter\EligibleLeads;
 use App\Services\HelpCenter\HelpCenterNavigation;
 use App\Services\HelpCenter\HelpCenterSpaceManager;
 use Illuminate\Contracts\View\View;
@@ -54,6 +57,35 @@ class SpaceController extends Controller
                     'destroy' => route('help-center.spaces.destroy', ['space' => '__ID__']),
                 ],
             ],
+        ]);
+    }
+
+    /**
+     * PATCH /help-center/spaces/{space} — edit an existing Space (P3 §5).
+     *
+     * An UPDATE against this Space's id and nothing else. P3 §26's rule cuts both ways: creating
+     * must never update an existing Space, and editing must never touch another one — which is
+     * why the id comes from the route rather than from the payload.
+     */
+    public function update(UpdateSpaceRequest $request, HelpCenterSpace $space): JsonResponse
+    {
+        $this->helpCenterWorkspace();
+        abort_unless(Auth::user()->can('update', $space), 403);
+
+        $data = $request->validated();
+
+        $space->forceFill([
+            'name' => $data['name'],
+            'description' => ($data['description'] ?? '') === '' ? null : $data['description'],
+            'types' => $data['types'],
+            'department_groups' => $data['department_groups'],
+            'lead_user_id' => $data['lead_user_id'],
+        ])->save();
+
+        return response()->json([
+            'ok' => true,
+            'space' => $space->fresh()->load('lead')->toPayload(),
+            'message' => 'Space updated.',
         ]);
     }
 
@@ -111,6 +143,72 @@ class SpaceController extends Controller
         $space->delete();
 
         return response()->json(['ok' => true, 'message' => 'Space deleted.']);
+    }
+
+    /**
+     * What the Edit Space dialog boots with (P3 §5).
+     *
+     * Current values AND the pickers, so the dialog opens filled in and needs no second request
+     * — the point of the screen is filling gaps, and a form that arrives empty while it loads
+     * invites somebody to save blanks over what is already there.
+     *
+     * @return array<string, mixed>
+     */
+    private function editPayload(HelpCenterSpace $space): array
+    {
+        $workspace = Auth::user()->currentWorkspace;
+
+        return [
+            'can' => Auth::user()->can('update', $space),
+            'space' => [
+                'name' => $space->name,
+                'description' => (string) $space->description,
+                'types' => $space->typeList(),
+                'department_groups' => $space->groupList(),
+                'lead_user_id' => $space->lead_user_id ? (string) $space->lead_user_id : '',
+            ],
+            'typeSuggestions' => array_values((array) config('help-center.space_type_suggestions')),
+            'typeMax' => (int) config('help-center.space_type_max', 8),
+            'typeMaxLength' => (int) config('help-center.space_type_max_length', 40),
+            'groupMax' => (int) config('help-center.department_group_max', 20),
+            'leads' => app(EligibleLeads::class)->options($workspace),
+            'endpoint' => route('help-center.spaces.update', $space),
+        ];
+    }
+
+    /**
+     * What the inbound test card boots with (P7).
+     *
+     * The latest attempt and the last PASSED one are both sent: a failing retry should not erase
+     * "this was verified on Tuesday", which is the fact the user actually relies on.
+     *
+     * @return array<string, mixed>
+     */
+    private function inboundTestPayload(HelpCenterSpace $space): array
+    {
+        $inbox = $space->inboxes->first();
+
+        $latest = HelpCenterInboundTest::query()
+            ->where('help_center_space_id', $space->id)->latest('id')->first();
+
+        $passed = HelpCenterInboundTest::query()
+            ->where('help_center_space_id', $space->id)
+            ->where('status', HelpCenterInboundTest::STATUS_PASSED)
+            ->latest('id')->first();
+
+        return [
+            'test' => $latest?->toPayload(),
+            'lastPassed' => $passed?->toPayload(),
+            'inboundAddress' => $inbox?->inboundAddress(),
+            'canRun' => Auth::user()->can('update', $space),
+            'endpoints' => [
+                'start' => route('help-center.spaces.inbound-test.store', $space),
+                'status' => route('help-center.spaces.inbound-test.show', $space),
+            ],
+            'urls' => [
+                'inbox' => route('help-center.spaces.section', ['space' => $space->id, 'section' => 'inbox']),
+            ],
+        ];
     }
 
     /**
@@ -212,6 +310,10 @@ class SpaceController extends Controller
             'sections' => $nav->views($space, $request),
             // The six conversation views are FILTERS here, not navigation (P4).
             'conversationViews' => (array) config('help-center.space_views'),
+            // The Overview's inbound test card (P7).
+            'inboundTest' => $this->inboundTestPayload($space),
+            // The Overview's Edit Space dialog (P3 §5).
+            'spaceEdit' => $this->editPayload($space),
         ]);
     }
 }

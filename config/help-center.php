@@ -44,6 +44,15 @@ return [
     'inbound_secret' => env('HELP_CENTER_INBOUND_SECRET', ''),
 
     /**
+     * How long an inbound test waits for its probe to come back, in seconds (P7).
+     *
+     * Two minutes: long enough for a provider's forwarding rule and Postmark to do their work,
+     * short enough that somebody watching the card is not left guessing. Evaluated on read
+     * rather than by a scheduled job, so a test cannot hang forever when the queue is down.
+     */
+    'inbound_test_timeout' => (int) env('HELP_CENTER_INBOUND_TEST_TIMEOUT', 120),
+
+    /**
      * SUGGESTIONS for the Space Type field — explicitly not a dropdown (§3, HC-D9).
      *
      * Space Type is a free-text multi-value field: a workspace types whatever it calls its own
