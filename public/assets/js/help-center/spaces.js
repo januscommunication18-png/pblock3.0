@@ -161,14 +161,19 @@ PB.boot('help-center-spaces', {
        rather than being crammed into a 48px bar. */
     '  <p class="px-5 sm:px-8 pt-5 text-[13px] text-sub max-w-[720px]">Manage the Help Desk spaces used by your teams to organize conversations, inboxes, workflows, and support members.</p>',
 
-    /* ===== Empty state ===== */
-    '  <div v-if="!spaces.length" class="px-5 sm:px-8 py-6">',
-    '    <div class="rounded-xl border border-line px-6 py-14 text-center max-w-[720px]">',
-    '      <div class="mx-auto h-10 w-10 rounded-lg bg-hover grid place-items-center text-sub" v-html="icon(\'rectangles-pair\', 18)"></div>',
-    '      <h2 class="mt-3 text-[15px] font-semibold text-head">No spaces yet</h2>',
-    '      <p class="mt-1 text-[13px] text-sub leading-relaxed max-w-[420px] mx-auto">Create a Help Desk space to organize your support team, conversations, inbox, and workflow.</p>',
-    '      <a v-if="canCreate" :href="urls.setup" class="inline-flex items-center h-9 px-4 mt-5 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold">Create Space</a>',
-    '    </div>',
+    /* ===== Empty state =====
+       The module's page-level empty state, not a card: Inbox (`mt-10 mx-auto max-w-[440px]
+       text-center`) and Overview (`mt-12 mx-auto max-w-[460px]`) both draw a centred,
+       BORDERLESS block — 48px tinted glyph, 15px heading, 13px body, then the action.
+
+       Spaces used to be the exception: a bordered `max-w-[720px]` card pinned to the left of
+       an otherwise empty screen, which read as a widget that had failed to fill its row rather
+       than as "there is nothing here yet". Same content, same wording — only the frame goes. */
+    '  <div v-if="!spaces.length" class="mt-10 mx-auto max-w-[440px] text-center px-5 sm:px-8">',
+    '    <span class="mx-auto h-12 w-12 rounded-xl bg-hover grid place-items-center text-sub" v-html="icon(\'rectangles-pair\', 22)"></span>',
+    '    <h2 class="mt-4 text-[15px] font-semibold text-head">No spaces yet</h2>',
+    '    <p class="mt-1.5 text-[13px] text-sub leading-relaxed">Create a Help Desk space to organize your support team, conversations, inbox, and workflow.</p>',
+    '    <a v-if="canCreate" :href="urls.setup" class="inline-flex items-center h-9 px-4 mt-5 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold">Create Space</a>',
     '  </div>',
 
     /* ===== Card grid — the Projects grid, one card per Space ===== */

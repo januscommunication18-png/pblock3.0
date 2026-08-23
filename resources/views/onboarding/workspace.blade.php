@@ -59,10 +59,19 @@
         <p class="text-[12px] text-sub mb-3">Choose what this workspace can do. You can turn more on later as they launch.</p>
         @include('partials.workspace-apps')
 
+        {{-- The tenant subdomain (P72), shown only once a customer-facing app is on. --}}
+        @include('partials.workspace-subdomain')
+
         <button id="continue" type="submit" disabled class="mt-7 w-full h-11 rounded-lg text-[14px] font-semibold bg-hover text-faint cursor-not-allowed transition-colors">Create workspace</button>
       </form>
     </div>
   </main>
+
+  {{-- Loaded DEFERRED and before the inline block below (P72). Deferred scripts run after
+       parsing, so the inline listener for `pb:subdomain-state` is already registered by the
+       time this dispatches its first state on load — the reveal and the gate agree from the
+       first paint rather than one frame later. --}}
+  <script defer src="{{ pb_asset('assets/js/workspace-subdomain.js') }}"></script>
 
   <script>
     (function () {
@@ -86,8 +95,17 @@
           el.onclick = function () { sizeEl.value = el.getAttribute('data-size'); render(); gate(); };
         });
       }
+      /* The subdomain field reports its own state (P72); this screen folds it into the gate
+         rather than inspecting the field, so the two stay independent of each other's markup. */
+      var subdomainOk = true;
+      window.addEventListener('pb:subdomain-state', function (e) {
+        subdomainOk = !!(e.detail && e.detail.valid);
+        gate();
+      });
+
       function gate() {
-        var ok = nameEl.value.trim().length > 0 && slugEl.value.trim().length > 0 && !!sizeEl.value;
+        var ok = nameEl.value.trim().length > 0 && slugEl.value.trim().length > 0 && !!sizeEl.value
+          && subdomainOk;
         cont.disabled = !ok;
         cont.className = 'mt-7 w-full h-11 rounded-lg text-[14px] font-semibold transition-colors ' +
           (ok ? 'bg-brand hover:bg-brand-dark text-white cursor-pointer' : 'bg-hover text-faint cursor-not-allowed');

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Workspace;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Workspace\StoreWorkspaceRequest;
 use App\Models\Workspace;
+use App\Services\TenantSubdomain;
 use App\Services\WorkspaceCreator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -51,6 +52,37 @@ class CreateWorkspaceController extends Controller
     }
 
     /** GET /workspaces/slug-available?slug=... — live availability check (WS-005). */
+    /**
+     * GET /workspaces/subdomain-available?subdomain= — the live check (P72).
+     *
+     * "The system should validate availability in real time and again on form submission." This
+     * is the first half; `WorkspaceFormRequest` is the second, and both run the same
+     * `TenantSubdomain` rules so a name this calls free cannot be refused on submit for a
+     * different reason.
+     *
+     * It answers with the NORMALIZED name as well as the verdict, because the two can differ:
+     * somebody typing `Acme Inc` is told that `acme-inc` is available, and the field shows them
+     * what they will actually get rather than silently changing it under them later.
+     *
+     * A `true` here is never a reservation. Two people typing `acme` at the same moment are both
+     * told it is free; the unique index on `tenants.subdomain` is what stops the second one
+     * creating a duplicate host, and the validator is what turns that into a readable message.
+     */
+    public function subdomainAvailable(Request $request): JsonResponse
+    {
+        $subdomain = TenantSubdomain::normalize((string) $request->query('subdomain'));
+        $refusal = TenantSubdomain::refusal($subdomain);
+
+        return response()->json([
+            'subdomain' => $subdomain,
+            'available' => $refusal === null && TenantSubdomain::isAvailable($subdomain),
+            // Null when the shape is fine and the name is simply taken — the screen says so
+            // itself, and repeating it here would be two wordings for one state.
+            'reason' => $refusal,
+            'url' => $subdomain === '' ? null : TenantSubdomain::url($subdomain),
+        ]);
+    }
+
     public function slugAvailable(Request $request): JsonResponse
     {
         $slug = Str::slug((string) $request->query('slug'));

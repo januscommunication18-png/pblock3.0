@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Jobs\IngestInboundEmail;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -31,6 +32,19 @@ class PostmarkInboundController extends Controller
 
             abort(404);
         }
+
+        /*
+         * Remember that Postmark reached us at all.
+         *
+         * This one timestamp separates the two failures that look identical from the outside:
+         * "your forwarding rule is not firing" and "Postmark has no webhook URL configured".
+         * Without it the inbound test can only ever blame forwarding, which sent people looking
+         * in the wrong place for a whole afternoon.
+         *
+         * Cache rather than a table: it is a single global fact with no history worth keeping,
+         * and it must survive nothing more than the current deployment.
+         */
+        Cache::forever('help-center.last_inbound_webhook_at', now()->toIso8601String());
 
         $payload = $request->all();
 

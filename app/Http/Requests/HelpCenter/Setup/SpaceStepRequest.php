@@ -32,6 +32,9 @@ class SpaceStepRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:100'],
             'description' => ['nullable', 'string', 'max:500'],
+            // The name customers see on mail from this Space (P65). Optional — blank means the
+            // Space name, which is the requirement's own default.
+            'inbound_display_name' => ['nullable', 'string', 'max:100'],
 
             // Free text, many per Space — no Rule::in (HC-D9).
             'types' => ['required', 'array', 'min:1', 'max:'.$typeMax],
@@ -88,6 +91,9 @@ class SpaceStepRequest extends FormRequest
         $this->merge([
             'name' => trim((string) $this->input('name')),
             'description' => $this->input('description') === null ? null : trim((string) $this->input('description')),
+            'inbound_display_name' => $this->input('inbound_display_name') === null
+                ? null
+                : trim((string) $this->input('inbound_display_name')),
             'types' => is_array($this->input('types'))
                 ? HelpCenterSpace::normalizeTypes($this->input('types'))
                 : $this->input('types'),

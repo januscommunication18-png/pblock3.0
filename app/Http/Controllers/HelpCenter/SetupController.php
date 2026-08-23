@@ -340,13 +340,23 @@ class SetupController extends Controller
      */
     private function steps(): array
     {
+        /*
+         * `short` is what the progress bar DRAWS; `label` is what it means.
+         *
+         * The six full labels come to about 120 characters, which is more than a single row can
+         * hold at any width this screen should be — so the bar wrapped onto two lines and the
+         * numbers stopped reading as a sequence. Truncating them would have been worse: half a
+         * label is a word nobody can act on. These are the same six steps named in one word
+         * each, with the full label kept as the row's `title` and as the heading of the step
+         * you are actually standing on.
+         */
         return [
-            ['number' => 1, 'label' => 'Create Your Space', 'section' => SetupDraftStore::SPACE],
-            ['number' => 2, 'label' => 'Invite Your Support Group', 'section' => SetupDraftStore::TEAM],
-            ['number' => 3, 'label' => 'Set Up Your Inbox', 'section' => SetupDraftStore::INBOX],
-            ['number' => 4, 'label' => 'Configure Your Workflow', 'section' => SetupDraftStore::WORKFLOW],
-            ['number' => 5, 'label' => 'Conversation Settings', 'section' => SetupDraftStore::SETTINGS],
-            ['number' => 6, 'label' => 'Review & Confirm', 'section' => null],
+            ['number' => 1, 'label' => 'Create Your Space', 'short' => 'Space', 'section' => SetupDraftStore::SPACE],
+            ['number' => 2, 'label' => 'Invite Your Support Group', 'short' => 'Team', 'section' => SetupDraftStore::TEAM],
+            ['number' => 3, 'label' => 'Set Up Your Inbox', 'short' => 'Inbox', 'section' => SetupDraftStore::INBOX],
+            ['number' => 4, 'label' => 'Configure Your Workflow', 'short' => 'Workflow', 'section' => SetupDraftStore::WORKFLOW],
+            ['number' => 5, 'label' => 'Conversation Settings', 'short' => 'Settings', 'section' => SetupDraftStore::SETTINGS],
+            ['number' => 6, 'label' => 'Review & Confirm', 'short' => 'Review', 'section' => null],
         ];
     }
 

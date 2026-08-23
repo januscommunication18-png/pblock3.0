@@ -82,6 +82,9 @@ class SetupCommitter
             'tenant_id' => $workspace->id,
             'name' => trim((string) $data['name']),
             'description' => $this->nullIfBlank($data['description'] ?? null),
+            // NULL when nobody typed one (P65) — `senderName()` falls back to the Space name at
+            // read time, so the two stay in step through a later rename.
+            'inbound_display_name' => $this->nullIfBlank($data['inbound_display_name'] ?? null),
             'types' => HelpCenterSpace::normalizeTypes((array) ($data['types'] ?? [])),
             'department_groups' => HelpCenterSpace::normalizeTypes((array) ($data['department_groups'] ?? [])),
             'lead_user_id' => $data['lead_user_id'],
@@ -93,74 +96,32 @@ class SetupCommitter
     /**
      * Step 4 (P2 §12-§16).
      *
-     * The order is NORMALIZED here rather than trusted from the client: `Open → custom → Closed`
-     * is a system constraint, so a payload that tried to put Closed second is corrected, not
-     * rejected and not obeyed. Same for the two activity rules — Open is always Active and
-     * Closed always Inactive, whatever arrived.
+     * The order and the system rules are NORMALIZED rather than trusted from the client, by
+     * `WorkflowStatusPayload::ordered()` — the same function Settings → Workflow's editor writes
+     * through (P16), so a workflow built by the wizard and one edited afterwards cannot end up
+     * obeying two different definitions of `Open → custom → Closed`.
      *
      * @param  array<string, mixed>  $data
      */
     private function createStatuses(Workspace $workspace, HelpCenterSpace $space, array $data): void
     {
-        $rows = (array) ($data['statuses'] ?? []);
-
-        $open = null;
-        $closed = null;
-        $custom = [];
-
-        foreach ($rows as $row) {
-            $key = $row['system_key'] ?? null;
-
-            if ($key === HelpCenterStatus::SYSTEM_OPEN) {
-                $open = $row;
-            } elseif ($key === HelpCenterStatus::SYSTEM_CLOSED) {
-                $closed = $row;
-            } else {
-                $custom[] = $row;
-            }
-        }
-
-        // A draft that somehow lost a system row still gets one: every Space has an Open and a
-        // Closed, and that is not the client's to decide.
-        $defaults = collect(HelpCenterStatus::systemDefaults())->keyBy('system_key');
-        $open ??= $defaults[HelpCenterStatus::SYSTEM_OPEN];
-        $closed ??= $defaults[HelpCenterStatus::SYSTEM_CLOSED];
-
-        $position = 1;
-        $ordered = [];
-
-        $ordered[] = ['row' => $open, 'position' => HelpCenterStatus::POSITION_OPEN];
-
-        foreach ($custom as $row) {
-            $ordered[] = ['row' => $row, 'position' => $position++];
-        }
-
-        $ordered[] = ['row' => $closed, 'position' => HelpCenterStatus::POSITION_CLOSED];
-
-        foreach ($ordered as $entry) {
-            $row = $entry['row'];
-            $key = $row['system_key'] ?? null;
-
+        foreach (WorkflowStatusPayload::ordered((array) ($data['statuses'] ?? [])) as $row) {
             HelpCenterStatus::create([
                 'tenant_id' => $workspace->id,
                 'help_center_space_id' => $space->id,
-                // The two system names are not the client's to change (P2 §13, §15).
-                'name' => match ($key) {
-                    HelpCenterStatus::SYSTEM_OPEN => 'Open',
-                    HelpCenterStatus::SYSTEM_CLOSED => 'Closed',
-                    default => trim((string) ($row['name'] ?? '')),
-                },
+                'name' => $row['name'],
                 'color' => $this->color($row['color'] ?? null),
-                'responsibility' => in_array($row['responsibility'] ?? null, HelpCenterStatus::responsibilities(), true)
-                    ? $row['responsibility']
-                    : HelpCenterStatus::RESPONSIBILITY_ASSIGNEE,
-                'is_active' => match ($key) {
-                    HelpCenterStatus::SYSTEM_OPEN => true,
-                    HelpCenterStatus::SYSTEM_CLOSED => false,
-                    default => (bool) ($row['is_active'] ?? true),
-                },
-                'system_key' => $key,
-                'position' => $entry['position'],
+                'responsibility' => $row['responsibility'],
+                'waiting_on' => $row['waiting_on'],
+                // The System Category (P54). The wizard's cards carry it too, so a Space is
+                // categorised from the moment it is created rather than from its first edit.
+                'system_category' => $row['system_category'],
+                'is_active' => $row['is_active'],
+                'is_default' => $row['is_default'],
+                'system_key' => $row['system_key'],
+                'position' => $row['position'],
+                // Filtered against this Space's actual members, which is a question about THIS
+                // workspace and so cannot live in the shared payload rules.
                 'default_assignees' => $this->memberIds($row['default_assignees'] ?? []),
             ]);
         }
@@ -182,9 +143,17 @@ class SetupCommitter
             'metadata' => $this->metadata((array) ($data['metadata'] ?? [])),
 
             'auto_bcc_enabled' => $bcc,
-            // Off means no address stored: a disabled setting should not leave a live address
-            // behind that a later toggle silently reactivates.
-            'auto_bcc_email' => $bcc ? mb_strtolower(trim((string) ($data['auto_bcc_email'] ?? ''))) : null,
+            /*
+             * Off means no address stored: a disabled setting should not leave a live address
+             * behind that a later toggle silently reactivates.
+             *
+             * The wizard still asks for ONE address — a first run is not the moment to build a
+             * list — and it is written as a one-element list because that is what the column
+             * holds now (P13). More are added on Settings → Auto BCC.
+             */
+            'auto_bcc_emails' => $bcc
+                ? array_values(array_filter([mb_strtolower(trim((string) ($data['auto_bcc_email'] ?? '')))]))
+                : [],
 
             'reassign_enabled' => $enabled,
             'reassign_after_minutes' => $enabled ? $minutes : null,

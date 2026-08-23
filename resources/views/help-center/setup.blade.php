@@ -17,6 +17,10 @@
 @push('scripts')
   {{-- wizard.js is the six-step flow. The older three-step setup.js is left on disk but is no
        longer loaded — it targets endpoints that no longer exist. --}}
+  {{-- BEFORE wizard.js: step 4's status card is shared with Settings → Workflow (P16) and is
+       read at parse time by the component registration. Both are deferred, which preserves
+       this order. --}}
+  <script defer src="{{ pb_asset('assets/js/help-center/status-card.js') }}"></script>
   <script defer src="{{ pb_asset('assets/js/help-center/wizard.js') }}"></script>
 @endpush
 

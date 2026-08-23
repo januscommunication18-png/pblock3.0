@@ -71,16 +71,9 @@ class InboundTestController extends Controller
         $this->helpCenterWorkspace();
         abort_unless(Auth::user()->can('view', $space), 404);
 
-        $test = $this->latest($space);
-
-        if ($test !== null && $test->hasTimedOut()) {
-            $test->forceFill([
-                'status' => HelpCenterInboundTest::STATUS_TIMEOUT,
-                'failed_at' => now(),
-                'failure_reason' => 'No forwarded message arrived within '
-                    .$test->timeoutSeconds().' seconds.',
-            ])->save();
-        }
+        // Written down by the model, which is where the per-address test on Settings → Inbox
+        // reads the same rule from.
+        $test = $this->latest($space)?->resolveTimeout();
 
         return response()->json([
             'ok' => true,

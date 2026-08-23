@@ -49,28 +49,6 @@ class HelpCenterController extends Controller
         ]);
     }
 
-    /**
-     * GET /help-center/conversations (§14).
-     *
-     * Built as the screen with its empty state, because there are no conversations to show yet
-     * (HC-D8). The filters §14 lists are the same six views a Space carries, so they are drawn
-     * from the same config rather than restated here.
-     */
-    public function conversations(): View|RedirectResponse
-    {
-        $workspace = $this->helpCenterWorkspace();
-
-        if (! $this->onboarding->isComplete()) {
-            return redirect()->route('help-center.setup');
-        }
-
-        return view('help-center.conversations', [
-            'workspace' => $workspace,
-            'section' => 'conversations',
-            'filters' => $this->conversationFilters(),
-        ]);
-    }
-
     /** GET /help-center/inboxes (§14). */
     public function inboxes(HelpCenterNavigation $nav): View|RedirectResponse
     {
@@ -99,7 +77,7 @@ class HelpCenterController extends Controller
      * The Overview's counts (§14).
      *
      * Configuration only — Spaces, Inboxes, connected addresses. §14's operational figures
-     * (open conversations, response times, workload) are listed there as "future examples" and
+     * (open Requests, response times, workload) are listed there as "future examples" and
      * count things that do not exist yet; a zero beside "Response time" would be a measurement,
      * not a placeholder.
      *
@@ -113,21 +91,5 @@ class HelpCenterController extends Controller
             ['label' => 'Connected addresses',
                 'value' => HelpCenterEmailAddress::query()->count(), 'icon' => 'link'],
         ];
-    }
-
-    /**
-     * §14's filter list: All, plus the six system views.
-     *
-     * @return array<int, array<string, string>>
-     */
-    private function conversationFilters(): array
-    {
-        $filters = [['key' => 'all', 'label' => 'All']];
-
-        foreach ((array) config('help-center.space_views') as $key => $view) {
-            $filters[] = ['key' => $key, 'label' => $view['label']];
-        }
-
-        return $filters;
     }
 }

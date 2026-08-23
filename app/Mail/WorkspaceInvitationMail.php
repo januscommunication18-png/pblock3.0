@@ -32,12 +32,24 @@ class WorkspaceInvitationMail extends Mailable implements ShouldQueue
         public readonly string $acceptUrl,
         public readonly string $expiresOn,
         public readonly ?string $workspaceLogoUrl = null,
+        /*
+         * What the person is being invited TO, when it is something more specific than the
+         * workspace — a Help Center Space, today (P10). All four are optional and the template
+         * falls back to the plain workspace wording when they are absent, so the ordinary
+         * Settings → Members invitation is unchanged by their existence.
+         */
+        public readonly ?string $contextTitle = null,
+        public readonly ?string $contextLine = null,
+        public readonly ?string $contextLabel = null,
+        public readonly ?string $contextValue = null,
     ) {}
 
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: "You've been invited to join {$this->workspaceName} on Project Block",
+            subject: $this->contextTitle !== null
+                ? "{$this->contextTitle} on Project Block"
+                : "You've been invited to join {$this->workspaceName} on Project Block",
         );
     }
 

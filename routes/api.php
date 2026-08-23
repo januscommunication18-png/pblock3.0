@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\HelpCenter\PostmarkBounceController;
 use App\Http\Controllers\HelpCenter\PostmarkInboundController;
 use Illuminate\Support\Facades\Route;
 
@@ -23,3 +24,13 @@ use Illuminate\Support\Facades\Route;
  */
 Route::post('/webhooks/postmark/inbound/{token?}', PostmarkInboundController::class)
     ->name('webhooks.postmark.inbound');
+
+/*
+ * Postmark's BOUNCE webhook (P10).
+ *
+ * The missing half of sending an invitation: Postmark accepts the SMTP transaction and only
+ * afterwards decides the address is undeliverable, so the application's send succeeds and
+ * nothing ever learns otherwise. This is how it finds out.
+ */
+Route::post('/webhooks/postmark/bounce/{token?}', PostmarkBounceController::class)
+    ->name('webhooks.postmark.bounce');

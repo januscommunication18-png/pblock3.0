@@ -6,13 +6,24 @@
   {{-- One Space, one section (P4).
 
        Every panel below reads through `$space`, never through the models' own tables — so a
-       Space's screen structurally cannot show another Space's Inbox, workflow or members
+       Space's screen structurally cannot show another Space's Inbox or Requests
        (P3 §15). The relations are eager-loaded once by the controller. --}}
   {{-- Toolbar — the same h-12 bordered bar the Spaces listing and the Projects index use, so
        every screen in the module carries one heading style: 14px medium, leading icon,
        right-aligned actions. It is flush to the edges, which is why the page's own padding
        starts below it rather than wrapping it. --}}
-  <div class="flex items-center gap-2 px-5 sm:px-8 h-12 border-b border-line">
+  {{-- `shrink-0` is load-bearing, not decoration (P81).
+
+       This bar is a flex child of the layout's `<main class="… flex flex-col">`, which is also
+       the scroll container. A flex item defaults to `flex-shrink: 1`, so when the column's
+       content is taller than the container — the Overview, with its charts and tables — the
+       browser takes the overflow out of every child that will give, and `h-12` becomes a
+       SUGGESTION. The bar rendered at 33px against the Inbox's 48px, and the 32px buttons in it
+       ended up with 0px above and 1px below: sitting on the border, which is what was reported.
+
+       Inbox looked right only by luck. Its list carries its own height and its own scroll, so
+       that column happened to fit and nothing was asked to shrink. --}}
+  <div class="flex items-center gap-2 px-5 sm:px-8 h-12 border-b border-line shrink-0">
     @include('partials.sidebar-expand')
     <span class="flex items-center gap-2 text-[14px] font-medium text-ink min-w-0">
       {!! pb_icon('rectangles-pair', 16, 'text-sub shrink-0') !!}
@@ -45,57 +56,67 @@
     @endif
   </div>
 
-  {{-- The same six sections as the sidebar, as tabs — so a Space can be moved through without
+  {{-- The same sections as the sidebar, as tabs — so a Space can be moved through without
        going back to the nav. Both are built from `$sections`, which is why "active" means the
        same in both. Its own bar under the toolbar, matching the toolbar's flush edges. --}}
-  <div class="flex flex-wrap items-center gap-1 px-5 sm:px-8 py-2 border-b border-line">
-    @foreach ($sections as $s)
-      <a href="{{ $s['url'] }}"
-         @class(['inline-flex items-center gap-1.5 h-7 px-3 rounded-md text-[12px] border', 'border-stroke bg-sel text-brand font-semibold' => $s['active'], 'border-transparent text-ink hover:bg-hover' => ! $s['active']])>
-        {!! pb_icon($s['icon'], 13) !!}
-        {{ $s['label'] }}
-      </a>
-    @endforeach
-  </div>
+  @include('partials.help-center-space-tabs')
 
   <div class="px-5 sm:px-8 py-6">
 
-    {{-- The Space's own subtitle line: types and description, under the tabs rather than in
-         the 48px toolbar, which has no room for them. --}}
-    @if ($space->typeList() || $space->description)
-      <div class="mb-5">
-        @if ($space->typeList())
-          <div class="flex flex-wrap items-center gap-1.5">
-            @foreach ($space->typeList() as $type)
-              <span class="_moretogether-tag _moretogether-tag--static">{{ $type }}</span>
-            @endforeach
-          </div>
-        @endif
-        @if ($space->description)
-          <p class="mt-1.5 text-[13px] text-sub max-w-[640px]">{{ $space->description }}</p>
-        @endif
-      </div>
-    @endif
+    {{-- The Space's types and description used to sit here, above every panel.
+
+         They are facts ABOUT the Space, and they were being printed over the top of the screens
+         you go to a Space to work in — a queue, or one of its views. On the Inbox that meant a
+         Space's type chip and its description standing between the tab bar and the Requests,
+         answering a question nobody had while the list they came for was pushed down.
+
+         They live on the Overview now, in the table that already answers "how is this Space set
+         up?" — Space Type was duplicated there anyway, and Description has joined it. --}}
 
     {{-- ============ Overview ============ --}}
     @if ($panel === 'overview')
       @php($inbox = $space->inboxes->first())
-      <dl class="mt-6 max-w-[720px] rounded-lg border border-line divide-y divide-line">
-        <div class="flex gap-4 px-4 py-3"><dt class="w-44 shrink-0 text-[12px] text-sub">Space Lead</dt>
-          <dd class="text-[13px] text-ink">{{ $space->lead?->displayName() ?? '—' }}</dd></div>
-        <div class="flex gap-4 px-4 py-3"><dt class="w-44 shrink-0 text-[12px] text-sub">Space Type</dt>
-          <dd class="text-[13px] text-ink">{{ $space->typeLabel() }}</dd></div>
-        <div class="flex gap-4 px-4 py-3"><dt class="w-44 shrink-0 text-[12px] text-sub">Department Groups</dt>
-          <dd class="text-[13px] text-ink">{{ $space->groupList() ? implode(', ', $space->groupList()) : '—' }}</dd></div>
-        <div class="flex gap-4 px-4 py-3"><dt class="w-44 shrink-0 text-[12px] text-sub">Support members</dt>
-          <dd class="text-[13px] text-ink">{{ $space->members->count() }}</dd></div>
-        <div class="flex gap-4 px-4 py-3"><dt class="w-44 shrink-0 text-[12px] text-sub">Inbox</dt>
-          <dd class="text-[13px] text-ink _moretogether-break">{{ $inbox?->name ?? '—' }}</dd></div>
-        <div class="flex gap-4 px-4 py-3"><dt class="w-44 shrink-0 text-[12px] text-sub">Inbound address</dt>
-          <dd class="text-[13px] text-ink _moretogether-break">{{ $inbox?->inboundAddress() ?? '—' }}</dd></div>
-        <div class="flex gap-4 px-4 py-3"><dt class="w-44 shrink-0 text-[12px] text-sub">Workflow</dt>
-          <dd class="text-[13px] text-ink">{{ $space->statuses->pluck('name')->implode(' → ') ?: '—' }}</dd></div>
-      </dl>
+
+      {{-- The reporting dashboard (docs/features/help-center.md, P50).
+
+           FIRST on the Overview, because the requirement makes this page "the primary reporting
+           dashboard for each Help Desk Space" — the configuration summary below it is reference
+           material, and reference material does not lead a dashboard. --}}
+      <div id="help-center-overview" class="mt-6"
+           data-bootstrap="{{ json_encode(['report' => $report, 'options' => $reportOptions]) }}">
+        <p id="help-center-overview-loading" class="text-[13px] text-sub">Loading reports&hellip;</p>
+      </div>
+
+      {{-- The same watchdog every deferred screen in this module carries: the data is already on
+           the page, so this is never waiting on a request — if the placeholder is still here
+           after eight seconds the screen script did not run, and saying so beats a line that
+           reads as a slow network for ever. --}}
+      <script>
+        setTimeout(function () {
+          var stuck = document.getElementById('help-center-overview-loading');
+          if (!stuck) return;
+
+          stuck.className = 'max-w-[560px] rounded-lg border border-danger/30 bg-danger/5 px-4 py-3 text-[13px] text-ink';
+          stuck.innerHTML = '<span class="font-semibold">The reports could not be displayed.</span>' +
+            '<span class="block mt-1 text-[12px] text-sub">The data was loaded, but the screen failed to start. ' +
+            'Reload the page; if it keeps happening, the browser console will say why.</span>';
+        }, 8000);
+      </script>
+
+      @push('scripts')
+        <script defer src="{{ pb_asset('assets/js/help-center/overview.js') }}"></script>
+      @endpush
+
+      {{-- The Space configuration table that used to sit here has MOVED (P51).
+
+           It is now a dialog behind the "Space Configuration" button in the dashboard header —
+           see public/assets/js/help-center/overview.js. It was reference material sitting below
+           eight panels of numbers, which is neither findable when you want it nor out of the way
+           when you do not.
+
+           The two blocks below stay on the page on purpose: they are not configuration, they are
+           things to ACT on. A missing customer-facing address is a fault to fix, and the inbound
+           test is a thing to run. --}}
 
       {{-- The gap that actually stops the inbound test working, called out where it is noticed
            rather than left as a silent zero. --}}
@@ -123,161 +144,58 @@
         @endpush
       @endif
 
-    {{-- ============ Conversations ============ --}}
-    @elseif ($panel === 'conversations')
-      {{-- §16's six views live HERE, as filters. Inert while there is nothing to filter, and
-           marked so — a control that looks live and does nothing is worse than one that says
-           it is waiting. --}}
-      <div class="mt-5 flex flex-wrap items-center gap-1" aria-disabled="true">
-        <span class="inline-flex items-center h-7 px-3 rounded-md text-[12px] border border-stroke bg-sel text-brand font-semibold">All</span>
-        @foreach ($conversationViews as $v)
-          <span class="inline-flex items-center h-7 px-3 rounded-md text-[12px] border border-line text-faint">{{ $v['label'] }}</span>
-        @endforeach
+    {{-- ============ Inbox, and its views (P9, P22) ============ --}}
+    @elseif ($inboxQueue)
+      {{-- The Inbox is the module's ONLY queue (P9). Every inbound email is a Request with its
+           own Ticket Number, and this is where one is worked.
+
+           The same mount serves Unassigned / Mine / Draft / Assigned / Closed / Spam (P22).
+           They are the SAME screen with the view applied in SQL, so they share this root, this
+           script and this watchdog rather than each getting a copy of them.
+
+           It is the WORK ITEM GRID: same Tabulator table, same .wi-grid skin, same group
+           headers. A Request and a work item are both "a thing with a status and an owner".
+
+           The filters are generated from the SPACE'S OWN WORKFLOW — no status name appears in
+           this file or in the screen script, which is what lets two Spaces run entirely
+           different workflows with no code between them. --}}
+      {{-- Mount only. PB.boot clears this root, so what is inside is the placeholder that
+           shows while the deferred grid scripts load — the screen is in inbox.js. --}}
+      <div id="help-center-inbox" data-bootstrap="{{ json_encode($inboxQueue) }}">
+        <p id="help-center-inbox-loading" class="mt-6 text-[13px] text-sub">Loading Requests&hellip;</p>
       </div>
-      <div class="mt-6 rounded-lg border border-line px-6 py-14 text-center max-w-[720px]">
-        <div class="mx-auto h-10 w-10 rounded-lg bg-hover grid place-items-center text-sub">{!! pb_icon('inbox', 18) !!}</div>
-        <h2 class="mt-3 text-[14px] font-semibold text-head">No conversations yet</h2>
-        <p class="mt-1 text-[13px] text-sub max-w-[420px] mx-auto">Once forwarding is live, customer email arriving at this Space's addresses will appear here.</p>
-      </div>
 
-    {{-- ============ Inbox ============ --}}
-    @elseif ($panel === 'inbox')
-      @forelse ($space->inboxes as $inbox)
-        <div class="mt-6 max-w-[720px] rounded-lg border border-line">
-          <div class="px-4 py-3 border-b border-line text-[14px] font-semibold text-head">{{ $inbox->name }}</div>
-          <div class="px-4 py-3">
-            <div class="flex flex-wrap items-center gap-2">
-              <span class="text-[12px] text-sub shrink-0">Inbound address</span>
-              <code class="_moretogether-break flex-1 min-w-[220px] rounded-md border border-line bg-[#f9fafb] px-2 py-1 text-[12px] text-ink">{{ $inbox->inboundAddress() }}</code>
-            </div>
-            @if ($inbox->emailAddresses->isNotEmpty())
-              <table class="mt-3 w-full text-[13px]">
-                <thead><tr class="text-left text-[12px] text-faint border-b border-line">
-                  <th class="py-2 font-medium">Name</th><th class="py-2 font-medium">Email Address</th><th class="py-2 font-medium">Status</th>
-                </tr></thead>
-                <tbody>
-                  @foreach ($inbox->emailAddresses as $a)
-                    @php($meta = $a->statusMeta())
-                    <tr class="border-b border-line last:border-0">
-                      <td class="py-2 text-ink">{{ $a->name ?: '—' }}</td>
-                      <td class="py-2 text-ink _moretogether-break">{{ $a->email }}</td>
-                      <td class="py-2"><span class="_moretogether-badge _moretogether-badge--{{ $meta['tone'] }}">{{ $meta['label'] }}</span></td>
-                    </tr>
-                  @endforeach
-                </tbody>
-              </table>
-            @else
-              <p class="mt-3 text-[12px] text-faint">No customer-facing addresses connected yet.</p>
-            @endif
-          </div>
-        </div>
-      @empty
-        <p class="mt-6 text-[13px] text-sub">This Space has no Inbox.</p>
-      @endforelse
-      <p class="mt-3 text-[12px] text-sub">
-        Addresses are added on the
-        <a href="{{ route('help-center.inboxes') }}" class="text-brand font-semibold hover:underline">Inboxes screen</a>.
-      </p>
+      {{-- The watchdog.
 
-    {{-- ============ Workflow ============ --}}
-    @elseif ($panel === 'workflow')
-      <div class="mt-6 flex flex-wrap items-center gap-2">
-        @foreach ($space->statuses as $i => $status)
-          <span class="inline-flex items-center h-6 px-2 rounded-full text-[11px] font-semibold text-white" style="background: {{ $status->color }}">{{ $status->name }}</span>
-          @if (! $loop->last)<span class="text-faint">&rarr;</span>@endif
-        @endforeach
-      </div>
-      <table class="mt-4 w-full max-w-[720px] text-[13px]">
-        <thead><tr class="text-left text-[12px] text-faint border-b border-line">
-          <th class="py-2 font-medium">Status</th><th class="py-2 font-medium">Responsibility</th>
-          <th class="py-2 font-medium">State</th><th class="py-2 font-medium">Default assignees</th>
-        </tr></thead>
-        <tbody>
-          @forelse ($space->statuses as $status)
-            <tr class="border-b border-line last:border-0">
-              <td class="py-2 text-ink">
-                {{ $status->name }}
-                @if ($status->isSystem()) <span class="text-faint">{!! pb_icon('lock', 11) !!}</span> @endif
-              </td>
-              <td class="py-2 text-sub">{{ $status->responsibility === 'creator' ? 'Creator' : 'Assignee' }}</td>
-              <td class="py-2 text-sub">{{ $status->is_active ? 'Active' : 'Inactive' }}</td>
-              <td class="py-2 text-sub">
-                @php($names = \App\Models\User::whereIn('id', $status->default_assignees ?: [])->pluck('full_name'))
-                {{ $names->isNotEmpty() ? $names->implode(', ') : '—' }}
-              </td>
-            </tr>
-          @empty
-            <tr><td colspan="4" class="py-3 text-[12px] text-faint">No workflow configured for this Space.</td></tr>
-          @endforelse
-        </tbody>
-      </table>
+           "Loading Requests…" is the placeholder Vue replaces on mount. If the screen script
+           never runs — a 404 on the asset, a blocked CDN, a JS error, a mount point that does
+           not resolve — nothing replaces it, and the page sits on that line indefinitely with
+           no way for the person reading it to tell a slow network from a broken build.
 
-    {{-- ============ Members ============ --}}
-    @elseif ($panel === 'members')
-      <table class="mt-6 w-full max-w-[720px] text-[13px]">
-        <thead><tr class="text-left text-[12px] text-faint border-b border-line">
-          <th class="py-2 font-medium">Coworker</th><th class="py-2 font-medium">Department Groups</th><th class="py-2 font-medium">Status</th>
-        </tr></thead>
-        <tbody>
-          @forelse ($space->members as $member)
-            <tr class="border-b border-line last:border-0">
-              <td class="py-2 text-ink _moretogether-break">{{ $member->user?->displayName() ?? $member->email }}</td>
-              <td class="py-2">
-                @forelse ($member->groupList() as $g)
-                  <span class="_moretogether-tag _moretogether-tag--static mr-1">{{ $g }}</span>
-                @empty
-                  <span class="text-faint">—</span>
-                @endforelse
-              </td>
-              <td class="py-2">
-                @if ($member->isPending())
-                  <span class="_moretogether-badge _moretogether-badge--wait">Invited</span>
-                @else
-                  <span class="_moretogether-badge _moretogether-badge--ok">Active</span>
-                @endif
-              </td>
-            </tr>
-          @empty
-            <tr><td colspan="3" class="py-3 text-[12px] text-faint">Nobody has been added to this Space yet.</td></tr>
-          @endforelse
-        </tbody>
-      </table>
+           INLINE and not in inbox.js on purpose: the failures worth catching here include
+           "inbox.js did not load", and a guard inside the file it is guarding cannot fire.
 
-    {{-- ============ Settings ============ --}}
-    @else
-      @php($cfg = $space->settings)
-      @if ($cfg)
-        <h2 class="mt-6 text-[14px] font-semibold text-head">Metadata</h2>
-        <dl class="mt-2 max-w-[720px] rounded-lg border border-line divide-y divide-line">
-          @foreach (config('help-center.metadata') as $key => $meta)
-            <div class="flex gap-4 px-4 py-2.5">
-              <dt class="w-44 shrink-0 text-[12px] text-sub">{{ $meta['label'] }}</dt>
-              <dd class="text-[13px] text-ink">
-                {{ ! ($meta['available'] ?? false) ? 'Coming Soon' : ((($cfg->metadata[$key] ?? false)) ? 'On' : 'Off') }}
-              </dd>
-            </div>
-          @endforeach
-        </dl>
+           The rows are already on the page in `data-bootstrap`, so this is never waiting on a
+           request — eight seconds is generous for parsing and mounting what is already here. --}}
+      <script>
+        setTimeout(function () {
+          var stuck = document.getElementById('help-center-inbox-loading');
+          if (!stuck) return;
 
-        <h2 class="mt-6 text-[14px] font-semibold text-head">Automation</h2>
-        @php($t = $cfg->threshold())
-        <dl class="mt-2 max-w-[720px] rounded-lg border border-line divide-y divide-line">
-          <div class="flex gap-4 px-4 py-2.5"><dt class="w-44 shrink-0 text-[12px] text-sub">Auto BCC</dt>
-            <dd class="text-[13px] text-ink _moretogether-break">{{ $cfg->auto_bcc_enabled ? $cfg->auto_bcc_email : 'Off' }}</dd></div>
-          <div class="flex gap-4 px-4 py-2.5"><dt class="w-44 shrink-0 text-[12px] text-sub">Reassignment</dt>
-            <dd class="text-[13px] text-ink">{{ $cfg->reassign_enabled ? $t['hours'].'h '.$t['minutes'].'m' : 'Off' }}</dd></div>
-          @if ($cfg->reassign_enabled)
-            <div class="flex gap-4 px-4 py-2.5"><dt class="w-44 shrink-0 text-[12px] text-sub">Then</dt>
-              <dd class="text-[13px] text-ink">{{ config('help-center.reassign_destinations')[$cfg->reassign_destination] ?? $cfg->reassign_destination }}</dd></div>
-          @endif
-          <div class="flex gap-4 px-4 py-2.5"><dt class="w-44 shrink-0 text-[12px] text-sub">Auto-follow on mention</dt>
-            <dd class="text-[13px] text-ink">{{ $cfg->auto_follow_mentions ? 'On' : 'Off' }}</dd></div>
-        </dl>
-        {{-- Honest about what is stored versus what runs (HC-D17). --}}
-        <p class="mt-3 text-[12px] text-sub max-w-[720px]">Reassignment and auto-follow are saved with this Space and take effect once conversations arrive.</p>
-      @else
-        <p class="mt-6 text-[13px] text-sub">This Space has no settings recorded. Spaces created before the settings step have none.</p>
-      @endif
+          stuck.className = 'mt-6 max-w-[560px] rounded-lg border border-danger/30 bg-danger/5 px-4 py-3 text-[13px] text-ink';
+          stuck.innerHTML = '<span class="font-semibold">The Inbox could not be displayed.</span>' +
+            '<span class="block mt-1 text-[12px] text-sub">The Requests were loaded, but the screen failed to start. ' +
+            'Reload the page; if it keeps happening, the browser console will say why.</span>' +
+            '<button type="button" onclick="window.location.reload()" ' +
+            'class="inline-flex items-center h-8 px-3 mt-2 rounded-md border border-stroke bg-white text-[13px] font-semibold text-ink hover:bg-hover">Reload</button>';
+        }, 8000);
+      </script>
+      @push('scripts')
+        {{-- The grid's assets, in the one order that works — see the partial's own note. --}}
+        @include('partials.work-item-assets')
+        <script defer src="{{ pb_asset('assets/js/help-center/inbox.js') }}"></script>
+      @endpush
+
     @endif
 
   </div>

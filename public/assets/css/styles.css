@@ -136,6 +136,26 @@ select.pb-input { padding-right: 2rem; color: #6b7280; }
   white-space: nowrap;
 }
 
+/* The same affix on the TRAILING edge — `acme` + `.projectblock.app` (P72).
+   A separate rule rather than reusing __prefix, whose padding is asymmetric for the leading
+   side: as a suffix it left a 14px gap before the dot and 2px after it, so the zone sat away
+   from the name it belongs to and hard against the border.
+
+   Named `pb-group__suffix` rather than with the `_moretogether` prefix CLAUDE.md §14 asks for,
+   because it is a second element of an existing house component and splitting one component
+   across two namespaces reads worse than either convention on its own. */
+.pb-group__suffix {
+  padding-left: 0.125rem;
+  padding-right: 0.875rem;
+  font-size: 14px;
+  color: #9ca3af;                   /* faint */
+  user-select: none;
+  white-space: nowrap;
+}
+
+/* A field followed by a suffix must not also pad its own right edge, or the two gaps add up. */
+.pb-group__field:has(+ .pb-group__suffix) { padding-right: 0; }
+
 .pb-group__field {
   flex: 1 1 auto;
   min-width: 0;

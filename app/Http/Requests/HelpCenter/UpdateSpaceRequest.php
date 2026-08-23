@@ -31,6 +31,8 @@ class UpdateSpaceRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:100'],
             'description' => ['nullable', 'string', 'max:500'],
+            // The customer-facing sender name (P65); blank means "use the Space name".
+            'inbound_display_name' => ['nullable', 'string', 'max:100'],
             'types' => ['required', 'array', 'min:1', 'max:'.(int) config('help-center.space_type_max', 8)],
             'types.*' => ['required', 'string', 'max:'.$typeLen],
             'department_groups' => ['nullable', 'array', 'max:'.(int) config('help-center.department_group_max', 20)],
@@ -87,6 +89,22 @@ class UpdateSpaceRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $groups = $this->input('department_groups');
+
+        /*
+         * Merged only when it was actually SENT (P65).
+         *
+         * The Space edit drawer does not render this field — it is edited under Settings → Inbox
+         * — so an unconditional merge would put `null` into `validated()` on every save from
+         * that drawer and quietly clear a display name somebody had configured. A field absent
+         * from the request is a field nobody was editing.
+         */
+        if ($this->exists('inbound_display_name')) {
+            $this->merge([
+                'inbound_display_name' => $this->input('inbound_display_name') === null
+                    ? null
+                    : trim((string) $this->input('inbound_display_name')),
+            ]);
+        }
 
         $this->merge([
             'name' => trim((string) $this->input('name')),

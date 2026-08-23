@@ -66,6 +66,9 @@
     $('#account-last-name').value = profile.last_name || '';
     $('#account-display-name').value = profile.display_name || '';
     $('#account-email').value = profile.email || '';
+    // The RAW text, not rendered HTML — this is a textarea and the column stores what was
+    // typed (P74).
+    $('#account-signature').value = profile.signature || '';
 
     // The banner is an uploaded image if there is one, and otherwise the chosen gradient —
     // the same fallback an uncovered project tile uses, so a profile looks deliberate before
@@ -273,6 +276,7 @@
       body.append('first_name', $('#account-first-name').value);
       body.append('last_name', $('#account-last-name').value);
       body.append('display_name', $('#account-display-name').value);
+      body.append('signature', $('#account-signature').value);
 
       return api(endpoints.update, { method: 'POST', body: body });
     }).then(adopt).catch(fail);
@@ -381,6 +385,7 @@
     body.append('first_name', $('#account-first-name').value);
     body.append('last_name', $('#account-last-name').value);
     body.append('display_name', $('#account-display-name').value);
+    body.append('signature', $('#account-signature').value);
 
     api(endpoints.update, { method: 'POST', body: body })
       .then(function (res) { adopt(res); close(); })

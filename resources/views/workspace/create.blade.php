@@ -98,6 +98,9 @@
         <p class="text-[12px] text-sub mb-3">Choose what this workspace can do. You can turn more on later as they launch.</p>
         @include('partials.workspace-apps')
 
+        {{-- The tenant subdomain (P72), shown only once a customer-facing app is on. --}}
+        @include('partials.workspace-subdomain')
+
         <div class="flex items-center gap-3 mt-8">
           <button id="create" type="submit" disabled class="h-10 px-5 rounded-md text-[14px] font-semibold bg-hover text-faint cursor-not-allowed transition-colors">Create workspace</button>
           <a href="{{ route('welcome') }}" class="h-10 px-5 grid place-items-center rounded-md border border-stroke text-[14px] font-semibold text-ink hover:bg-hover">Go back</a>
@@ -110,6 +113,12 @@
     </div>
   </main>
 
+  {{-- Loaded DEFERRED and before the inline block below (P72). Deferred scripts run after
+       parsing, so the inline listener for `pb:subdomain-state` is already registered by the
+       time this dispatches its first state on load — the reveal and the gate agree from the
+       first paint rather than one frame later. --}}
+  <script defer src="{{ pb_asset('assets/js/workspace-subdomain.js') }}"></script>
+
   <script>
     (function () {
       var nameEl = document.getElementById('ws-name');
@@ -120,6 +129,14 @@
       var hint = document.getElementById('create-hint');
       var slugTouched = {{ old('slug') ? 'true' : 'false' }};
 
+      /* The subdomain field reports its own state (P72). Held here rather than read off the
+         field, so this screen does not need to know how that partial is built. */
+      var subdomain = { required: false, valid: true };
+      window.addEventListener('pb:subdomain-state', function (e) {
+        subdomain = e.detail || subdomain;
+        gate();
+      });
+
       function gate() {
         // Named one by one so the hint can say WHICH one is still missing. "Fill in the
         // required fields" on a form this long is a hint that makes the reader hunt.
@@ -128,6 +145,9 @@
         if (!slugEl.value.trim()) missing.push('a URL');
         if (!sizeEl.value) missing.push('a team size');
         if (!viewEl.value) missing.push('a view');
+        // Named like the rest, so switching Help Center on and missing the new field below
+        // does not leave a disabled button with no explanation.
+        if (subdomain.required && !subdomain.valid) missing.push('an available subdomain');
 
         var ok = missing.length === 0;
         create.disabled = !ok;

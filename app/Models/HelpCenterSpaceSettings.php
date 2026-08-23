@@ -32,7 +32,7 @@ class HelpCenterSpaceSettings extends Model
         'help_center_space_id',
         'metadata',
         'auto_bcc_enabled',
-        'auto_bcc_email',
+        'auto_bcc_emails',
         'reassign_enabled',
         'reassign_after_minutes',
         'reassign_destination',
@@ -44,6 +44,7 @@ class HelpCenterSpaceSettings extends Model
         return [
             'metadata' => 'array',
             'auto_bcc_enabled' => 'boolean',
+            'auto_bcc_emails' => 'array',
             'reassign_enabled' => 'boolean',
             'reassign_after_minutes' => 'integer',
             'auto_follow_mentions' => 'boolean',
@@ -96,13 +97,51 @@ class HelpCenterSpaceSettings extends Model
         return ['hours' => intdiv($total, 60), 'minutes' => $total % 60];
     }
 
+    /**
+     * The addresses Auto BCC copies, always as a list (P13).
+     *
+     * Null and `[]` both mean "none configured", and a caller should not have to know which one
+     * this row happens to hold. Values are re-cast to strings because the column is JSON, which
+     * will hand back whatever was written into it.
+     *
+     * @return array<int, string>
+     */
+    public function bccEmails(): array
+    {
+        return array_values(array_map('strval', (array) $this->auto_bcc_emails));
+    }
+
+    /** The most addresses one Space may BCC. */
+    public static function bccMax(): int
+    {
+        return (int) config('help-center.auto_bcc_max', 10);
+    }
+
+    /**
+     * Is one of the metadata switches on for this Space?
+     *
+     * Falls back to the switch's CONFIGURED default rather than to false, because a Space whose
+     * settings row predates a new switch has not turned it off — it has never been asked. `false`
+     * would silently opt every existing Space out of anything added later.
+     */
+    public function feature(string $key): bool
+    {
+        $map = (array) $this->metadata;
+
+        if (array_key_exists($key, $map)) {
+            return (bool) $map[$key];
+        }
+
+        return (bool) (config('help-center.metadata.'.$key.'.default') ?? false);
+    }
+
     /** @return array<string, mixed> */
     public function toPayload(): array
     {
         return [
             'metadata' => (array) $this->metadata,
             'auto_bcc_enabled' => $this->auto_bcc_enabled,
-            'auto_bcc_email' => $this->auto_bcc_email,
+            'auto_bcc_emails' => $this->bccEmails(),
             'reassign_enabled' => $this->reassign_enabled,
             'reassign_after' => $this->threshold(),
             'reassign_destination' => $this->reassign_destination,

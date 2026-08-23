@@ -10,10 +10,23 @@
         </td></tr>
 
         <tr><td style="padding:8px 32px 0;">
-          <h1 style="font-size:20px;font-weight:700;color:#0f0f10;margin:12px 0 6px;">You've been invited to join a workspace</h1>
+          {{--
+            The headline and the line under it say what the person was actually invited to.
+            An invitation sent from a Help Center Space passes that context in; one sent from
+            Settings → Members passes nothing and keeps the wording it always had.
+          --}}
+          <h1 style="font-size:20px;font-weight:700;color:#0f0f10;margin:12px 0 6px;">
+            {{ $contextTitle ?? "You've been invited to join a workspace" }}
+          </h1>
           <p style="font-size:14px;color:#6b7280;margin:0 0 20px;">
-            <strong style="color:#23272f;">{{ $inviterName }}</strong> has invited you to join
-            <strong style="color:#23272f;">{{ $workspaceName }}</strong> on Project Block.
+            {{-- Escaped, always: a Space name is typed by a user and reaches this template
+                 unmodified, so it is untrusted content going into HTML. --}}
+            @if ($contextLine)
+              {{ $contextLine }}
+            @else
+              <strong style="color:#23272f;">{{ $inviterName }}</strong> has invited you to join
+              <strong style="color:#23272f;">{{ $workspaceName }}</strong> on Project Block.
+            @endif
           </p>
         </td></tr>
 
@@ -26,10 +39,21 @@
 
         <tr><td style="padding:0 32px;">
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8f9fa;border:1px solid #e5e7eb;border-radius:10px;">
-            <tr>
-              <td style="padding:12px 16px;font-size:13px;color:#6b7280;">Workspace</td>
-              <td style="padding:12px 16px;font-size:13px;color:#23272f;font-weight:600;" align="right">{{ $workspaceName }}</td>
-            </tr>
+            @if ($contextLabel && $contextValue)
+              <tr>
+                <td style="padding:12px 16px;font-size:13px;color:#6b7280;">{{ $contextLabel }}</td>
+                <td style="padding:12px 16px;font-size:13px;color:#23272f;font-weight:600;" align="right">{{ $contextValue }}</td>
+              </tr>
+              <tr>
+                <td style="padding:0 16px 12px;font-size:13px;color:#6b7280;">Workspace</td>
+                <td style="padding:0 16px 12px;font-size:13px;color:#23272f;font-weight:600;" align="right">{{ $workspaceName }}</td>
+              </tr>
+            @else
+              <tr>
+                <td style="padding:12px 16px;font-size:13px;color:#6b7280;">Workspace</td>
+                <td style="padding:12px 16px;font-size:13px;color:#23272f;font-weight:600;" align="right">{{ $workspaceName }}</td>
+              </tr>
+            @endif
             <tr>
               <td style="padding:0 16px 12px;font-size:13px;color:#6b7280;">Your role</td>
               <td style="padding:0 16px 12px;font-size:13px;color:#23272f;font-weight:600;" align="right">{{ $roleLabel }}</td>

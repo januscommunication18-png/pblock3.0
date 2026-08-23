@@ -39,6 +39,19 @@ class WorkspaceMembership extends Model
 
     public const STATUS_ACTIVE = 'active';
 
+    /**
+     * Tenant access revoked by the Back Office (backoffice-clients.md, § "Client Actions").
+     *
+     * A new value in an existing vocabulary, so no migration: `status` is a string column. It is
+     * the counterpart to disabling a CLIENT — that closes every tenant to somebody, this closes
+     * one, which is the distinction the requirement draws to stop an administrator "accidentally
+     * disabling all of a customer's tenant access".
+     *
+     * Existing queries that filter on `STATUS_ACTIVE` already exclude it, so a disabled
+     * membership drops out of member lists and access checks without those callers changing.
+     */
+    public const STATUS_DISABLED = 'disabled';
+
     protected $fillable = [
         'workspace_id',
         'user_id',

@@ -99,7 +99,19 @@
     return c;
   }
 
-  function toast(message, kind) {
+  /* toast(message, kind, opts)
+     ------------------------------------------------------------------
+     `opts` is additive and every field optional, so every existing two-argument call behaves
+     exactly as before:
+
+       title   — replaces the fixed "Success"/"Error" heading. Real-time notifications say what
+                 happened ("New customer reply received"), which a heading of "Success" does not.
+       timeout — milliseconds; the requirement asks for about five seconds where an
+                 acknowledgement of your own click only needs three and a half.
+       onClick — makes the card itself a control. Used to open the ticket a notification is
+                 about, which is the requirement's "clicking the toast should open the ticket". */
+  function toast(message, kind, opts) {
+    opts = opts || {};
     var isError = kind === 'error';
     var icon = isError
       ? '<svg class="h-6 w-6" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" fill="#ef4444"/><path d="M9 9l6 6M15 9l-6 6" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>'
@@ -113,14 +125,26 @@
       '<div class="ml-4 flex shrink-0"><button type="button" class="inline-flex rounded-md text-faint hover:text-sub" data-x>' +
       '' + wiIcon('xmark', 18) + '</button></div>' +
       '</div></div>';
-    card.querySelector('[data-t]').textContent = isError ? 'Error' : 'Success';
+    card.querySelector('[data-t]').textContent = opts.title || (isError ? 'Error' : 'Success');
     card.querySelector('[data-m]').textContent = message;
     toastContainer().appendChild(card);
     requestAnimationFrame(function () { card.classList.remove('opacity-0', 'translate-x-2'); });
     var done = false;
     function dismiss() { if (done) return; done = true; card.classList.add('opacity-0', 'translate-x-2'); setTimeout(function () { card.remove(); }, 300); }
     card.querySelector('[data-x]').addEventListener('click', dismiss);
-    setTimeout(dismiss, 3600);
+
+    if (typeof opts.onClick === 'function') {
+      card.classList.add('cursor-pointer');
+      card.addEventListener('click', function (e) {
+        // Not when they meant to dismiss it: the close button lives inside the card, so
+        // without this, clicking X would also follow the link.
+        if (e.target.closest('[data-x]')) return;
+        dismiss();
+        opts.onClick();
+      });
+    }
+
+    setTimeout(dismiss, opts.timeout || 3600);
   }
 
   // ================= shared components =================
@@ -375,12 +399,21 @@
       // value: most dialogs are a single column of fields, but a form with side-by-side rows
       // (the module form) needs the room, and cramming it into 520px is what makes those
       // pairs unreadable.
-      props: { open: Boolean, title: String, width: { type: String, default: 'max-w-[520px]' } },
+      // `z` is the stacking layer, as a Tailwind class. A default rather than a fixed value for
+      // the same reason `width` is one: a dialog opened from a plain page sits above the page,
+      // but a dialog opened from INSIDE a drawer has to clear the drawer's own shell — and a
+      // modal that renders behind the thing that opened it is a modal nobody can see.
+      props: {
+        open: Boolean,
+        title: String,
+        width: { type: String, default: 'max-w-[520px]' },
+        z: { type: String, default: 'z-[70]' },
+      },
       emits: ['close'],
       template:
         // role/aria-modal are load-bearing beyond a11y: the settings shell reads them to know
         // a dialog is open, so Escape closes the dialog instead of leaving the page.
-        '<teleport to="body"><div v-if="open" role="dialog" aria-modal="true" class="fixed inset-0 z-[70] flex items-start justify-center p-4 sm:pt-24">' +
+        '<teleport to="body"><div v-if="open" role="dialog" aria-modal="true" :class="[\'fixed inset-0 flex items-start justify-center p-4 sm:pt-24\', z]">' +
         '<div class="absolute inset-0 bg-black/40" @click="$emit(\'close\')"></div>' +
         '<div :class="[\'relative w-full bg-white rounded-xl shadow-xl flex flex-col max-h-[85vh]\', width]">' +
         '<div class="flex items-center justify-between px-6 py-4 border-b border-line shrink-0">' +
@@ -394,10 +427,18 @@
 
     // Destructive confirmation.
     app.component('pb-confirm', {
-      props: { open: Boolean, title: String, message: String, confirmLabel: { type: String, default: 'Delete' } },
+      props: {
+        open: Boolean,
+        title: String,
+        message: String,
+        confirmLabel: { type: String, default: 'Delete' },
+        // Passed through to `pb-modal`, for the same reason it has one: a confirmation raised
+        // from inside a drawer has to clear the drawer. See pb-modal's own note.
+        z: { type: String, default: 'z-[70]' },
+      },
       emits: ['confirm', 'close'],
       template:
-        '<pb-modal :open="open" :title="title" @close="$emit(\'close\')">' +
+        '<pb-modal :open="open" :title="title" :z="z" @close="$emit(\'close\')">' +
         '<p class="text-[13px] text-sub leading-relaxed">{{ message }}</p>' +
         '<template #footer>' +
         '<button class="h-9 px-4 rounded-md border border-stroke text-[13px] font-semibold text-ink hover:bg-hover" @click="$emit(\'close\')">Cancel</button>' +
@@ -666,8 +707,26 @@
    * function is what stops a second searchable combobox being written for that one panel.
    */
   function boot(name, component, options) {
-    var root = document.getElementById((options && options.root) || 'settings-root');
-    if (!root) return;
+    /*
+     * `options.root` is an ID, but a CSS-selector "#id" is the obvious thing to write and was
+     * written — getElementById returned null, boot bailed out silently, and the screen sat on
+     * its "Loading…" placeholder forever with nothing in the console to say why. Accept both
+     * spellings rather than leave that trap for the next screen.
+     */
+    var id = String((options && options.root) || 'settings-root').replace(/^#/, '');
+    var root = document.getElementById(id);
+
+    if (!root) {
+      /*
+       * SAY SO. A missing mount point is a programming mistake, not a runtime condition, and
+       * the only symptom the user ever sees is a placeholder that never goes away.
+       */
+      if (window.console && console.error) {
+        console.error('PB.boot("' + name + '"): no element with id "' + id + '" — the screen cannot mount.');
+      }
+
+      return;
+    }
     if (!window.Vue) {
       // The Vue runtime failed to load (blocked CDN, offline, ad-blocker). Surface
       // it instead of silently sitting on the "Loading…" placeholder forever.

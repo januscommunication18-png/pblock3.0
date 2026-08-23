@@ -24,6 +24,8 @@ class User extends Authenticatable
         'last_name',
         'full_name',
         'display_name',
+        // The agent's personal sign-off, appended to Help Center replies (P74).
+        'signature',
         'email',
         'email_verified_at',
         'avatar_url',
@@ -99,6 +101,27 @@ class User extends Authenticatable
      * every screen, not just their profile. Then their name, then the local part of their
      * email — which is not a name, but it is theirs and it is better than an empty chip.
      */
+    /**
+     * The signature as HTML, or an empty string (P74).
+     *
+     * Stored as plain text and converted here, once, so every caller renders it the same way.
+     * `fromPlainText` escapes the content and turns line breaks into markup, which is what makes
+     * a signature containing `<b>` show those characters rather than emboldening the rest of the
+     * email — the agent typed text, not markup, and the column says so.
+     */
+    public function signatureHtml(): string
+    {
+        $text = trim((string) $this->signature);
+
+        return $text === '' ? '' : (string) app(\App\Services\RichTextSanitizer::class)->fromPlainText($text);
+    }
+
+    /** Is there a personal signature worth appending? */
+    public function hasSignature(): bool
+    {
+        return trim((string) $this->signature) !== '';
+    }
+
     public function displayName(): string
     {
         return $this->display_name ?: ($this->full_name ?: strtok((string) $this->email, '@'));

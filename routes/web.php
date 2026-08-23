@@ -1,6 +1,18 @@
 <?php
 
+// FIRST: tenant.php is domain-constrained, and every route below it is NOT — an unconstrained
+// route matches any host, including a tenant's. Registered later, a tenant `/help` would lose
+// to whichever central route claimed the path first, silently. See that file's header.
+require __DIR__.'/tenant.php';
+
 require __DIR__.'/auth.php';
+/*
+ * The Back Office (docs/features/backoffice-auth.md).
+ *
+ * Inside the `web` group so it gets sessions and CSRF, but on its own guard — being signed in
+ * as a customer grants nothing here, and vice versa (§9, BO-D1).
+ */
+require __DIR__.'/backoffice.php';
 require __DIR__.'/invitation.php';
 require __DIR__.'/workspace.php';
 require __DIR__.'/project.php';

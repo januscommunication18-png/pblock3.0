@@ -7,7 +7,7 @@
   rather not wait, and for when meta refresh is disabled.
 --}}
 @push('head')
-  <meta http-equiv="refresh" content="4;url={{ route('welcome') }}" />
+  <meta http-equiv="refresh" content="4;url={{ $continueUrl }}" />
 @endpush
 
 @section('body')
@@ -22,8 +22,10 @@
         Your Project Block account is ready and you've joined the workspace.
       </p>
 
-      <a href="{{ route('welcome') }}" class="mt-7 inline-flex items-center justify-center h-11 px-6 rounded-lg bg-brand hover:bg-brand-dark text-white text-[14px] font-semibold transition-colors">
-        Go to workspace
+      {{-- The destination is decided by the controller: the workspace normally, the Help Center
+           Space when that is what the invitation was actually about (P10). --}}
+      <a href="{{ $continueUrl }}" class="mt-7 inline-flex items-center justify-center h-11 px-6 rounded-lg bg-brand hover:bg-brand-dark text-white text-[14px] font-semibold transition-colors">
+        {{ $continueLabel }}
       </a>
     </div>
   </main>

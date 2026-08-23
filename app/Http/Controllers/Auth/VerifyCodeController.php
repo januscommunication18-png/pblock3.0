@@ -13,6 +13,7 @@ use App\Services\AuthCodeService;
 use App\Services\OnboardingRouter;
 use App\Support\SessionReturnTarget;
 use Illuminate\Http\RedirectResponse;
+use App\Services\Backoffice\ClientAccess;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
@@ -81,6 +82,17 @@ class VerifyCodeController extends Controller
 
             return $user;
         });
+
+        /*
+         * The same client check the password path applies (backoffice-clients.md, §17).
+         *
+         * BOTH sign-in paths, because a rule enforced on one of two doors is not enforced. The
+         * code has already been consumed by this point, so a blocked user cannot retry with it.
+         */
+        if (! app(ClientAccess::class)->allows($user)) {
+            return redirect()->route('signin')
+                ->withErrors(['email' => ClientAccess::BLOCKED_MESSAGE]);
+        }
 
         // Read before the session is regenerated, for the same reason as in SignInController.
         $returnTo = SessionReturnTarget::pull($request);

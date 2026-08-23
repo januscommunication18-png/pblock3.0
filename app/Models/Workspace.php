@@ -6,6 +6,7 @@ use Database\Factories\WorkspaceFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Stancl\Tenancy\Database\Models\Tenant as BaseTenant;
 
 /**
@@ -33,6 +34,13 @@ class Workspace extends BaseTenant
             'id',
             'name',
             'slug',
+            /*
+             * The customer-facing subdomain (P72). Declared HERE for the reason the note below
+             * gives: left off this list, VirtualColumn folds it into `data` instead of the real
+             * column the migration added — and the unique index that is supposed to guarantee
+             * one tenant per host would be guarding a column nothing ever writes.
+             */
+            'subdomain',
             'company_size',
             'timezone',
             'logo_url',
@@ -62,6 +70,23 @@ class Workspace extends BaseTenant
     }
 
     /** Memberships are central plumbing (not tenant-scoped) — see WorkspaceMembership. */
+    /**
+     * This workspace's settings row, readable with NO tenancy context (Back Office, §10).
+     *
+     * `workspaceSettings`, NOT `settings`: `Workspace` extends stancl's Tenant, which folds any
+     * attribute that is not in `getCustomColumns()` into the `data` JSON column. A relation
+     * called `settings` would collide with that lookup — the same class of bug as naming a
+     * relation after an existing column. The longer name has no such twin.
+     *
+     * `withoutGlobalScopes()` is load-bearing: `WorkspaceSettings` uses `BelongsToTenant`, whose
+     * global scope confines every query to the ACTIVE tenant. The Back Office runs with none, so
+     * without this the relation would resolve against nothing for every workspace.
+     */
+    public function workspaceSettings(): HasOne
+    {
+        return $this->hasOne(WorkspaceSettings::class, 'tenant_id')->withoutGlobalScopes();
+    }
+
     public function memberships(): HasMany
     {
         return $this->hasMany(WorkspaceMembership::class, 'workspace_id');

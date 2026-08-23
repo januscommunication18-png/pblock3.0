@@ -28,6 +28,16 @@ class StoreSpaceRequest extends FormRequest
             'description' => ['nullable', 'string', 'max:500'],
 
             /*
+             * The name customers see on mail from this Space (P65).
+             *
+             * OPTIONAL, because the requirement gives it a default — the Space name — and asking
+             * somebody to type "eBay Support" twice on the same form to get the obvious result
+             * is a field that only exists to be ignored. `max:100` matches the column and the
+             * Space name beside it.
+             */
+            'inbound_display_name' => ['nullable', 'string', 'max:100'],
+
+            /*
              * Space Types — free text, many per Space (§3, HC-D9).
              *
              * Deliberately NO `Rule::in`: there is no fixed vocabulary, and validating against
@@ -129,6 +139,9 @@ class StoreSpaceRequest extends FormRequest
             'description' => $this->input('description') === null
                 ? null
                 : trim((string) $this->input('description')),
+            'inbound_display_name' => $this->input('inbound_display_name') === null
+                ? null
+                : trim((string) $this->input('inbound_display_name')),
             'types' => is_array($types) ? HelpCenterSpace::normalizeTypes($types) : $types,
         ]);
     }
@@ -140,6 +153,7 @@ class StoreSpaceRequest extends FormRequest
             'name.required' => 'Give the Space a name.',
             'name.max' => 'A Space name can be at most 100 characters.',
             'description.max' => 'A description can be at most 500 characters.',
+            'inbound_display_name.max' => 'A sender name can be at most 100 characters.',
             'types.required' => 'Add at least one Space type.',
             'types.min' => 'Add at least one Space type.',
             'types.max' => 'A Space can have at most :max types.',

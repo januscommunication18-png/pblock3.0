@@ -25,7 +25,7 @@ PB.boot('help-center-space', {
       open: false,
       saving: false,
       errors: {},
-      form: { name: '', description: '', types: [], lead_user_id: '' }
+      form: { name: '', description: '', inbound_display_name: '', types: [], lead_user_id: '' }
     };
   },
 
@@ -34,6 +34,16 @@ PB.boot('help-center-space', {
       return this.leads.map(function (p) {
         return { value: String(p.id), label: p.name, desc: p.email, avatar: p.avatar, initial: p.initial };
       });
+    },
+
+    /* What the customer will see (P65).
+       The typed name, or the Space name when nobody has typed one — the same fallback
+       HelpCenterSpace::senderName() applies on the server, so the preview is a promise rather
+       than a guess. The address half is deliberately not shown as a real address: it does not
+       exist yet, and printing a made-up one would be showing somebody a mailbox they cannot use. */
+    senderPreview: function () {
+      return String(this.form.inbound_display_name || '').trim()
+        || String(this.form.name || '').trim();
     },
 
     canSubmit: function () {
@@ -51,7 +61,7 @@ PB.boot('help-center-space', {
 
   methods: {
     show: function () {
-      this.form = { name: '', description: '', types: [], lead_user_id: '' };
+      this.form = { name: '', description: '', inbound_display_name: '', types: [], lead_user_id: '' };
       this.errors = {};
       this.open = true;
     },
@@ -90,6 +100,16 @@ PB.boot('help-center-space', {
     '      <label class="block text-[12px] font-semibold text-ink mb-1">Description <span class="text-faint font-normal">(optional)</span></label>',
     '      <textarea v-model="form.description" maxlength="500" rows="3" class="pb-textarea w-full"></textarea>',
     '      <p v-if="err(\'description\')" class="mt-1 text-[12px] text-danger">{{ err(\'description\') }}</p>',
+    '    </div>',
+    '    <div>',
+    '      <label class="block text-[12px] font-semibold text-ink mb-1">Inbound Email Display Name <span class="text-faint font-normal">(optional)</span></label>',
+    '      <input v-model="form.inbound_display_name" maxlength="100" class="pb-input w-full" :placeholder="form.name || \'eBay Support\'" />',
+    '      <p class="mt-1 text-[12px] text-faint">This name will be shown to customers as the sender name when emails are sent from this Space.</p>',
+    '      <p v-if="senderPreview" class="mt-1.5 text-[12px] text-sub _moretogether-break">',
+    '        <span class="font-semibold text-ink">{{ senderPreview }}</span>',
+    '        <span class="text-faint"> &lt;inbound address generated after the Space is created&gt;</span>',
+    '      </p>',
+    '      <p v-if="err(\'inbound_display_name\')" class="mt-1 text-[12px] text-danger">{{ err(\'inbound_display_name\') }}</p>',
     '    </div>',
     '    <div>',
     '      <label class="block text-[12px] font-semibold text-ink mb-1">Space Type</label>',

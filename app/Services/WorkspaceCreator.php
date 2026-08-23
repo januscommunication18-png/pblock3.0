@@ -41,6 +41,9 @@ class WorkspaceCreator
             $workspace = Workspace::create([
                 'name' => $data['name'],
                 'slug' => $data['slug'],
+                // NULL when this workspace runs nothing customer-facing (P72). Never '', which
+                // a unique column would treat as a value two workspaces could collide over.
+                'subdomain' => ($data['subdomain'] ?? null) ?: null,
                 'company_size' => $data['company_size'],
                 'timezone' => $data['timezone'] ?? null,
                 'view_type' => $viewType,

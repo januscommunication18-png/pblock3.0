@@ -40,6 +40,17 @@ Route::middleware('auth')->group(function () {
     Route::get('/workspaces/slug-available', [CreateWorkspaceController::class, 'slugAvailable'])
         ->name('workspaces.slug');
 
+    /*
+     * The tenant subdomain's live availability check (P72).
+     *
+     * Throttled, unlike the slug's: this one is called on every keystroke and it answers a
+     * question about OTHER tenants — "does `acme` exist?" — so an unthrottled version is a
+     * cheap way to enumerate who is on the platform. 60/minute is far more than typing needs.
+     */
+    Route::get('/workspaces/subdomain-available', [CreateWorkspaceController::class, 'subdomainAvailable'])
+        ->middleware('throttle:60,1')
+        ->name('workspaces.subdomain');
+
     // Invite teammates to the current workspace (spec §6), reachable from the app
     Route::get('/workspaces/invite', [InviteMembersController::class, 'show'])->name('workspaces.invite');
     Route::post('/workspaces/invite', [InviteMembersController::class, 'store'])

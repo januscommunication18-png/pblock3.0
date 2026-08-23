@@ -150,6 +150,29 @@
                        class="w-full h-9 px-3 rounded-md border border-line text-[13px] outline-none focus:border-brand" />
                 <p class="mt-1 text-[11px] text-faint">What others see. Defaults to your name.</p>
               </div>
+
+              {{-- Signature (P74) — spans both columns, because a sign-off is several lines and
+                   half a dialog's width would wrap every one of them.
+
+                   A textarea rather than the project's rich editor: that editor is a Vue
+                   component and this dialog is plain JS, so mounting it here would turn the
+                   whole dialog into a Vue island for one field. The requirement asks for "a
+                   rich-text OR formatted text field" and its own example is three plain lines,
+                   which this holds exactly — and a textarea round-trips its own content, which
+                   HTML in a textarea does not. --}}
+              {{-- `grid-column` inline, not `sm:col-span-2`: no col-span utility is present in
+                   the shipped tailwind.css, so the class would silently do nothing and the
+                   textarea would sit in one half-width column. --}}
+              <div style="grid-column: 1 / -1">
+                <label class="block text-[13px] font-medium text-ink mb-1.5" for="account-signature">Signature</label>
+                <textarea id="account-signature" name="signature" rows="4" maxlength="2000"
+                          placeholder="Thanks,&#10;{{ $__acct->displayName() }}&#10;Customer Support"
+                          class="w-full px-3 py-2 rounded-md border border-line text-[13px] leading-relaxed outline-none focus:border-brand"></textarea>
+                <p class="mt-1 text-[11px] text-faint">
+                  Added to the bottom of your replies to customers in the Help Center. You can edit it
+                  before sending. Leave it empty to send replies without a signature.
+                </p>
+              </div>
             </div>
 
             <p id="account-error" class="hidden mt-4 text-[12px] text-danger"></p>

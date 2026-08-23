@@ -153,13 +153,22 @@ PB.boot('help-center-inbound-test', {
     '      <div class="text-[13px] font-semibold text-ink">We couldn&rsquo;t verify your inbound email</div>',
     '      <p class="mt-1.5 text-[12px] text-sub">{{ test.explanation }}</p>',
     '      <p v-if="test.failure_reason" class="mt-1 text-[12px] text-sub _moretogether-break">{{ test.failure_reason }}</p>',
-    '      <ul class="mt-2 pl-4 list-disc text-[12px] text-sub space-y-0.5">',
+    /* Two different lists, because the two causes have nothing in common. Checking a
+       forwarding rule is wasted effort when the webhook URL was never set. */
+    '      <ul v-if="test.ever_received_inbound !== false" class="mt-2 pl-4 list-disc text-[12px] text-sub space-y-0.5">',
     '        <li>Confirm that email forwarding is enabled.</li>',
     '        <li>Confirm that the forwarding destination is correct.</li>',
     '        <li>Check that the inbound address was entered without additional spaces.</li>',
     '        <li>Check whether your email provider requires forwarding verification.</li>',
     '        <li>Confirm that the forwarding rule applies to incoming messages.</li>',
     '        <li>Check Postmark inbound activity for rejected or failed messages.</li>',
+    '      </ul>',
+    '      <ul v-else class="mt-2 pl-4 list-disc text-[12px] text-sub space-y-0.5">',
+    '        <li><strong>Set the Inbound Webhook URL</strong> in Postmark &rarr; your Server &rarr; Message Streams &rarr; Inbound &rarr; Settings. This is the usual cause.</li>',
+    '        <li>Confirm the Inbound Domain there matches the domain in your inbound address.</li>',
+    '        <li>Open the received message in Postmark&rsquo;s Inbound activity and check its Webhook section for delivery attempts and their response codes.</li>',
+    '        <li>Confirm the webhook URL is reachable from the internet, not a localhost address.</li>',
+    '        <li>Check you are configuring the same Postmark server that receives this mail.</li>',
     '      </ul>',
     '    </div>',
 

@@ -21,5 +21,13 @@ class DatabaseSeeder extends Seeder
             'name' => 'Test User',
             'email' => 'test@example.com',
         ]);
+
+        /*
+         * The Back Office Super Admin (docs/features/backoffice-auth.md, §7).
+         *
+         * Idempotent, so `db:seed` on an existing environment confirms the account rather than
+         * failing on the unique index — see the seeder for why it sets no password.
+         */
+        $this->call(BackofficeSuperAdminSeeder::class);
     }
 }

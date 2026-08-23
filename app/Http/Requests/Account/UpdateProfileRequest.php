@@ -29,6 +29,15 @@ class UpdateProfileRequest extends FormRequest
             'first_name' => ['nullable', 'string', 'max:80'],
             'last_name' => ['nullable', 'string', 'max:80'],
             'display_name' => ['nullable', 'string', 'max:120'],
+            /*
+             * The agent's Help Center signature (P74).
+             *
+             * Plain text — the column stores what was typed and the HTML is built on render, so
+             * there is nothing to sanitize here beyond a length. 2000 characters is a generous
+             * sign-off and a firm ceiling: this string is appended to every reply the agent
+             * sends, so an unbounded one is an unbounded email.
+             */
+            'signature' => ['nullable', 'string', 'max:2000'],
             // Chosen from the palette, not typed. Anything off the list is refused rather than
             // trusted: this string is rendered into a `style` attribute, and a free-text value
             // there is a CSS injection with the user's own profile as the vector.
@@ -41,7 +50,7 @@ class UpdateProfileRequest extends FormRequest
     {
         $trimmed = [];
 
-        foreach (['first_name', 'last_name', 'display_name'] as $field) {
+        foreach (['first_name', 'last_name', 'display_name', 'signature'] as $field) {
             if (! $this->has($field)) {
                 continue;
             }

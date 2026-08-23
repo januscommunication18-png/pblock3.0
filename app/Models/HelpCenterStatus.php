@@ -28,6 +28,19 @@ class HelpCenterStatus extends Model
 
     public const RESPONSIBILITY_CREATOR = 'creator';
 
+    /**
+     * Whose clock runs while a Request sits in this status (P9, Waiting Responsibility).
+     *
+     * Distinct from `responsibility` above, which decides who gets ASSIGNED. These decide who
+     * OWES the next action, which is the only thing that makes a waiting period mean anything:
+     * without it the Inbox can report a ticket's age and nothing else.
+     */
+    public const WAITING_AGENT = 'agent';
+
+    public const WAITING_CUSTOMER = 'customer';
+
+    public const WAITING_NEITHER = 'neither';
+
     public const RESPONSIBILITY_ASSIGNEE = 'assignee';
 
     /** Where the two system rows sit. Custom statuses are numbered between them. */
@@ -41,8 +54,11 @@ class HelpCenterStatus extends Model
         'name',
         'color',
         'responsibility',
+        'waiting_on',
+        'is_default',
         'is_active',
         'system_key',
+        'system_category',
         'position',
         'default_assignees',
     ];
@@ -51,6 +67,7 @@ class HelpCenterStatus extends Model
     {
         return [
             'is_active' => 'boolean',
+            'is_default' => 'boolean',
             'position' => 'integer',
             'default_assignees' => 'array',
         ];
@@ -82,6 +99,39 @@ class HelpCenterStatus extends Model
         return $this->system_key === self::SYSTEM_CLOSED;
     }
 
+    /**
+     * The status a new Request opens in, for one Space (P9, Default Status).
+     *
+     * Falls back to Open and then to the first status in workflow order, because a Space with no
+     * default must still be able to receive email — an inbound message that cannot be given a
+     * status would otherwise be dropped, and losing a customer's mail to a configuration gap is
+     * far worse than opening it in the wrong column.
+     */
+    public static function defaultFor(int $spaceId): ?self
+    {
+        $statuses = static::query()->where('help_center_space_id', $spaceId)->ordered()->get();
+
+        return $statuses->firstWhere('is_default', true)
+            ?? $statuses->firstWhere('system_key', self::SYSTEM_OPEN)
+            ?? $statuses->first();
+    }
+
+    /**
+     * Make this the Space's starting status, and the only one.
+     *
+     * Cleared across the whole Space first: "default" is a property of the WORKFLOW, not of a
+     * row, so two rows claiming it is not a state the product has an answer for.
+     */
+    public function makeDefault(): void
+    {
+        static::query()
+            ->where('help_center_space_id', $this->help_center_space_id)
+            ->where('id', '!=', $this->id)
+            ->update(['is_default' => false]);
+
+        $this->forceFill(['is_default' => true])->save();
+    }
+
     /** P2 §16: only custom statuses can be deleted, renamed or moved. */
     public function isEditable(): bool
     {
@@ -105,6 +155,9 @@ class HelpCenterStatus extends Model
                 'name' => 'Open',
                 'color' => '#22c55e',
                 'responsibility' => self::RESPONSIBILITY_ASSIGNEE,
+                // New mail lands here and is waiting on an agent from the moment it arrives.
+                'waiting_on' => self::WAITING_AGENT,
+                'is_default' => true,
                 // Always active, and not negotiable (P2 §16).
                 'is_active' => true,
                 'system_key' => self::SYSTEM_OPEN,
@@ -115,6 +168,9 @@ class HelpCenterStatus extends Model
                 'name' => 'Closed',
                 'color' => '#6b7280',
                 'responsibility' => self::RESPONSIBILITY_ASSIGNEE,
+                // The end of the workflow: nobody owes anything, so no clock runs.
+                'waiting_on' => self::WAITING_NEITHER,
+                'is_default' => false,
                 // Always inactive, and not negotiable (P2 §16).
                 'is_active' => false,
                 'system_key' => self::SYSTEM_CLOSED,
@@ -125,9 +181,38 @@ class HelpCenterStatus extends Model
     }
 
     /** @return array<int, string> */
+    public static function waitingOptions(): array
+    {
+        return [self::WAITING_AGENT, self::WAITING_CUSTOMER, self::WAITING_NEITHER];
+    }
+
+    /** @return array<int, string> */
     public static function responsibilities(): array
     {
         return [self::RESPONSIBILITY_CREATOR, self::RESPONSIBILITY_ASSIGNEE];
+    }
+
+    /**
+     * The System Categories a status may belong to (P54).
+     *
+     * From config, which is where the vocabulary lives (P53) — this model does not carry a second
+     * copy of the five, so adding one is a config change and nothing else.
+     */
+    public static function systemCategories(): array
+    {
+        return array_keys((array) config('help-center.system_categories'));
+    }
+
+    public static function isSystemCategory(?string $key): bool
+    {
+        return $key !== null && in_array($key, self::systemCategories(), true);
+    }
+
+    /** The category's display label — "Active", not `active`. */
+    public function systemCategoryLabel(): string
+    {
+        return (string) (config('help-center.system_categories.'.$this->system_category.'.label')
+            ?? $this->system_category);
     }
 
     /** @return array<string, mixed> */
@@ -138,8 +223,11 @@ class HelpCenterStatus extends Model
             'name' => $this->name,
             'color' => $this->color,
             'responsibility' => $this->responsibility,
+            'waiting_on' => $this->waiting_on,
+            'is_default' => (bool) $this->is_default,
             'is_active' => $this->is_active,
             'system_key' => $this->system_key,
+            'system_category' => $this->system_category,
             'editable' => $this->isEditable(),
             'position' => $this->position,
             'default_assignees' => array_values((array) $this->default_assignees),

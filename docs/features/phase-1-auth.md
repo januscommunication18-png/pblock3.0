@@ -102,3 +102,83 @@ Capture: `Listeners\CaptureOutgoingEmail`, `Providers\EmailLogServiceProvider`.
 Routes: `routes/auth.php`.
 Views: `layouts/auth`, `auth/signup`, `auth/verify`, `auth/signin`, `onboarding/{profile,role,goals}`, `dev/emaillog/{index,show}`.
 Config: `config-snippets/filesystems.php`, `services.php`, `mail-and-env.md`, `public/assets/*`.
+
+---
+
+## P73 — Onboarding profile: default opt-in and a password strength meter (2026-08-22)
+
+**Requirement.** The marketing checkbox ticked by default and still unstickable; a real-time
+strength meter under the password field (Weak → Fair → Good → Strong) and a requirements list
+that marks each item as it is satisfied. "The password strength display should be guidance only;
+the actual password validation rules should still be enforced when the form is submitted."
+
+### The checkbox, and the hidden input that makes it honest
+
+`old('marketing_opt_in', 1)` ticks it on a fresh load. On its own that would have introduced a
+quiet bug: an unchecked checkbox submits **nothing**, so `old('marketing_opt_in')` is null both
+when the user deliberately unticked it and when there is no old input at all. With the box now
+ticked by default those two cases are opposite intentions — so failing validation on any other
+field would have silently re-ticked a box the user had just cleared.
+
+A `<input type="hidden" name="marketing_opt_in" value="0">` **before** the checkbox fixes it:
+something is always submitted, PHP keeps the last value for a repeated name, and the checkbox
+overrides the hidden input whenever it is ticked.
+
+Verified: unticked → submitted a mismatched password confirmation → the form redisplayed with
+the validation error and the box **still unticked**.
+
+### Strength is guidance and is not wired to anything
+
+`Continue` is not conditioned on the meter, and `ProfileRequest` is untouched. The requirement
+asked for that, and it is also the honest arrangement given what is actually enforced here:
+`Password::defaults()` resolves in this application to **a minimum of 8 characters and nothing
+else** — no mixed case, no numbers, no symbols.
+
+Which is why the five chips carry a line under them: *"Only the length is required — the rest
+make your password stronger."* Rendering all five identically would tell somebody that four
+things are required which are not, and they would then be able to submit eight lowercase letters
+and reasonably wonder which of the two the form meant.
+
+### Scoring
+
+Five tests — 8+ characters, uppercase, lowercase, number, special character — plus a bonus that
+grows with length (+1 at 12, +2 at 16). Nothing under 8 characters can rate better than Weak
+whatever else it contains.
+
+The length bonus is not decoration. With a single step at 12 the meter rated
+`correcthorsebatterystaple` as **Fair** while the nine-character `Abcdefg1!` came out **Strong** —
+guidance that pushes people toward the weaker of the two passwords. A second step at 16 puts a
+real passphrase ahead of a short password wearing punctuation.
+
+| Password | Rating |
+|---|---|
+| `Ab1!xyz` (7, has everything) | Weak — the length floor |
+| `abcdefgh` | Weak |
+| `Abcdefgh` | Fair |
+| `Abcdefg1` | Good |
+| `Abcdefg1!` | Strong |
+| `abcdefghijkl` | Fair |
+| `correcthorsebatterystaple` | Good |
+
+The "special character" test is `[^A-Za-z0-9\s]` rather than a fixed list: a password containing
+`£` or an em dash is not weaker for being unusual, and a list would quietly refuse to credit
+characters somebody legitimately used.
+
+The bar appears with the first keystroke — an empty field showing "Weak" is a verdict on nothing —
+and the label is `aria-live="polite"` so the strength is announced without interrupting typing.
+
+### A note on the widths
+
+The bar's four steps are inline `style="width:…"` rather than `w-1/4`/`w-2/4`/`w-3/4`. Those
+fractions are **not in the shipped `tailwind.css`**, so they would have silently done nothing.
+The upload progress bar directly above already uses an inline width for the same reason.
+
+### Worth raising: pre-ticked marketing consent
+
+Built as asked. It is worth knowing that a pre-ticked box is not valid consent under GDPR — the
+regulation requires a clear affirmative act (Recital 32), and the CJEU said so directly in
+*Planet49* (C-673/17). If any of these users are in the EU or UK, this checkbox in this state
+would not stand up as a lawful basis for marketing email.
+
+That is a product and legal call rather than a technical one, and the change is a one-word edit
+(`old('marketing_opt_in', 1)` → `0`) if it turns out to matter.

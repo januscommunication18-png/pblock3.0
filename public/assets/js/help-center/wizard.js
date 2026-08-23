@@ -18,83 +18,10 @@ PB.boot('help-center-setup', {
   props: { bootstrap: Object },
 
   /*
-   * One status card, used three times: for Open, for each custom status, and for Closed.
-   *
-   * A component rather than three copies of the markup, because the only thing that differs
-   * between them is whether the row is a SYSTEM one — and that difference is four small
-   * conditionals, where three copies would be three places to fix every future change.
-   *
-   * The `status` object is mutated in place. That is deliberate: it is the same object the
-   * parent holds in `statuses`, so the fields the user edits are already where the payload
-   * reads them. Ordering and deletion are emitted instead, because those are facts about the
-   * LIST, which the card does not own.
+   * The status card lives in its own file, because Settings → Workflow's editor edits the same
+   * rows through the same rules (P16). Loaded before this script — see setup.blade.php.
    */
-  components: {
-    'hc-status-card': {
-      props: {
-        status: { type: Object, required: true },
-        colors: { type: Array, default: function () { return []; } },
-        responsibilities: { type: Array, default: function () { return []; } },
-        assignees: { type: Array, default: function () { return []; } }
-      },
-      emits: ['move', 'remove'],
-      computed: {
-        system: function () { return !!this.status.system_key; },
-        lockLabel: function () {
-          return this.status.system_key === 'open' ? 'Always Active' : 'Always Inactive';
-        }
-      },
-      methods: {
-        icon: function (name, size) { return window.wiIcon ? window.wiIcon(name, size || 16) : ''; },
-        // pb-combo works in strings; the payload wants integers.
-        assigneeValues: function () { return (this.status.default_assignees || []).map(String); },
-        setAssignees: function (values) {
-          this.status.default_assignees = (values || []).map(function (v) { return parseInt(v, 10); });
-        }
-      },
-      template: [
-        '<div :class="[\'rounded-lg border px-4 py-3\', system ? \'border-line bg-[#f9fafb]\' : \'border-line bg-white\']">',
-        '  <div class="flex items-start gap-3">',
-        '    <div class="pt-2 text-faint" :class="system ? \'opacity-40\' : \'cursor-move\'" v-html="icon(system ? \'lock\' : \'grip-vertical\', 14)"></div>',
-        '    <div class="flex-1 min-w-0 grid gap-3 sm:grid-cols-2">',
-        '      <div>',
-        '        <label class="block text-[11px] font-semibold text-faint uppercase tracking-wide mb-1">Status Name</label>',
-        '        <input v-if="!system" v-model="status.name" maxlength="60" class="pb-input w-full" placeholder="Waiting on Customer" />',
-        '        <div v-else class="h-9 flex items-center gap-2 text-[13px] font-semibold text-ink">{{ status.name }}<span v-html="icon(\'lock\', 11)" class="text-faint"></span></div>',
-        '      </div>',
-        '      <div>',
-        '        <label class="block text-[11px] font-semibold text-faint uppercase tracking-wide mb-1">Responsibility</label>',
-        '        <pb-combo v-model="status.responsibility" :options="responsibilities" :searchable="false" />',
-        '      </div>',
-        '      <div>',
-        '        <label class="block text-[11px] font-semibold text-faint uppercase tracking-wide mb-1">Colour</label>',
-        '        <pb-color-picker v-model="status.color" :presets="colors" />',
-        '      </div>',
-        '      <div>',
-        '        <label class="block text-[11px] font-semibold text-faint uppercase tracking-wide mb-1">Default Assignees</label>',
-        '        <pb-combo :model-value="assigneeValues()" @update:model-value="setAssignees($event)" :options="assignees" :multiple="true" placeholder="Anyone" />',
-        '      </div>',
-        '    </div>',
-        '    <div class="w-[136px] shrink-0 text-right">',
-        '      <div class="text-[11px] font-semibold text-faint uppercase tracking-wide mb-1">Preview</div>',
-        '      <span class="inline-flex items-center h-6 px-2 rounded-full text-[11px] font-semibold text-white" :style="{ background: status.color }">{{ status.name || \'Untitled\' }}</span>',
-        /* Open is always Active and Closed always Inactive (P2 §16), so neither gets a toggle. */
-        '      <div class="mt-2 flex items-center justify-end">',
-        '        <pb-toggle v-if="!system" :model-value="status.is_active" @update:model-value="status.is_active = $event" />',
-        '        <span v-else class="text-[11px] text-faint">{{ lockLabel }}</span>',
-        '      </div>',
-        /* Only custom statuses can be reordered or deleted (P2 §16). */
-        '      <div v-if="!system" class="mt-2 flex items-center justify-end gap-1">',
-        '        <button type="button" @click="$emit(\'move\', -1)" aria-label="Move up" class="_moretogether-iconbtn" v-html="icon(\'arrow-up\', 12)"></button>',
-        '        <button type="button" @click="$emit(\'move\', 1)" aria-label="Move down" class="_moretogether-iconbtn" v-html="icon(\'arrow-down\', 12)"></button>',
-        '        <button type="button" @click="$emit(\'remove\')" aria-label="Delete status" class="_moretogether-iconbtn _moretogether-iconbtn--danger" v-html="icon(\'trash-can\', 12)"></button>',
-        '      </div>',
-        '    </div>',
-        '  </div>',
-        '</div>'
-      ].join('\n')
-    }
-  },
+  components: { 'hc-status-card': window.HC_STATUS_CARD },
 
   data: function () {
     var b = this.bootstrap || {};
@@ -131,12 +58,22 @@ PB.boot('help-center-setup', {
       space: {
         name: space.name || '',
         description: space.description || '',
+        inbound_display_name: space.inbound_display_name || '',
         types: (space.types || []).slice(),
         department_groups: (space.department_groups || []).slice(),
         lead_user_id: space.lead_user_id ? String(space.lead_user_id) : ''
       },
 
       members: ((d.team || {}).members || []).slice(),
+      /*
+       * The coworker the trash icon is asking about, and their row index.
+       *
+       * Removing somebody here undoes an Add that has not been sent anywhere — but it is still
+       * a row somebody typed an address into, and the icon that does it sits at the end of a
+       * table row where the pointer passes over it on the way to anything else. The dialog is
+       * the difference between an action and an accident.
+       */
+      removeTarget: null,
       memberForm: { email: '', role: '', department_groups: [] },
       memberError: '',
 
@@ -178,6 +115,14 @@ PB.boot('help-center-setup', {
   },
 
   computed: {
+    /* The sender name a customer will see (P65) — what was typed, or the Space name as the
+       fallback. The same rule HelpCenterSpace::senderName() applies on the server, so the
+       preview here and the Review step both describe what will actually be sent. */
+    senderPreview: function () {
+      return String(this.space.inbound_display_name || '').trim()
+        || String(this.space.name || '').trim();
+    },
+
     leadOptions: function () {
       return this.leads.map(function (p) {
         return { value: String(p.id), label: p.name, desc: p.email, avatar: p.avatar, initial: p.initial };
@@ -399,7 +344,17 @@ PB.boot('help-center-setup', {
       this.memberForm = { email: '', role: '', department_groups: [] };
     },
 
-    removeMember: function (i) { this.members.splice(i, 1); },
+    /** Ask first. `askRemoveMember` opens the dialog; this is what the dialog calls. */
+    removeMember: function () {
+      if (!this.removeTarget) return;
+
+      this.members.splice(this.removeTarget.index, 1);
+      this.removeTarget = null;
+    },
+
+    askRemoveMember: function (i) {
+      this.removeTarget = { index: i, member: this.members[i] };
+    },
 
     memberName: function (m) {
       var known = this.leads.find(function (p) {
@@ -556,7 +511,34 @@ PB.boot('help-center-setup', {
   },
 
   template: [
-    '<div class="mx-auto max-w-[792px] px-5 sm:px-8 py-10">',
+    /* 1100 rather than 792.
+       The narrow measure was set when every step was a single column of inputs. Steps 2, 3, 4
+       and 6 have since grown two-column grids, a status editor and a review table, and those
+       were being squeezed into a width chosen for a paragraph. The FIELDS keep their own
+       readable widths — this only stops the screen from being narrower than its content.
+
+       1100 and not, say, 1040 because `max-w-[1100px]` is IN the built stylesheet and
+       `max-w-[1040px]` is not: Tailwind emits only the classes it finds in the sources it
+       scans, and an arbitrary value that exists solely inside this template string produces no
+       rule at all — the container silently goes full width. Check the built CSS before
+       inventing a new one here. */
+    '<div>',
+
+    /* ===== Page header — the same h-12 bordered bar every other Help Center screen carries
+       (Spaces, Inboxes, a Space's views). The wizard was the one screen without it, so the
+       module's chrome stopped one screen short. It sits OUTSIDE the 1100px measure below, so
+       the bar spans the full main area like the others rather than being inset with the form.
+       The sidebar-expand control moved up here from the step row for the same reason: it is
+       part of the chrome, not part of the flow. ===== */
+    '  <div class="flex items-center gap-2 px-5 sm:px-8 h-12 border-b border-line">',
+    '    <button type="button" data-sidebar-expand title="Show sidebar" aria-label="Show sidebar" aria-controls="sidebar" aria-expanded="false" class="h-7 w-7 place-items-center rounded-md text-sub hover:bg-hover hover:text-ink shrink-0" v-html="icon(\'sidebar\', 16)"></button>',
+    '    <span data-sidebar-divider aria-hidden="true" class="h-5 w-px bg-line shrink-0"></span>',
+    '    <span class="flex items-center gap-2 text-[14px] font-medium text-ink">',
+    '      <span v-html="icon(\'rectangles-pair\', 16, \'text-sub\')"></span>Set up your Help Center',
+    '    </span>',
+    '  </div>',
+
+    '  <div class="mx-auto max-w-[1100px] px-5 sm:px-8 py-10">',
 
     /* ---- somebody who may not run this (§19) ---- */
     '  <div v-if="!canCreate" class="rounded-lg border border-line px-6 py-12 text-center">',
@@ -568,16 +550,31 @@ PB.boot('help-center-setup', {
     '  <div v-else>',
 
     /* ---- progress: current step and total (P2 §2) ---- */
-    /* Brings the collapsed Help Center panel back; hidden by CSS while it is open. */
     '    <div class="flex items-center gap-2 mb-2">',
-    '      <button type="button" data-sidebar-expand title="Show sidebar" aria-label="Show sidebar" aria-controls="sidebar" aria-expanded="false" class="h-7 w-7 place-items-center rounded-md text-sub hover:bg-hover hover:text-ink shrink-0" v-html="icon(\'sidebar\', 16)"></button>',
     '      <span class="text-[12px] font-semibold text-brand">Step {{ step }} of {{ totalSteps }}</span>',
     '    </div>',
-    '    <ol class="flex flex-wrap items-center gap-x-2 gap-y-1 mb-8">',
-    '      <li v-for="(s, i) in steps" :key="s.number" class="flex items-center gap-2 min-w-0">',
+    /* ONE ROW, always.
+       It used to wrap: six full labels ("Invite Your Support Group", "Configure Your Workflow")
+       are about 120 characters, more than any sensible width holds, so the bar broke over two
+       lines and the numbers stopped reading as a sequence. It draws the SHORT label now —
+       Space / Team / Inbox / Workflow / Settings / Review — with the full one on the row's
+       title and, more importantly, as the heading of the step you are standing on, which is the
+       only step whose full name you actually need.
+
+       `flex-nowrap` and `whitespace-nowrap` mean it cannot wrap again; the connector between
+       steps grows instead, so the bar spans the width rather than bunching at the left. Below
+       `sm` the labels drop and the numbers stay — a phone gets one row too. */
+    '    <ol class="flex flex-nowrap items-center gap-2 mb-8">',
+    '      <li v-for="(s, i) in steps" :key="s.number" :title="s.label"',
+    '          :class="[\'flex items-center gap-2 min-w-0\', i < steps.length - 1 ? \'flex-1\' : \'\']">',
     '        <span :class="[\'h-6 w-6 shrink-0 rounded-full grid place-items-center text-[11px] font-semibold\', s.number < step ? \'bg-brand text-white\' : (s.number === step ? \'bg-sel text-brand border border-stroke\' : \'bg-hover text-faint\')]">{{ s.number }}</span>',
-    '        <span :class="[\'text-[12px] truncate\', s.number > step ? \'text-faint\' : \'text-ink\']">{{ s.label }}</span>',
-    '        <span v-if="i < steps.length - 1" class="w-4 h-px bg-line shrink-0"></span>',
+    // `truncate` rather than plain `whitespace-nowrap`: with the bar unable to wrap, a window
+    // too narrow to hold six labels would otherwise push them out of the container. Ellipsis is
+    // the last resort, and the full label is still on the row's title.
+    '        <span :class="[\'hidden sm:block text-[12px] truncate\', s.number === step ? \'text-ink font-semibold\' : (s.number > step ? \'text-faint\' : \'text-ink\')]">{{ s.short || s.label }}</span>',
+    // The connector lives INSIDE the row it follows — a sibling <li> would be outside the
+    // v-for and could not see `i`. It grows, which is what spreads the six across the bar.
+    '        <span v-if="i < steps.length - 1" class="h-px bg-line flex-1 ml-1" style="min-width:8px"></span>',
     '      </li>',
     '    </ol>',
 
@@ -595,6 +592,13 @@ PB.boot('help-center-setup', {
     '          <label class="block text-[12px] font-semibold text-ink mb-1">Description <span class="text-faint font-normal">(optional)</span></label>',
     '          <textarea v-model="space.description" maxlength="500" rows="3" class="pb-textarea w-full" placeholder="Handles customer product questions, technical issues, and account support."></textarea>',
     '          <p v-if="err(\'description\')" class="mt-1 text-[12px] text-danger">{{ err(\'description\') }}</p>',
+    '        </div>',
+    '        <div>',
+    '          <label class="block text-[12px] font-semibold text-ink mb-1">Inbound Email Display Name <span class="text-faint font-normal">(optional)</span></label>',
+    '          <input v-model="space.inbound_display_name" maxlength="100" class="pb-input w-full" :placeholder="space.name || \'eBay Support\'" />',
+    '          <p class="mt-1 text-[12px] text-faint">This name will be shown to customers as the sender name when emails are sent from this Space.</p>',
+    '          <p v-if="senderPreview" class="mt-1.5 text-[12px] text-sub _moretogether-break"><span class="font-semibold text-ink">{{ senderPreview }}</span><span class="text-faint"> &lt;inbound address generated after the Space is created&gt;</span></p>',
+    '          <p v-if="err(\'inbound_display_name\')" class="mt-1 text-[12px] text-danger">{{ err(\'inbound_display_name\') }}</p>',
     '        </div>',
     '        <div>',
     '          <label class="block text-[12px] font-semibold text-ink mb-1">Space Type</label>',
@@ -650,7 +654,16 @@ PB.boot('help-center-setup', {
     '            <td class="py-2 text-ink _moretogether-break">{{ memberName(m) }} <span v-if="!m.user_id" class="_moretogether-badge _moretogether-badge--wait">Will be invited</span></td>',
     '            <td class="py-2 text-ink">{{ roleLabel(m.role) }}</td>',
     '            <td class="py-2"><span v-for="g in m.department_groups" :key="g" class="_moretogether-tag _moretogether-tag--static mr-1">{{ g }}</span><span v-if="!m.department_groups.length" class="text-faint">—</span></td>',
-    '            <td class="py-2 text-right"><button type="button" @click="removeMember(i)" class="text-[12px] text-sub hover:text-danger">Remove</button></td>',
+    /* An icon, not the word "Remove": the column is one control wide and repeats down the
+       table, so the label was five characters of chrome on every row saying what the trash
+       glyph says on its own. `title` and `aria-label` keep it named for a pointer and for a
+       screen reader. */
+    '            <td class="py-2 text-right">',
+    '              <button type="button" @click="askRemoveMember(i)" :title="\'Remove \' + memberName(m)"',
+    '                      :aria-label="\'Remove \' + memberName(m)"',
+    '                      class="h-7 w-7 inline-grid place-items-center rounded-md text-sub hover:bg-hover hover:text-danger"',
+    '                      v-html="icon(\'trash\', 15)"></button>',
+    '            </td>',
     '          </tr>',
     '        </tbody>',
     '      </table>',
@@ -719,13 +732,21 @@ PB.boot('help-center-setup', {
     '      <h1 class="text-[18px] font-semibold text-head">Configure your workflow</h1>',
     '      <p class="mt-1 text-[13px] text-sub">Build the workflow your team will use to manage conversations from open to closed.</p>',
 
-    /* Open, then the Add link, then the custom statuses, then Closed.
-       The link sits BETWEEN Open and everything below it and stays there however many custom
-       statuses exist — but a new card is always inserted directly above Closed, because Closed
-       is always last (P2 §16). So "where you click" and "where it lands" are deliberately
-       different, which is why the button says so. */
+    /* Open, then the custom statuses, then the Add link, then Closed.
+       The link used to sit directly under Open — above every custom status — while a new card
+       is always inserted just ABOVE Closed, because Closed is always last (P2 §16). So the
+       button and the card it produced were at opposite ends of a growing list: after three or
+       four statuses you were at the bottom looking at the newest card with the only way to add
+       another scrolled off the top of the screen, which reads as the button having disappeared.
+       It sits at the END of the list now, where the next card actually lands. */
     '      <div class="mt-6">',
     '        <hc-status-card v-if="openStatus" :status="openStatus" :colors="statusColors" :responsibilities="responsibilities" :assignees="assigneeOptions()" />',
+    '      </div>',
+
+    '      <div class="space-y-3">',
+    '        <hc-status-card v-for="s in customStatuses" :key="s._uid" :status="s" :colors="statusColors" :responsibilities="responsibilities" :assignees="assigneeOptions()"',
+    '                        @move="move(s, $event)" @remove="removeStatus(s)"',
+    '                        :draggable="true" @dragstart="onDragStart(s)" @dragover="onDragOver(s, $event)" @drop="onDrop(s)" />',
     '      </div>',
 
     '      <div class="my-4 flex items-center gap-3">',
@@ -738,18 +759,12 @@ PB.boot('help-center-setup', {
     '      </div>',
     '      <p v-if="customStatuses.length >= statusMax" class="mb-4 text-center text-[12px] text-faint">That is the most statuses a workflow can hold.</p>',
 
-    '      <div class="space-y-3">',
-    '        <hc-status-card v-for="s in customStatuses" :key="s._uid" :status="s" :colors="statusColors" :responsibilities="responsibilities" :assignees="assigneeOptions()"',
-    '                        @move="move(s, $event)" @remove="removeStatus(s)"',
-    '                        :draggable="true" @dragstart="onDragStart(s)" @dragover="onDragOver(s, $event)" @drop="onDrop(s)" />',
-    '      </div>',
-
     '      <div class="mt-3">',
     '        <hc-status-card v-if="closedStatus" :status="closedStatus" :colors="statusColors" :responsibilities="responsibilities" :assignees="assigneeOptions()" />',
     '      </div>',
 
     '      <p v-if="err(\'statuses\') || rowErr(\'statuses.\')" class="mt-3 text-[12px] text-danger">{{ err(\'statuses\') || rowErr(\'statuses.\') }}</p>',
-    '      <p class="mt-3 text-[12px] text-faint">Open is always first and Closed always last. New statuses are added just above Closed; drag them, or use the arrows, to reorder.</p>',
+    '      <p class="mt-3 text-[12px] text-faint">Open is always first and Closed always last. Everything between them is yours — drag them, or use the arrows, to reorder.</p>',
     '    </div>',
 
     /* ================= STEP 5 — Conversation Settings (P2 §17–§24) ================= */
@@ -824,6 +839,7 @@ PB.boot('help-center-setup', {
     '          <dl class="px-4 py-3 space-y-2 text-[13px]">',
     '            <div class="flex gap-4"><dt class="w-40 shrink-0 text-sub">Name</dt><dd class="text-ink">{{ space.name || \'—\' }}</dd></div>',
     '            <div class="flex gap-4"><dt class="w-40 shrink-0 text-sub">Description</dt><dd class="text-ink">{{ space.description || \'—\' }}</dd></div>',
+    '            <div class="flex gap-4"><dt class="w-40 shrink-0 text-sub">Sender name</dt><dd class="text-ink">{{ senderPreview || \'—\' }}</dd></div>',
     '            <div class="flex gap-4"><dt class="w-40 shrink-0 text-sub">Space Type</dt><dd><span v-for="t in space.types" :key="t" class="_moretogether-tag _moretogether-tag--static mr-1">{{ t }}</span></dd></div>',
     '            <div class="flex gap-4"><dt class="w-40 shrink-0 text-sub">Department Groups</dt><dd><span v-for="g in space.department_groups" :key="g" class="_moretogether-tag _moretogether-tag--static mr-1">{{ g }}</span><span v-if="!space.department_groups.length" class="text-faint">—</span></dd></div>',
     '            <div class="flex gap-4"><dt class="w-40 shrink-0 text-sub">Space Lead</dt><dd class="text-ink">{{ leadName }}</dd></div>',
@@ -887,14 +903,44 @@ PB.boot('help-center-setup', {
     '      </div>',
     '    </div>',
 
-    /* ---- footer: Back / Continue / Create (P2 §2) ---- */
-    '    <div class="mt-8 flex flex-wrap items-center gap-2 border-t border-line pt-6">',
-    '      <button v-if="step > 1" type="button" @click="back" :disabled="saving" class="inline-flex items-center h-9 px-4 rounded-md border border-stroke text-[13px] font-semibold text-ink hover:bg-hover disabled:opacity-50">Back</button>',
+    /* ---- footer: Back / Continue / Create (P2 §2) ----
+       `mb` rather than padding on the page wrapper: the 150px belongs to the ACTION ROW, so it
+       travels with it and stays put whatever a step renders above. An inline style because
+       `mb-[150px]` is not in the built stylesheet — see the container's note above. */
+    '    <div style="margin-bottom:150px"',
+    '         class="mt-8 flex flex-wrap items-center gap-2 border-t border-line pt-6">',
+    /* Continue first, then Back.
+       The forward action is the one nearly every visit to this screen ends with, so it leads —
+       and it keeps the same position on all six steps, where Back is absent on the first. With
+       Back leading, the primary button shifted sideways between Step 1 and Step 2. */
     '      <button type="button" @click="next" :disabled="!canContinue" class="inline-flex items-center h-9 px-4 rounded-md bg-brand text-white text-[13px] font-semibold disabled:opacity-50">{{ saving ? \'Saving…\' : (step === totalSteps ? \'Create Space\' : \'Continue\') }}</button>',
+    '      <button v-if="step > 1" type="button" @click="back" :disabled="saving" class="inline-flex items-center h-9 px-4 rounded-md border border-stroke text-[13px] font-semibold text-ink hover:bg-hover disabled:opacity-50">Back</button>',
     '      <button type="button" @click="cancel" class="ml-auto inline-flex items-center h-9 px-4 rounded-md text-[13px] font-semibold text-sub hover:text-danger">Cancel Setup</button>',
     '    </div>',
 
     '  </div>',
+    /* closes the 1100px measure opened under the page header */
+    '  </div>',
+
+    /* ---- Remove coworker? (Step 2) ----
+       Outside the step branches, at the root: pb-modal teleports to <body>, so it only has to
+       exist, and `removeTarget` is the one thing that decides whether it is open. */
+    '  <pb-modal :open="!!removeTarget" title="Remove coworker?" @close="removeTarget = null">',
+    '    <p class="text-[13px] text-sub leading-relaxed">',
+    '      Remove <span class="font-semibold text-ink">{{ removeTarget ? memberName(removeTarget.member) : \'\' }}</span>',
+    '      from this Space?',
+    '    </p>',
+    /* Honest about how little this does — nothing has been created yet, and saying so is what
+       stops the dialog reading like a warning about deleting an account. */
+    '    <p class="mt-3 text-[12px] text-sub">',
+    '      They have not been invited yet, so nothing is sent or undone — they are simply taken',
+    '      off this list. You can add them again at any point before you finish setup.',
+    '    </p>',
+    '    <template #footer>',
+    '      <button type="button" class="h-9 px-4 rounded-md border border-stroke text-[13px] font-semibold text-ink hover:bg-hover" @click="removeTarget = null">Cancel</button>',
+    '      <button type="button" class="h-9 px-4 rounded-md bg-danger text-white text-[13px] font-semibold" @click="removeMember">Remove</button>',
+    '    </template>',
+    '  </pb-modal>',
     '</div>'
   ].join('\n')
 }, { root: 'help-center-setup' });

@@ -99,6 +99,81 @@ return [
      * Reserved slugs blocked from workspace URLs (WS-004). Keeps workspace slugs from
      * colliding with application/system routes and marketing paths.
      */
+    /**
+     * The tenant SUBDOMAIN (docs/features/workspace-subdomain.md, P72).
+     *
+     * `acme` in `https://acme.projectblock.app`. One identifier per tenant, and the products
+     * are separated by ROUTE underneath it — `/help`, `/client` — rather than by giving each
+     * its own host. That is the requirement's own recommendation and it is the right one: a
+     * tenant gets one customer-facing domain to publish, and Help Center and Client Hub cannot
+     * collide over who owns `acme`.
+     *
+     * Deliberately NOT the same thing as `slug`. The slug is this workspace's path on the
+     * shared application host (`app.projectblock.so/acme-inc`) and every workspace has one; the
+     * subdomain is a customer-facing host and only a workspace running a customer-facing
+     * product needs one. Merging them would put two inputs on one column and force every
+     * tenant to accept their internal path as their public brand.
+     */
+    'subdomain' => [
+        /*
+         * The zone the tenant's label is added to. Env so staging can differ from production
+         * without a code change, which is also what makes this testable.
+         *
+         * HOST ONLY — no port. `Route::domain()` matches `$request->getHost()`, which excludes
+         * the port, so a root of `localhost:8000` would compile to a pattern that can never
+         * match. The port belongs to display, and lives below.
+         */
+        'root' => env('TENANT_ROOT_DOMAIN', 'projectblock.app'),
+        'scheme' => env('TENANT_ROOT_SCHEME', 'https'),
+
+        /*
+         * Appended when BUILDING a url, never when matching one.
+         *
+         * Only needed locally, where the dev server is on a port: `TENANT_ROOT_PORT=8000` makes
+         * the previews read `http://acme.localhost:8000` while routing still matches
+         * `acme.localhost`. Null in production, where the port is implied by the scheme.
+         */
+        'port' => env('TENANT_ROOT_PORT'),
+
+        /*
+         * 3 to 63. The ceiling is not a preference: 63 octets is the maximum length of a single
+         * DNS label (RFC 1035), so a longer one could never be resolved whatever we stored.
+         */
+        'min' => 3,
+        'max' => 63,
+
+        /*
+         * The apps that make a tenant customer-facing, and therefore require one.
+         *
+         * `clienthub` is listed although it is not released yet — the rule is about what the
+         * app IS, and a list that has to be remembered on release day is a list that will not
+         * be.
+         */
+        'required_by' => ['helpdesk', 'clienthub'],
+
+        /**
+         * Hosts that must never belong to a tenant.
+         *
+         * A superset of `reserved_slugs` in spirit but a different list, because it protects
+         * something different: these are names that resolve, or will resolve, somewhere of our
+         * own. `www` and `mail` are the obvious ones; `status` and `billing` are pages people
+         * will expect at the root; `autodiscover`/`autoconfig` are what mail clients probe for;
+         * `_domainkey`/`dmarc` are where mail authentication lives, and a tenant owning one
+         * could break signing for the whole zone.
+         */
+        'reserved' => [
+            'www', 'admin', 'api', 'app', 'apps', 'mail', 'smtp', 'imap', 'pop', 'webmail',
+            'support', 'help', 'helpdesk', 'billing', 'status', 'backoffice', 'dashboard',
+            'account', 'accounts', 'auth', 'login', 'logout', 'signin', 'signup', 'register',
+            'assets', 'static', 'cdn', 'media', 'files', 'download', 'downloads',
+            'blog', 'docs', 'developer', 'developers', 'partner', 'partners',
+            'staging', 'dev', 'test', 'demo', 'sandbox', 'preview', 'beta', 'alpha',
+            'ns', 'ns1', 'ns2', 'dns', 'mx', 'autodiscover', 'autoconfig', 'dmarc',
+            '_domainkey', 'dkim', 'spf', 'vpn', 'ssh', 'ftp', 'git',
+            'projectblock', 'inbound', 'client', 'clienthub', 'security', 'legal', 'privacy',
+        ],
+    ],
+
     'reserved_slugs' => [
         'admin', 'api', 'app', 'auth', 'login', 'logout', 'signin', 'signup', 'verify',
         'onboarding', 'workspace', 'workspaces', 'settings', 'billing', 'support', 'help',

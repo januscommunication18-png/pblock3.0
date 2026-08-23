@@ -40,7 +40,17 @@
     @include('partials.app-rail')
     @include('partials.help-center-nav')
 
-    <main class="flex-1 min-w-0 overflow-y-auto">
+    {{-- `flex flex-col`, so a screen can ask for the leftover height (P55).
+
+         Settings is the reason: its sidebar has to run to the bottom of the window whatever the
+         selected page happens to contain. A `min-height: calc(100vh - …)` would have done it
+         with a magic number, and the number would have been wrong the moment the Space tab bar
+         wrapped onto a second line — which it already does at narrower widths.
+
+         This costs the other screens nothing: a column of blocks stacks identically whether or
+         not its parent is a flex container, and only a child that asks for `flex-1` behaves
+         differently. --}}
+    <main class="flex-1 min-w-0 overflow-y-auto flex flex-col">
       @yield('content')
     </main>
   </div>

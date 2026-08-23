@@ -11,6 +11,7 @@ use App\Services\OnboardingRouter;
 use App\Support\SessionReturnTarget;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use App\Services\Backoffice\ClientAccess;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\View\View;
@@ -65,6 +66,20 @@ class SignInController extends Controller
             return back()
                 ->withInput(['email' => $email])
                 ->withErrors(['email' => 'Those credentials do not match our records.']);
+        }
+
+        /*
+         * A disabled or pending-deletion CLIENT cannot sign in (backoffice-clients.md, §17).
+         *
+         * Checked at the sign-in path rather than only in the Back Office UI (BC-D3): a status
+         * nothing enforces is a switch that does nothing. Placed after the credentials are
+         * verified on purpose — telling somebody their company is disabled before they have
+         * proved who they are would answer a question they have not earned.
+         */
+        if (! app(ClientAccess::class)->allows($user)) {
+            return back()
+                ->withInput(['email' => $email])
+                ->withErrors(['email' => ClientAccess::BLOCKED_MESSAGE]);
         }
 
         // Read BEFORE regenerating: regeneration is what carries the session forward, and

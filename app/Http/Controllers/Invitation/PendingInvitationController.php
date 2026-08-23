@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Invitation;
 
 use App\Http\Controllers\Controller;
+use App\Listeners\LinkHelpCenterSpaceMemberships;
 use App\Models\WorkspaceInvitation;
 use App\Services\OnboardingRouter;
 use App\Services\WorkspaceInvitationAccepter;
@@ -75,7 +76,7 @@ class PendingInvitationController extends Controller
     }
 
     /** GET /invite/joined — the "Welcome to {Workspace}" confirmation (§49/§50). */
-    public function joined(): View|RedirectResponse
+    public function joined(Request $request): View|RedirectResponse
     {
         $workspace = Auth::user()->currentWorkspace;
 
@@ -83,7 +84,26 @@ class PendingInvitationController extends Controller
             return redirect()->route('welcome');
         }
 
-        return view('invitations.joined', ['workspace' => $workspace]);
+        /*
+         * Where this screen continues to.
+         *
+         * Normally the workspace. But an invitation sent from Help Center → Space → Add Member
+         * was about a Space, and dropping somebody on the workspace home after they accepted it
+         * leaves them to find their way to the thing they were invited to — which they cannot
+         * do, because they have never seen this application before (P10).
+         *
+         * `LinkHelpCenterSpaceMemberships` leaves the id here when acceptance completed such a
+         * membership. Pulled, so a refresh of a later screen does not resurrect it.
+         */
+        $spaceId = $request->session()->pull(LinkHelpCenterSpaceMemberships::SESSION_SPACE_KEY);
+
+        return view('invitations.joined', [
+            'workspace' => $workspace,
+            'continueUrl' => $spaceId
+                ? route('help-center.spaces.open', ['space' => $spaceId])
+                : route('welcome'),
+            'continueLabel' => $spaceId ? 'Go to the Space' : 'Go to workspace',
+        ]);
     }
 
     /**

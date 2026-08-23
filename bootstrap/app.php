@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\Dev\LogViewerController;
 use App\Http\Middleware\EnforceIdleTimeout;
+use App\Http\Middleware\BackofficeSessionTimeout;
+use App\Http\Middleware\EnsureBackofficeVerified;
 use App\Http\Middleware\InitializeWorkspaceTenancy;
 use App\Http\Middleware\InjectSessionGuard;
 use App\Http\Middleware\RequireAccessCode;
@@ -37,8 +39,26 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         // Initializes tenancy to the user's current workspace for settings routes
         // (single-database tenancy — activates the BelongsToTenant row scope).
+        /*
+         * Where a GUEST is sent lives in AppServiceProvider, not here.
+         *
+         * `Authenticate::redirectUsing()` there already owns this decision, and it runs during
+         * boot — after this file — so a second `redirectGuestsTo()` set here would be silently
+         * overridden. One rule, in the place that actually wins.
+         */
+
         $middleware->alias([
             'workspace.tenancy' => InitializeWorkspaceTenancy::class,
+            /*
+             * The Back Office gate (docs/features/backoffice-auth.md, §4 and §9).
+             *
+             * Aliases rather than group-appends: unlike the customer middleware below, these
+             * must apply to SOME routes and not others — `backoffice.verified` guards the login
+             * screen but must not guard the verification screen that leads to it, or nobody
+             * could ever reach either.
+             */
+            'backoffice.verified' => EnsureBackofficeVerified::class,
+            'backoffice.timeout' => BackofficeSessionTimeout::class,
         ]);
 
         // Access gate (Dev/UAT): holds every web request behind the access-code screen until

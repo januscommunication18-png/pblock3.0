@@ -29,13 +29,23 @@ class WorkspaceInviter
     public function __construct(private readonly WorkspaceSeatGuard $seats) {}
 
     /**
+     * `$context` says what the person is being invited TO, beyond the workspace itself.
+     *
+     * An invitation sent from Help Center → Space → Add Member is still a workspace invitation —
+     * same seat, same token, same acceptance — but "you've been invited to join a workspace" is
+     * not what happened from the recipient's side, and an email that does not mention the Space
+     * somebody was actually added to reads like a mis-sent message. So the context travels as
+     * two lines of copy rather than as a second kind of invitation: one invite path, one set of
+     * seat checks, one expiry rule (P10).
+     *
      * @param  array<int, array{email:string, role:string}>  $rows
+     * @param  array{title?:string, line?:string, label?:string, value?:string}  $context
      * @return array<int, array{email:string, role:string, status:string}> per-recipient result
      */
-    public function invite(Workspace $workspace, User $inviter, array $rows): array
+    public function invite(Workspace $workspace, User $inviter, array $rows, array $context = []): array
     {
         // Run inside the workspace's tenancy context (atomic; reverts to the prior context).
-        return $workspace->run(function () use ($workspace, $inviter, $rows) {
+        return $workspace->run(function () use ($workspace, $inviter, $rows, $context) {
             $results = [];
             $seenThisRequest = [];
             $inviteRoles = config('workspace.invite_roles');
@@ -121,7 +131,7 @@ class WorkspaceInviter
                     'expires_at' => now()->addDays($expiryDays),
                 ]));
 
-                $this->sendInvitationEmail($workspace, $inviter, $invitation, $token);
+                $this->sendInvitationEmail($workspace, $inviter, $invitation, $token, $context);
 
                 $results[] = ['email' => $email, 'role' => $role, 'status' => 'invited'];
             }
@@ -131,15 +141,53 @@ class WorkspaceInviter
     }
 
     /**
+     * Send a pending invitation again, on a NEW token (invite spec §13).
+     *
+     * The stored token is a SHA-256 hash and the raw value was kept nowhere, so "resend the
+     * same link" is not a thing that can be done — the link has to be reissued. That is the
+     * safer behaviour anyway: the address gets one working link at a time, and whatever was
+     * mailed before stops working the moment a fresh one goes out.
+     *
+     * Reached when somebody is added to a Space at an address that already had an invitation
+     * outstanding. Refusing there and saying "already invited" would be technically true and
+     * useless: the admin asked for that person to be on this Space, and the previous email said
+     * nothing about a Space.
+     */
+    public function resend(
+        Workspace $workspace,
+        User $inviter,
+        WorkspaceInvitation $invitation,
+        array $context = [],
+    ): bool {
+        if (! $invitation->isAcceptable()) {
+            return false;
+        }
+
+        $token = WorkspaceInvitation::newToken();
+
+        $invitation->forceFill([
+            'token' => WorkspaceInvitation::hashToken($token),
+            'expires_at' => now()->addDays((int) config('workspace.invitation_expiry_days', 14)),
+        ])->save();
+
+        $this->sendInvitationEmail($workspace, $inviter, $invitation, $token, $context);
+
+        return true;
+    }
+
+    /**
      * Queue the invitation email (CLAUDE.md §11). Delivery failure must not roll back the
      * invitation — the row is what the Members screen and the resend action work from — so
      * this sits outside the transaction and reports rather than throws.
+     *
+     * @param  array{title?:string, line?:string, label?:string, value?:string}  $context
      */
     private function sendInvitationEmail(
         Workspace $workspace,
         User $inviter,
         WorkspaceInvitation $invitation,
         string $rawToken,
+        array $context = [],
     ): void {
         $roleLabels = config('workspace.roles');
 
@@ -155,6 +203,10 @@ class WorkspaceInviter
                 acceptUrl: route('invitations.show', ['token' => $rawToken]),
                 expiresOn: optional($invitation->expires_at)->format('F j, Y') ?? '',
                 workspaceLogoUrl: $workspace->logo_url,
+                contextTitle: $context['title'] ?? null,
+                contextLine: $context['line'] ?? null,
+                contextLabel: $context['label'] ?? null,
+                contextValue: $context['value'] ?? null,
             ));
         } catch (\Throwable $e) {
             // Never log the token or the link — both carry the raw secret.

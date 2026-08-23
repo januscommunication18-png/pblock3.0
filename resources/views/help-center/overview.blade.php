@@ -5,7 +5,10 @@
 @section('content')
   {{-- The module's one heading style: the h-12 bordered toolbar the Spaces listing and the
        Projects index both use. --}}
-  <div class="flex items-center gap-2 px-5 sm:px-8 h-12 border-b border-line">
+  {{-- `shrink-0` — see the note in help-center/space.blade.php (P81). This bar is a flex child
+       of a scrolling column, and without it a tall page compresses `h-12` and pushes the buttons
+       onto the border. --}}
+  <div class="flex items-center gap-2 px-5 sm:px-8 h-12 border-b border-line shrink-0">
     @include('partials.sidebar-expand')
     <span class="flex items-center gap-2 text-[14px] font-medium text-ink">
       {!! pb_icon('house', 16, 'text-sub') !!}

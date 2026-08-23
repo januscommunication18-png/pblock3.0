@@ -3,8 +3,9 @@
 namespace App\Services\HelpCenter\Inbound;
 
 use App\Mail\InboundTestMail;
-use App\Models\HelpCenterInbox;
+use App\Models\HelpCenterEmailAddress;
 use App\Models\HelpCenterInboundTest;
+use App\Models\HelpCenterInbox;
 use App\Models\User;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -30,10 +31,20 @@ class InboundTestRunner
     /**
      * Send a probe and return the test row.
      *
-     * @throws RuntimeException when the Inbox has no address to test through
+     * `$address` names WHICH customer-facing address to probe. The Space Overview's card has no
+     * opinion and passes null, taking the Inbox's first; Settings → Inbox tests one row at a
+     * time, because an Inbox with three connected addresses can have two working and one not,
+     * and "the Inbox is fine" is no answer to "is THIS address forwarding?".
+     *
+     * @throws RuntimeException when the Inbox has no address to test through, or the address
+     *                          given is not on this Inbox
      */
-    public function start(HelpCenterInbox $inbox, User $actor): HelpCenterInboundTest
+    public function start(HelpCenterInbox $inbox, User $actor, ?HelpCenterEmailAddress $address = null): HelpCenterInboundTest
     {
+        if ($address !== null && (int) $address->help_center_inbox_id !== (int) $inbox->id) {
+            throw new RuntimeException('That email address is not connected to this Inbox.');
+        }
+
         /*
          * The probe goes to the CUSTOMER-FACING address, not to our inbound address.
          *
@@ -42,7 +53,7 @@ class InboundTestRunner
          * are the two things most likely to be misconfigured and the two things this test
          * exists to exercise.
          */
-        $address = $inbox->emailAddresses()->orderBy('id')->first();
+        $address = $address ?: $inbox->emailAddresses()->orderBy('id')->first();
 
         if ($address === null) {
             throw new RuntimeException(

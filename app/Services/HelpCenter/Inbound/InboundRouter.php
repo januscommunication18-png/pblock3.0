@@ -62,8 +62,43 @@ class InboundRouter
         $prefix = (string) config('help-center.inbound_prefix', 'inbox');
         $domain = mb_strtolower((string) config('help-center.inbound_domain'));
 
-        $pattern = '/^'.preg_quote($prefix, '/').'-([a-z0-9]+)@'.preg_quote($domain, '/').'$/';
+        return $this->parse($address)['token'] ?? null;
+    }
 
-        return preg_match($pattern, $address, $matches) ? $matches[1] : null;
+    /**
+     * The `+tag` on one of our inbound addresses, if there is one (P62).
+     *
+     * `inbox-8pb4kxdj+r42-9f1c3a7e02@…` carries the ticket it belongs to in the address itself,
+     * which is the one part of an email a customer's client cannot strip. See
+     * HelpCenterRequest::replyTag().
+     */
+    public function replyTag(string $address): ?string
+    {
+        return $this->parse($address)['tag'] ?? null;
+    }
+
+    /**
+     * Split one of our addresses into its token and its optional tag.
+     *
+     * The tag is OPTIONAL in the pattern, so every address that routed before this existed still
+     * routes — the plus form is an addition, not a new contract.
+     *
+     * @return array{token: ?string, tag: ?string}
+     */
+    private function parse(string $address): array
+    {
+        $address = mb_strtolower(trim($address));
+
+        $prefix = (string) config('help-center.inbound_prefix', 'inbox');
+        $domain = mb_strtolower((string) config('help-center.inbound_domain'));
+
+        $pattern = '/^'.preg_quote($prefix, '/').'-([a-z0-9]+)(?:\+([a-z0-9-]+))?@'
+            .preg_quote($domain, '/').'$/';
+
+        if (! preg_match($pattern, $address, $m)) {
+            return ['token' => null, 'tag' => null];
+        }
+
+        return ['token' => $m[1], 'tag' => $m[2] ?? null];
     }
 }

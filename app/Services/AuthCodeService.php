@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Mail\BackofficeCodeMail;
 use App\Mail\LoginCodeMail;
 use App\Models\EmailVerificationCode;
 use Illuminate\Support\Carbon;
@@ -64,7 +65,20 @@ class AuthCodeService
          * on failure — leaving "the account exists but no email arrived" with no trail at all.
          */
         try {
-            Mail::to($email)->send(new LoginCodeMail($code, self::TTL_MINUTES));
+            /*
+             * The Back Office gets its own Mailable (docs/features/backoffice-auth.md, §3).
+             *
+             * Every RULE about the code is shared — that is the point of reusing this service
+             * (BO-D2) — but the WORDING must not be. A platform-administration code arriving
+             * under the customer application's subject line is the message somebody skims,
+             * assumes belongs to the app they were already signing into, and types in wherever
+             * it was asked for.
+             */
+            $mail = $purpose === EmailVerificationCode::PURPOSE_BACKOFFICE
+                ? new BackofficeCodeMail($code, self::TTL_MINUTES)
+                : new LoginCodeMail($code, self::TTL_MINUTES);
+
+            Mail::to($email)->send($mail);
         } catch (Throwable $e) {
             Log::channel(config('logging.default'))->error('auth.code.send_failed', [
                 'email' => $email,

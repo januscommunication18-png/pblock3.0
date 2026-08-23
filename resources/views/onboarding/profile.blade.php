@@ -83,6 +83,39 @@
                 <button type="button" class="pw-eye absolute right-3 top-1/2 -translate-y-1/2 text-faint hover:text-sub">{!! pb_icon('eye', 17) !!}</button>
               </div>
               @error('password')<p class="mt-1 text-[12px] text-danger">{{ $message }}</p>@enderror
+
+              {{-- Password strength — GUIDANCE, never a gate.
+
+                   The bar and the chips are hints; `Continue` is not conditioned on them and the
+                   server's own rule is what decides. That is the requirement's instruction and it
+                   is also the honest arrangement: the only rule actually enforced here is
+                   `Password::defaults()`, which in this application is a minimum of 8 characters.
+                   Marking all five chips identically would tell somebody that four things are
+                   required which are not, so the note below says which one is.
+
+                   Widths are inline styles rather than `w-1/4` and friends: the shipped
+                   tailwind.css does not contain those fractions, so they would silently do
+                   nothing — the same trap the upload bar above already avoids. --}}
+              <div id="pw-meter" class="mt-2">
+                <div id="pw-bar-row" class="hidden flex items-center gap-2">
+                  <div class="h-1.5 flex-1 rounded-full bg-line overflow-hidden">
+                    <div id="pw-bar" class="h-full rounded-full bg-danger transition-all duration-200" style="width:0%"></div>
+                  </div>
+                  {{-- Announced politely so a screen-reader user hears the strength change
+                       without the message interrupting what they are typing. --}}
+                  <span id="pw-label" class="text-[11px] font-semibold text-faint" aria-live="polite"></span>
+                </div>
+
+                <ul id="pw-reqs" class="mt-2 flex flex-wrap gap-3 text-[11px] text-faint">
+                  <li data-req="len"><span class="pw-tick">&middot;</span> 8+ characters</li>
+                  <li data-req="upper"><span class="pw-tick">&middot;</span> Uppercase</li>
+                  <li data-req="lower"><span class="pw-tick">&middot;</span> Lowercase</li>
+                  <li data-req="number"><span class="pw-tick">&middot;</span> Number</li>
+                  <li data-req="symbol"><span class="pw-tick">&middot;</span> Special character</li>
+                </ul>
+
+                <p class="mt-1 text-[11px] text-faint">Only the length is required — the rest make your password stronger.</p>
+              </div>
             </div>
             <div>
               <label class="block text-[13px] text-sub mb-1.5">Confirm password</label>
@@ -100,7 +133,16 @@
         </button>
 
         <label class="mt-5 flex items-start gap-2.5 text-[13px] text-ink cursor-pointer">
-          <input type="checkbox" name="marketing_opt_in" value="1" {{ old('marketing_opt_in', $user->marketing_opt_in) ? 'checked' : '' }} class="mt-0.5 h-4 w-4 accent-[#1b5f8a]" />
+          {{-- The hidden 0 FIRST, and it is not decoration.
+
+               An unchecked checkbox submits nothing, so `old('marketing_opt_in')` is null both
+               when the user deliberately unticked it and when there is no old input at all.
+               With the box now ticked by default, those two cases are opposite intentions —
+               without this, failing validation on the name field would silently re-tick a box
+               the user had just cleared. PHP keeps the LAST value for a repeated name, so the
+               checkbox overrides this whenever it is ticked. --}}
+          <input type="hidden" name="marketing_opt_in" value="0" />
+          <input type="checkbox" name="marketing_opt_in" value="1" {{ old('marketing_opt_in', 1) ? 'checked' : '' }} class="mt-0.5 h-4 w-4 accent-[#1b5f8a]" />
           <span>I agree to Project Block marketing communications
             <span class="block text-[12px] text-sub">You may unsubscribe anytime. <a href="#" class="text-link hover:underline">Read our privacy policy.</a></span>
           </span>
@@ -147,6 +189,86 @@
       document.getElementById('pw-chevron').classList.toggle('rotate-180');
       document.getElementById('set_password').value = hidden ? 0 : 1;
     });
+    /* ---- Password strength (guidance only) ----
+       Recalculated on every keystroke from the field itself, so it can never disagree with what
+       is in the box — no cached score, no debounce. It is a handful of regexes; the cost of
+       running them per character is nothing next to the cost of showing a stale verdict.
+
+       Nothing here touches `Continue`. The requirement is explicit that this is guidance and
+       that the real rules are enforced on submit, so a user who wants an eight-character
+       password the meter calls Weak is still allowed to have one. */
+    (function () {
+      var field = document.querySelector('input[name="password"]');
+      var meter = document.getElementById('pw-meter');
+
+      if (!field || !meter) return;
+
+      var barRow = document.getElementById('pw-bar-row');
+      var bar = document.getElementById('pw-bar');
+      var label = document.getElementById('pw-label');
+      var items = meter.querySelectorAll('#pw-reqs li');
+
+      var TESTS = {
+        len: function (v) { return v.length >= 8; },
+        upper: function (v) { return /[A-Z]/.test(v); },
+        lower: function (v) { return /[a-z]/.test(v); },
+        number: function (v) { return /[0-9]/.test(v); },
+        // Anything that is not a letter, a digit or a space. Deliberately broad rather than a
+        // fixed list: a password containing `£` or `—` is not weaker for being unusual, and a
+        // list would quietly refuse to credit characters somebody legitimately used.
+        symbol: function (v) { return /[^A-Za-z0-9\s]/.test(v); }
+      };
+
+      /* Four levels: how many of the five hold, plus a bonus that GROWS with length.
+
+         Length is counted more than once on purpose — it is the property that actually resists
+         a guessing attack. A single bonus at 12 was not enough: it rated
+         `correcthorsebatterystaple` as Fair while the nine-character `Abcdefg1!` came out
+         Strong, which is guidance that pushes people toward the weaker of the two. A second
+         step at 16 puts a real passphrase ahead of a short password wearing punctuation.
+
+         Nothing under 8 can be better than Weak, whatever else it contains. */
+      var LEVELS = [
+        { name: 'Weak', bar: 'bg-danger', text: 'text-danger', width: '25%' },
+        { name: 'Fair', bar: 'bg-warn', text: 'text-warn', width: '50%' },
+        { name: 'Good', bar: 'bg-brand', text: 'text-brand', width: '75%' },
+        { name: 'Strong', bar: 'bg-success', text: 'text-success', width: '100%' }
+      ];
+
+      function render() {
+        var v = field.value || '';
+        var met = 0;
+
+        items.forEach(function (li) {
+          var ok = TESTS[li.getAttribute('data-req')](v);
+
+          if (ok) met++;
+
+          li.querySelector('.pw-tick').innerHTML = ok ? '&#10003;' : '&middot;';
+          li.classList.toggle('text-success', ok);
+          li.classList.toggle('text-faint', !ok);
+        });
+
+        // The bar appears with the first character; an empty field showing "Weak" would be a
+        // verdict on nothing.
+        barRow.classList.toggle('hidden', v.length === 0);
+
+        if (v.length === 0) return;
+
+        var bonus = v.length >= 16 ? 2 : v.length >= 12 ? 1 : 0;
+        var score = TESTS.len(v) ? met + bonus : 0;
+        var level = LEVELS[score <= 2 ? 0 : score === 3 ? 1 : score === 4 ? 2 : 3];
+
+        bar.style.width = level.width;
+        bar.className = 'h-full rounded-full transition-all duration-200 ' + level.bar;
+        label.textContent = level.name;
+        label.className = 'text-[11px] font-semibold ' + level.text;
+      }
+
+      field.addEventListener('input', render);
+      render();
+    })();
+
     document.querySelectorAll('.pw-eye').forEach(function (eye) {
       eye.addEventListener('click', function (e) {
         e.preventDefault();

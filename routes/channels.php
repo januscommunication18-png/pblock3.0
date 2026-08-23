@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\HelpCenterSpace;
 use App\Models\WorkspaceMembership;
 use Illuminate\Support\Facades\Broadcast;
 
@@ -41,3 +42,44 @@ Broadcast::channel('tenant.{tenantId}.user.{userId}', function ($user, string $t
         ->where('status', WorkspaceMembership::STATUS_ACTIVE)
         ->exists();
 });
+
+/**
+ * `private-tenant.{tenantId}.help-center.space.{spaceId}` — one Space's live ticket stream (P67).
+ *
+ * The Space rather than the person, because a new customer reply concerns whoever is looking at
+ * that Inbox — usually several people, and not necessarily the assignee.
+ *
+ * Three checks, and all three earn their place:
+ *
+ *  - an ACTIVE member of that workspace, exactly as the user channel above requires. Somebody
+ *    removed from a workspace with a tab still open must stop hearing about it, and a socket
+ *    that was authorized once would otherwise go on delivering until they reloaded;
+ *  - the Space actually belongs to that workspace — without it, a member of workspace A could
+ *    listen on `tenant.A.help-center.space.{a space in B}` and be told about B's tickets;
+ *  - and the Space policy's own answer, so who may LISTEN is decided by the same code that
+ *    decides who may READ (CLAUDE.md §12).
+ *
+ * `withoutGlobalScopes()` is required rather than tidy: a websocket subscribe carries no tenancy
+ * context, so `BelongsToTenant`'s scope would find nothing and every subscribe would be refused.
+ * The `tenant_id` is then checked by hand, which is what that scope would have done.
+ */
+Broadcast::channel(
+    'tenant.{tenantId}.help-center.space.{spaceId}',
+    function ($user, string $tenantId, string $spaceId) {
+        $member = WorkspaceMembership::query()
+            ->where('workspace_id', $tenantId)
+            ->where('user_id', $user->id)
+            ->where('status', WorkspaceMembership::STATUS_ACTIVE)
+            ->exists();
+
+        if (! $member) {
+            return false;
+        }
+
+        $space = HelpCenterSpace::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->find($spaceId);
+
+        return $space !== null && $user->can('view', $space);
+    },
+);

@@ -233,6 +233,9 @@ class ProfileController extends Controller
             'first_name' => $user->first_name,
             'last_name' => $user->last_name,
             'display_name' => $user->display_name,
+            // The raw text, not the rendered HTML: this feeds a textarea, and handing it markup
+            // would show the agent tags they never typed (P74).
+            'signature' => (string) $user->signature,
             'email' => $user->email,
             'initial' => $user->initial(),
             'name' => $user->displayName(),

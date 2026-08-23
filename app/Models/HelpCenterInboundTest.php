@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Cache;
 use Stancl\Tenancy\Database\Concerns\BelongsToTenant;
 
 /**
@@ -107,6 +108,28 @@ class HelpCenterInboundTest extends Model
         return $this->sent_at->addSeconds($this->timeoutSeconds())->isPast();
     }
 
+    /**
+     * Write the timeout down, if this test has run out of time.
+     *
+     * Called on READ, from every screen that displays a test. It lives here rather than in the
+     * controller that first needed it because there are two of those now — the Space Overview's
+     * card and the per-address test on Settings → Inbox — and "when does a test give up?" must
+     * not be a question two files answer separately.
+     */
+    public function resolveTimeout(): self
+    {
+        if ($this->hasTimedOut()) {
+            $this->forceFill([
+                'status' => self::STATUS_TIMEOUT,
+                'failed_at' => now(),
+                'failure_reason' => 'No forwarded message arrived within '
+                    .$this->timeoutSeconds().' seconds.',
+            ])->save();
+        }
+
+        return $this;
+    }
+
     public function timeoutSeconds(): int
     {
         return (int) config('help-center.inbound_test_timeout', 120);
@@ -159,10 +182,29 @@ class HelpCenterInboundTest extends Model
     {
         return match ($this->status) {
             self::STATUS_SEND_FAILED => 'The test email could not be sent. Postmark refused the outbound message, so it never reached your inbox.',
-            self::STATUS_TIMEOUT => 'The test email was sent, but ProjectBlock did not receive the forwarded message.',
+            self::STATUS_TIMEOUT => self::everReceivedInbound()
+                // We demonstrably receive inbound mail, so this message specifically did not
+                // arrive — the forwarding rule is the thing to look at.
+                ? 'The test email was sent, but ProjectBlock did not receive the forwarded message.'
+                // We have NEVER been called by Postmark. No forwarding rule can fix that.
+                : 'The test email was sent, but ProjectBlock has never received any inbound email. '
+                    .'That almost always means the Inbound Webhook URL is not set in Postmark — '
+                    .'mail is being received there and never passed on to this application.',
             self::STATUS_PARSE_FAILED => 'The forwarded email arrived, but ProjectBlock could not process it.',
             default => null,
         };
+    }
+
+    /**
+     * Has Postmark ever called our inbound webhook, on this deployment?
+     *
+     * Set by PostmarkInboundController on every authenticated hit. `false` is a much stronger
+     * signal than a single failed test: it means the last leg of the chain has never once run,
+     * which points at configuration rather than at any individual message.
+     */
+    public static function everReceivedInbound(): bool
+    {
+        return Cache::get('help-center.last_inbound_webhook_at') !== null;
     }
 
     /** @return array<string, mixed> */
@@ -185,6 +227,8 @@ class HelpCenterInboundTest extends Model
             'sent_at' => $this->sent_at?->format('M j, Y \a\t g:i A'),
             'received_at' => $this->received_at?->format('M j, Y \a\t g:i A'),
             'received' => (array) $this->received_meta,
+            // Lets the card show the right troubleshooting list rather than a generic one.
+            'ever_received_inbound' => self::everReceivedInbound(),
         ];
     }
 }

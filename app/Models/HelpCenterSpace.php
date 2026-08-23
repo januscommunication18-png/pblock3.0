@@ -21,10 +21,28 @@ class HelpCenterSpace extends Model
 {
     use BelongsToTenant;
 
+    /**
+     * The Company & Customer sub-switches (P75 §2), which the master `company` switch governs.
+     *
+     * Listed here rather than inferred from a config flag, because the relationship is between
+     * SWITCHES and there is exactly one such group — a `governed_by` key in config would be a
+     * general mechanism built for a single case.
+     *
+     * @var array<int, string>
+     */
+    public const COMPANY_SUB_FEATURES = [
+        'customer_management',
+        'company_management',
+        'customer_custom_fields',
+        'company_custom_fields',
+        'ticket_metadata_mapping',
+    ];
+
     protected $fillable = [
         'tenant_id',
         'name',
         'description',
+        'inbound_display_name',
         'types',
         'department_groups',
         'lead_user_id',
@@ -43,6 +61,23 @@ class HelpCenterSpace extends Model
         ];
     }
 
+    /**
+     * The name a customer sees on mail from this Space (P65).
+     *
+     * The configured display name, or the Space's own name when nobody has set one — the
+     * requirement's default, resolved HERE rather than copied into the column at creation, so
+     * that renaming the Space renames the sender too until somebody deliberately separates them.
+     *
+     * Trimmed on the way out as well as on the way in: a name that is only whitespace is a From
+     * header with an empty quoted string in it, which some clients render as a blank sender.
+     */
+    public function senderName(): string
+    {
+        $configured = trim((string) $this->inbound_display_name);
+
+        return $configured !== '' ? $configured : trim((string) $this->name);
+    }
+
     public function inboxes(): HasMany
     {
         return $this->hasMany(HelpCenterInbox::class);
@@ -55,9 +90,73 @@ class HelpCenterSpace extends Model
     }
 
     /** The conversation workflow, Open first and Closed last (P2 §16). */
+    /** This Space's CSAT configuration (P56). Absent means the packaged defaults. */
+    public function ratingSettings(): HasOne
+    {
+        return $this->hasOne(HelpCenterRatingSettings::class, 'help_center_space_id');
+    }
+
     public function statuses(): HasMany
     {
         return $this->hasMany(HelpCenterStatus::class)->orderBy('position')->orderBy('id');
+    }
+
+    /** The custom fields on this Space's Company records (P18), in form order. */
+    public function companyFields(): HasMany
+    {
+        return $this->hasMany(HelpCenterCompanyField::class)->orderBy('position')->orderBy('id');
+    }
+
+    /** The custom fields on this Space's Customer records (P75 §2), in form order. */
+    public function customerFields(): HasMany
+    {
+        return $this->hasMany(HelpCenterCustomerField::class)->orderBy('position')->orderBy('id');
+    }
+
+    /**
+     * This Space's Ticket Metadata Mapping rows (P75 §3), in application order.
+     *
+     * Ordered by `position` because that IS the order they are applied in, not merely the order
+     * they are drawn in — two mappings reaching the same destination resolve top-down, and that
+     * has to be the same list a person is looking at.
+     */
+    public function metadataMappings(): HasMany
+    {
+        return $this->hasMany(HelpCenterMetadataMapping::class)->orderBy('position')->orderBy('id');
+    }
+
+    /**
+     * Is one of the Space's feature switches on (P2 §18, P75 §2)?
+     *
+     * Asked on the SPACE rather than on the settings row, because a Space that has never opened
+     * Settings has no row at all — and "no row" means "running on the defaults", not "everything
+     * off". Every caller would otherwise have to remember that.
+     *
+     * The five Company & Customer sub-switches are additionally gated on the master `company`
+     * switch: a sub-switch left on from before the module was turned off must not keep a page
+     * alive on its own.
+     */
+    public function featureEnabled(string $key): bool
+    {
+        $settings = $this->settings;
+
+        $on = $settings === null
+            ? (bool) (config('help-center.metadata.'.$key.'.default') ?? false)
+            : $settings->feature($key);
+
+        if (! $on || ! in_array($key, self::COMPANY_SUB_FEATURES, true)) {
+            return $on;
+        }
+
+        return $settings === null
+            ? (bool) (config('help-center.metadata.company.default') ?? false)
+            : $settings->feature('company');
+    }
+
+    /** This Space's tag vocabulary (P14). Alphabetical — it is a list somebody scans. */
+    public function tags(): HasMany
+    {
+        return $this->hasMany(HelpCenterTag::class)->orderBy('name');
     }
 
     /** How this Space behaves (P2 §17-§24). One row, or none until Step 6 has run. */
