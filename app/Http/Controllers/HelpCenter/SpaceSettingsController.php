@@ -5,10 +5,10 @@ namespace App\Http\Controllers\HelpCenter;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\HelpCenter\Concerns\GuardsHelpCenter;
 use App\Http\Requests\HelpCenter\UpdateSpaceSettingRequest;
-use App\Http\Controllers\HelpCenter\SpaceController;
+use App\Models\HelpCenterCompany;
 use App\Models\HelpCenterCompanyField;
-use App\Models\HelpCenterMetadataMapping;
 use App\Models\HelpCenterEmailTemplate;
+use App\Models\HelpCenterMetadataMapping;
 use App\Models\HelpCenterRatingSettings;
 use App\Models\HelpCenterSignature;
 use App\Models\HelpCenterSpace;
@@ -77,6 +77,10 @@ class SpaceSettingsController extends Controller
             // P75's page reads all three; loaded here rather than in the payload builder so the
             // one place that decides what a Settings page costs stays one place.
             'companyFields', 'customerFields', 'metadataMappings',
+            // The SLA page's four resources (docs/features/helpdesk-sla.md, §2). Loaded here
+            // for the same reason P75's three are — what a Settings page costs stays visible in
+            // one place rather than being discovered one lazy load at a time.
+            'businessHours', 'slaHolidays', 'slaEscalations',
         ]);
 
         return view('help-center.space-settings', [
@@ -283,6 +287,101 @@ class SpaceSettingsController extends Controller
      *
      * @return array<string, mixed>
      */
+    /**
+     * The SLA page's payload (docs/features/helpdesk-sla.md, §2–§8, §24–§25).
+     *
+     * `slaEndpoints`, NOT `endpoints`: `$common` already carries `endpoint`, and this is built
+     * as `$common + [...]` where PHP keeps the LEFT operand's keys — the same near-miss P48 and
+     * P56 both hit. A distinct name is the fix that cannot recur.
+     *
+     * @return array<string, mixed>
+     */
+    private function slaPayload(HelpCenterSpace $space): array
+    {
+        $url = fn (string $name, array $extra = []) => route('help-center.spaces.sla.'.$name,
+            ['space' => $space->id] + $extra);
+
+        // `__ID__` placeholders, replaced by the client. The alternative is building one URL per
+        // row server-side, which means the page has to be re-rendered to delete something.
+        $keyed = fn (array $config) => collect($config)
+            ->map(fn (array $entry, string $key) => ['value' => $key] + $entry)
+            ->values()->all();
+
+        return [
+            'description' => 'Service-level targets for this Space: what you promise, when the '
+                .'clock runs, and who hears about it when a promise is at risk.',
+
+            'policies' => $space->slaPolicies()->with('targets', 'businessHours')->get()
+                ->map(fn ($p) => $p->toPayload())->all(),
+            'businessHours' => $space->businessHours->map(fn ($h) => $h->toPayload())->values()->all(),
+            'holidays' => $space->slaHolidays->map(fn ($h) => [
+                'id' => $h->id,
+                'name' => $h->name,
+                'date' => $h->date->toDateString(),
+                'date_label' => $h->repeats_annually
+                    ? $h->date->format('j F').' (every year)'
+                    : $h->date->format('j F Y'),
+                'repeats_annually' => (bool) $h->repeats_annually,
+            ])->values()->all(),
+            'escalations' => $space->slaEscalations->map(fn ($e) => $e->toPayload())->values()->all(),
+
+            // Every vocabulary the pickers offer, from config — see the note on `workflow` above.
+            'priorities' => $keyed((array) config('help-center.priorities')),
+            'units' => $keyed((array) config('help-center.sla_units')),
+            'timerKinds' => $keyed((array) config('help-center.sla_timer_kinds')),
+            'reopenBehaviors' => $keyed((array) config('help-center.sla_reopen_behaviors')),
+            'conditionFields' => $keyed((array) config('help-center.sla_condition_fields')),
+            'conditionOperators' => $keyed((array) config('help-center.sla_condition_operators')),
+            'escalationTriggers' => $keyed((array) config('help-center.sla_escalation_triggers')),
+            'escalationActions' => $keyed((array) config('help-center.sla_escalation_actions')),
+            'weekDays' => collect((array) config('help-center.sla_week_days'))
+                ->map(fn (string $label, string $key) => ['value' => $key, 'label' => $label])
+                ->values()->all(),
+            'defaultSchedule' => (array) config('help-center.sla_default_schedule'),
+            'timezones' => timezone_identifiers_list(),
+
+            // What a condition or an action can point AT. Companies are a short list; customers
+            // are not, which is why that condition matches on email instead (see the config).
+            'companies' => HelpCenterCompany::query()->orderBy('name')->limit(500)
+                ->get(['id', 'name'])->map(fn ($c) => ['value' => $c->id, 'label' => $c->name])->all(),
+            'tags' => $space->tags->map(fn ($t) => ['value' => $t->id, 'label' => $t->name])->values()->all(),
+            'statuses' => $space->statuses->sortBy('position')->values()
+                ->map(fn ($s) => ['value' => $s->id, 'label' => $s->name])->all(),
+            'members' => $space->members->map(fn ($m) => [
+                'value' => $m->user_id, 'label' => $m->user?->displayName() ?? 'Member',
+            ])->values()->all(),
+            // Department Groups are what this product has instead of teams — "Change Team"
+            // (§25) points at one of these, because there is nothing else for it to point at.
+            'groups' => collect($space->groupList())
+                ->map(fn (string $g) => ['value' => $g, 'label' => $g])->values()->all(),
+            'customerFields' => $space->customerFields->map(fn ($f) => ['value' => $f->id, 'label' => $f->name])->values()->all(),
+            'companyFields' => $space->companyFields->map(fn ($f) => ['value' => $f->id, 'label' => $f->name])->values()->all(),
+
+            'slaEndpoints' => [
+                'hoursStore' => $url('hours.store'),
+                'hoursUpdate' => $url('hours.update', ['hours' => '__ID__']),
+                'hoursDestroy' => $url('hours.destroy', ['hours' => '__ID__']),
+                'holidayStore' => $url('holidays.store'),
+                'holidayUpdate' => $url('holidays.update', ['holiday' => '__ID__']),
+                'holidayDestroy' => $url('holidays.destroy', ['holiday' => '__ID__']),
+                'policyStore' => $url('policies.store'),
+                'policyUpdate' => $url('policies.update', ['policy' => '__ID__']),
+                'policyDestroy' => $url('policies.destroy', ['policy' => '__ID__']),
+                'policyDuplicate' => $url('policies.duplicate', ['policy' => '__ID__']),
+                'policyOrder' => $url('policies.order'),
+                'escalationStore' => $url('escalations.store'),
+                'escalationUpdate' => $url('escalations.update', ['escalation' => '__ID__']),
+                'escalationDestroy' => $url('escalations.destroy', ['escalation' => '__ID__']),
+            ],
+
+            // Honest about what is stored versus what runs, exactly as Reassignment is (HC-D17).
+            // The clocks themselves are the next slice; a page that implied otherwise would be
+            // promising response times nothing is measuring.
+            'note' => 'SLA configuration is saved with this Space. The clocks that measure '
+                .'against it arrive with the SLA engine.',
+        ];
+    }
+
     private function bootstrapFor(HelpCenterSpace $space, array $item): array
     {
         $cfg = $space->settings;
@@ -394,6 +493,16 @@ class SpaceSettingsController extends Controller
                     'space' => $space->id, 'setting' => 'email-template',
                 ]),
             ],
+
+            /*
+             * SLA (docs/features/helpdesk-sla.md, §2) — four resources on one screen.
+             *
+             * Everything the four tabs need arrives in one payload: the rows themselves, every
+             * vocabulary their pickers offer, and the endpoints they write to. The panel has no
+             * list of its own, so a unit or a trigger added to config appears on the screen
+             * without a second edit.
+             */
+            'sla' => $common + $this->slaPayload($space),
 
             'auto_bcc' => $common + [
                 'description' => 'Send a blind copy of every message in this Space to other addresses.',

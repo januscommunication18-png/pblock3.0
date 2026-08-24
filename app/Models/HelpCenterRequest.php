@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\DB;
 use Stancl\Tenancy\Database\Concerns\BelongsToTenant;
 
@@ -207,6 +208,24 @@ class HelpCenterRequest extends Model
     {
         return $this->hasMany(HelpCenterMessage::class, 'help_center_request_id')
             ->orderBy('received_at')->orderBy('id');
+    }
+
+    /**
+     * This ticket's SLA instance (docs/features/helpdesk-sla.md, §37).
+     *
+     * Nullable by design, and not only while the feature is being built: a Space that has
+     * configured no SLA policy has tickets with no SLA, and every reader treats "no instance" as
+     * "nothing promised" rather than as an error.
+     */
+    public function ticketSla(): HasOne
+    {
+        return $this->hasOne(HelpCenterTicketSla::class, 'help_center_request_id');
+    }
+
+    /** Every clock on this ticket, across all Next Response cycles (§10). */
+    public function slaTimers(): HasMany
+    {
+        return $this->hasMany(HelpCenterSlaTimer::class, 'help_center_request_id');
     }
 
     // ---- Ticket numbers ------------------------------------------------------------------

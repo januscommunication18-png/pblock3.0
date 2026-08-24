@@ -159,6 +159,47 @@ class HelpCenterSpace extends Model
         return $this->hasMany(HelpCenterTag::class)->orderBy('name');
     }
 
+    /*
+     |----------------------------------------------------------------------
+     | SLA (docs/features/helpdesk-sla.md)
+     |----------------------------------------------------------------------
+     */
+
+    /** The working weeks this Space counts SLA time against (§5). Default first. */
+    public function businessHours(): HasMany
+    {
+        return $this->hasMany(HelpCenterBusinessHours::class)->ordered();
+    }
+
+    /** Days the SLA clock does not run (§7). Space-level, not per calendar — SLA-D4. */
+    public function slaHolidays(): HasMany
+    {
+        return $this->hasMany(HelpCenterSlaHoliday::class)->ordered();
+    }
+
+    /**
+     * The Space's SLA policies, in EVALUATION order (§14).
+     *
+     * Ordered here rather than at each call site: the order is not a display preference, it is
+     * the rule that decides which policy a ticket gets, and a caller that forgot to sort would
+     * apply a different SLA than the settings screen shows.
+     */
+    public function slaPolicies(): HasMany
+    {
+        return $this->hasMany(HelpCenterSlaPolicy::class)->ordered();
+    }
+
+    /** The fallback when no policy's conditions match (§13). */
+    public function defaultSlaPolicy(): HasOne
+    {
+        return $this->hasOne(HelpCenterSlaPolicy::class)->where('is_default', true);
+    }
+
+    public function slaEscalations(): HasMany
+    {
+        return $this->hasMany(HelpCenterSlaEscalation::class)->ordered();
+    }
+
     /** How this Space behaves (P2 §17-§24). One row, or none until Step 6 has run. */
     public function settings(): HasOne
     {

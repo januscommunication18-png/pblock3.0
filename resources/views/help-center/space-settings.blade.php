@@ -14,6 +14,14 @@
     <link rel="stylesheet" href="{{ pb_asset('assets/css/tabulator-skin.css') }}" />
     <script src="{{ pb_asset('assets/vendor/tabulator/tabulator.min.js') }}"></script>
     <script defer src="{{ pb_asset('assets/js/help-center/space-members.js') }}"></script>
+  @elseif ($settingKind === 'sla')
+    {{-- SLA is its own screen (docs/features/helpdesk-sla.md, §2), not a settings panel.
+
+         Its own script rather than another `kind` branch inside space-settings.js: that file is
+         already 3,500 lines of one component, and this page is four resources with four of their
+         own endpoints. Adding it there would have meant one component that no longer fits in a
+         head — the same reason Members brings its own. --}}
+    <script defer src="{{ pb_asset('assets/js/help-center/sla-settings.js') }}"></script>
   @else
     {{-- The rich-text editor (P41), for the Email Template panel's bodies and signature
          content (P48). Loaded for every settings page rather than only that one: `@push` runs
@@ -212,6 +220,12 @@
               'class="inline-flex items-center h-8 px-3 mt-2 rounded-md border border-stroke bg-white text-[13px] font-semibold text-ink hover:bg-hover">Reload</button>';
           }, 8000);
         </script>
+      @elseif ($settingKind === 'sla')
+        {{-- The same mount-point contract as every other panel: an id, a bootstrap payload and a
+             placeholder the app replaces, so a screen that fails to boot says so. --}}
+        <div id="help-center-sla" data-bootstrap="{{ json_encode($bootstrap) }}">
+          <div class="max-w-[980px] mx-auto px-5 sm:px-8 py-10 text-sub text-[13px]">Loading SLA…</div>
+        </div>
       @else
         {{-- Same mount-point contract as Project Settings: an id, a data-bootstrap payload, and
              a "Loading…" placeholder the Vue app replaces — so a failure to boot shows something

@@ -4,20 +4,23 @@ use App\Http\Controllers\HelpCenter\CompanyController;
 use App\Http\Controllers\HelpCenter\CompanyCustomerController;
 use App\Http\Controllers\HelpCenter\CustomerController;
 use App\Http\Controllers\HelpCenter\CustomFieldController;
-use App\Http\Controllers\HelpCenter\MetadataMappingController;
 use App\Http\Controllers\HelpCenter\EmailAddressController;
+use App\Http\Controllers\HelpCenter\EmailTemplateController;
 use App\Http\Controllers\HelpCenter\HelpCenterController;
 use App\Http\Controllers\HelpCenter\InboundTestController;
 use App\Http\Controllers\HelpCenter\InboxController;
 use App\Http\Controllers\HelpCenter\InboxQueueController;
+use App\Http\Controllers\HelpCenter\MetadataMappingController;
 use App\Http\Controllers\HelpCenter\PublicRatingController;
 use App\Http\Controllers\HelpCenter\RatingController;
 use App\Http\Controllers\HelpCenter\RequestAttachmentController;
 use App\Http\Controllers\HelpCenter\RequestController;
-use App\Http\Controllers\HelpCenter\EmailTemplateController;
 use App\Http\Controllers\HelpCenter\RequestNoteController;
 use App\Http\Controllers\HelpCenter\RequestSnoozeController;
 use App\Http\Controllers\HelpCenter\SetupController;
+use App\Http\Controllers\HelpCenter\SlaCalendarController;
+use App\Http\Controllers\HelpCenter\SlaEscalationController;
+use App\Http\Controllers\HelpCenter\SlaPolicyController;
 use App\Http\Controllers\HelpCenter\SpaceController;
 use App\Http\Controllers\HelpCenter\SpaceEntryController;
 use App\Http\Controllers\HelpCenter\SpaceMemberController;
@@ -385,6 +388,46 @@ Route::middleware(['auth', 'workspace.tenancy'])
          * `{type}` is validated against the config keys in the controller rather than in the
          * route, so an unknown type gives a 404 from the one place that knows what a type is.
          */
+        /*
+         * SLA configuration (docs/features/helpdesk-sla.md, §2–§8, §24–§25).
+         *
+         * Its own routes rather than the one settings PATCH, for the reason the email templates
+         * have theirs: this section is four RESOURCES with their own tables, not a panel of
+         * fields on the settings row. `/order` sits before `/{policy}` so the literal segment is
+         * not swallowed by the numeric one.
+         */
+        Route::post('/spaces/{space}/sla/business-hours', [SlaCalendarController::class, 'storeHours'])
+            ->whereNumber('space')->name('spaces.sla.hours.store');
+        Route::patch('/spaces/{space}/sla/business-hours/{hours}', [SlaCalendarController::class, 'updateHours'])
+            ->whereNumber(['space', 'hours'])->name('spaces.sla.hours.update');
+        Route::delete('/spaces/{space}/sla/business-hours/{hours}', [SlaCalendarController::class, 'destroyHours'])
+            ->whereNumber(['space', 'hours'])->name('spaces.sla.hours.destroy');
+
+        Route::post('/spaces/{space}/sla/holidays', [SlaCalendarController::class, 'storeHoliday'])
+            ->whereNumber('space')->name('spaces.sla.holidays.store');
+        Route::patch('/spaces/{space}/sla/holidays/{holiday}', [SlaCalendarController::class, 'updateHoliday'])
+            ->whereNumber(['space', 'holiday'])->name('spaces.sla.holidays.update');
+        Route::delete('/spaces/{space}/sla/holidays/{holiday}', [SlaCalendarController::class, 'destroyHoliday'])
+            ->whereNumber(['space', 'holiday'])->name('spaces.sla.holidays.destroy');
+
+        Route::patch('/spaces/{space}/sla/policies/order', [SlaPolicyController::class, 'reorder'])
+            ->whereNumber('space')->name('spaces.sla.policies.order');
+        Route::post('/spaces/{space}/sla/policies', [SlaPolicyController::class, 'store'])
+            ->whereNumber('space')->name('spaces.sla.policies.store');
+        Route::post('/spaces/{space}/sla/policies/{policy}/duplicate', [SlaPolicyController::class, 'duplicate'])
+            ->whereNumber(['space', 'policy'])->name('spaces.sla.policies.duplicate');
+        Route::patch('/spaces/{space}/sla/policies/{policy}', [SlaPolicyController::class, 'update'])
+            ->whereNumber(['space', 'policy'])->name('spaces.sla.policies.update');
+        Route::delete('/spaces/{space}/sla/policies/{policy}', [SlaPolicyController::class, 'destroy'])
+            ->whereNumber(['space', 'policy'])->name('spaces.sla.policies.destroy');
+
+        Route::post('/spaces/{space}/sla/escalations', [SlaEscalationController::class, 'store'])
+            ->whereNumber('space')->name('spaces.sla.escalations.store');
+        Route::patch('/spaces/{space}/sla/escalations/{escalation}', [SlaEscalationController::class, 'update'])
+            ->whereNumber(['space', 'escalation'])->name('spaces.sla.escalations.update');
+        Route::delete('/spaces/{space}/sla/escalations/{escalation}', [SlaEscalationController::class, 'destroy'])
+            ->whereNumber(['space', 'escalation'])->name('spaces.sla.escalations.destroy');
+
         // A Space's CSAT configuration (P56) — its own table, so its own endpoint.
         Route::put('/spaces/{space}/rating', [RatingController::class, 'update'])
             ->whereNumber('space')->name('spaces.rating.update');

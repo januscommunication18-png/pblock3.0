@@ -626,6 +626,19 @@ return [
         ['key' => 'workflow', 'label' => 'Workflow', 'status' => 'active', 'kind' => 'workflow'],
 
         /*
+         * SLA (docs/features/helpdesk-sla.md, §2) — four pages on one screen: Policies,
+         * Business Hours, Holiday Calendar and Escalation Rules.
+         *
+         * Directly after Workflow, because the two are one conversation: a status decides
+         * whether the clock runs (§19), and a policy decides how long it may run for. Reading
+         * one without the other tells a team half of what happens to a ticket.
+         *
+         * Its own `kind`, and its own script — see space-settings.blade.php. Four resources with
+         * their own tables is more than the settings panel's one-endpoint shape can carry.
+         */
+        ['key' => 'sla', 'label' => 'SLA', 'status' => 'active', 'kind' => 'sla'],
+
+        /*
          * Who works this Space — moved here from the Space's own tab bar.
          *
          * Third, after the two questions people open Settings with ("where does mail arrive?"
@@ -909,6 +922,197 @@ return [
             'jar', 'vbs', 'vbe', 'js', 'jse', 'wsf', 'wsh', 'ps1', 'psm1',
             'sh', 'bash', 'app', 'scpt', 'hta', 'reg', 'lnk',
         ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | SLA (docs/features/helpdesk-sla.md)
+    |--------------------------------------------------------------------------
+    | The SLA subsystem's fixed vocabulary. Config for the reason everything else in this file
+    | is: these lists are read by the settings forms, the request that validates them, the
+    | engine that acts on them and the panel that explains a stored value — four readers that
+    | must not be able to disagree about what `pause` or `percent_90` means.
+    */
+
+    /** What a workflow status does to the running clocks (§19). */
+    'sla_behaviors' => [
+        'continue' => [
+            'label' => 'Continue SLA',
+            'description' => 'The clocks keep running while a Request sits here.',
+        ],
+        'pause' => [
+            'label' => 'Pause SLA',
+            'description' => 'Every running clock stops, and resumes with its remaining time.',
+        ],
+        'complete_resolution' => [
+            'label' => 'Complete Resolution SLA',
+            'description' => 'The Resolution clock is met here. Response clocks stop with it.',
+        ],
+        'stop' => [
+            'label' => 'Stop SLA',
+            'description' => 'The clocks end without being met — the Request has left the queue.',
+        ],
+    ],
+
+    /**
+     * The three clocks (§9–§11).
+     *
+     * `repeats` is the whole difference between them: Next Response starts again on every
+     * customer reply, which is why timers carry a cycle number and the other two never leave 1.
+     */
+    'sla_timer_kinds' => [
+        'first_response' => ['label' => 'First Response', 'repeats' => false],
+        'next_response' => ['label' => 'Next Response', 'repeats' => true],
+        'resolution' => ['label' => 'Resolution', 'repeats' => false],
+    ],
+
+    /** §16's six states, and whether the clock is still moving in each. */
+    'sla_timer_statuses' => [
+        'not_started' => ['label' => 'Not Started', 'color' => '#9ca3af', 'running' => false],
+        'running' => ['label' => 'On Track', 'color' => '#22c55e', 'running' => true],
+        'due_soon' => ['label' => 'Due Soon', 'color' => '#f59e0b', 'running' => true],
+        'paused' => ['label' => 'Paused', 'color' => '#6b7280', 'running' => false],
+        'completed' => ['label' => 'Completed', 'color' => '#3b82f6', 'running' => false],
+        'breached' => ['label' => 'Breached', 'color' => '#ef4444', 'running' => false],
+    ],
+
+    /**
+     * The units a target may be authored in (§8).
+     *
+     * `days` is a BUSINESS day — the calendar's own working length for that date, not 24 hours
+     * and not a fixed eight (SLA-D7). That is why the unit is stored rather than flattened to
+     * minutes at save time.
+     */
+    'sla_units' => [
+        'minutes' => ['label' => 'Minutes'],
+        'hours' => ['label' => 'Hours'],
+        'days' => ['label' => 'Business Days'],
+    ],
+
+    /** What a resolved ticket's Resolution clock does when the customer comes back (§23). */
+    'sla_reopen_behaviors' => [
+        'resume' => ['label' => 'Resume Existing Resolution SLA'],
+        'restart' => ['label' => 'Start New Resolution SLA'],
+        'none' => ['label' => 'Do Not Restart Resolution SLA'],
+    ],
+
+    /**
+     * "SLA Applies When" (§12).
+     *
+     * `source` tells the condition editor where the value picker gets its options, and tells the
+     * matcher what it is comparing: `list` is an id from a table, `vocabulary` is a key from this
+     * config file, and `custom_field` is a value stored against the ticket's Customer or Company.
+     *
+     * FOUR of the requirement's conditions are absent, and their absence is the decision
+     * SLA-D6 records: Customer Type, Ticket Type, Ticket Channel and Support Plan are not things
+     * this product stores. A ticket has no type and no channel column (every Request arrives by
+     * email), and there is no support-plan concept anywhere. Offering them would be four
+     * dropdowns with nothing to select and a matcher that could only ever return false.
+     *
+     * Three of the four are already expressible: Company & Customer custom fields (P75) are
+     * exactly where a team records "Enterprise", "Gold Plan" or "Billing", and the two
+     * `*_field` conditions below match against them.
+     */
+    'sla_condition_fields' => [
+        'company' => ['label' => 'Company', 'source' => 'list'],
+        /*
+         * The customer by EMAIL, not by id.
+         *
+         * A Space has thousands of customers and a handful of companies, so a customer picker
+         * would be a dropdown nobody can scroll — and email is how a customer is identified
+         * everywhere else in this module, including on Requests that were never matched to a
+         * customer row at all.
+         */
+        'customer_email' => ['label' => 'Customer Email', 'source' => 'text'],
+        'priority' => ['label' => 'Ticket Priority', 'source' => 'vocabulary', 'vocabulary' => 'priorities'],
+        'tag' => ['label' => 'Tag', 'source' => 'list'],
+        'customer_field' => ['label' => 'Customer Field', 'source' => 'custom_field', 'record' => 'customer'],
+        'company_field' => ['label' => 'Company Field', 'source' => 'custom_field', 'record' => 'company'],
+    ],
+
+    /**
+     * How a condition compares.
+     *
+     * `is` and `is_not` take a SET of values — "Company is one of Acme, Globex" is one condition,
+     * not two, and modelling it as two would force the author to pick `any` for the whole policy
+     * just to express it.
+     */
+    'sla_condition_operators' => [
+        'is' => ['label' => 'is', 'multiple' => true],
+        'is_not' => ['label' => 'is not', 'multiple' => true],
+        'contains' => ['label' => 'contains', 'multiple' => false],
+        'is_set' => ['label' => 'is set', 'multiple' => false, 'valueless' => true],
+        'is_not_set' => ['label' => 'is not set', 'multiple' => false, 'valueless' => true],
+    ],
+
+    /**
+     * When an escalation fires (§24).
+     *
+     * Five triggers, not the requirement's eight: "First Response SLA Breached" is `breached`
+     * with the rule's `kind` set to `first_response`. Spelling each stage out as its own trigger
+     * would mean nine more the day somebody wants "First Response reaches 90%".
+     */
+    'sla_escalation_triggers' => [
+        'percent_50' => ['label' => 'SLA reaches 50%', 'percent' => 50],
+        'percent_75' => ['label' => 'SLA reaches 75%', 'percent' => 75],
+        'percent_90' => ['label' => 'SLA reaches 90%', 'percent' => 90],
+        'due_soon' => ['label' => 'SLA Due Soon', 'percent' => null],
+        'breached' => ['label' => 'SLA Breached', 'percent' => null],
+    ],
+
+    /**
+     * What an escalation does (§25).
+     *
+     * `needs` says what the action requires beside its name — a rule that changes priority needs
+     * to know which one, and one that notifies the assignee needs nothing.
+     *
+     * NOT called `value`. Every vocabulary here reaches the browser as `['value' => $key] +
+     * $entry`, and PHP's `+` keeps the LEFT operand's keys — an entry key called `value` would
+     * be silently dropped on the way out, and the picker would render a text box for every
+     * action because none of them appeared to need anything.
+     *
+     * "Change Team" points at a Department Group: that is what this product has instead of
+     * teams, and there is nothing else for it to mean.
+     */
+    'sla_escalation_actions' => [
+        'notify_assignee' => ['label' => 'Notify Assignee', 'needs' => null],
+        'notify_space_admin' => ['label' => 'Notify Space Admin', 'needs' => null],
+        'notify_team_lead' => ['label' => 'Notify Team Lead', 'needs' => null],
+        'send_email' => ['label' => 'Send Email', 'needs' => 'email'],
+        'change_assignee' => ['label' => 'Change Assignee', 'needs' => 'member'],
+        'change_team' => ['label' => 'Change Team', 'needs' => 'group'],
+        'change_priority' => ['label' => 'Change Priority', 'needs' => 'priority'],
+        'change_status' => ['label' => 'Change Status', 'needs' => 'status'],
+        'add_tag' => ['label' => 'Add Tag', 'needs' => 'tag'],
+        'remove_tag' => ['label' => 'Remove Tag', 'needs' => 'tag'],
+    ],
+
+    /**
+     * The working week a new Business Hours calendar starts as — §5's example, exactly.
+     *
+     * A default that is somebody's real week beats an empty form: the common case is
+     * "weekdays, office hours", and a Space that wants something else edits five fields instead
+     * of authoring seven.
+     */
+    'sla_default_schedule' => [
+        'mon' => ['open' => '08:00', 'close' => '18:00'],
+        'tue' => ['open' => '08:00', 'close' => '18:00'],
+        'wed' => ['open' => '08:00', 'close' => '18:00'],
+        'thu' => ['open' => '08:00', 'close' => '18:00'],
+        'fri' => ['open' => '08:00', 'close' => '18:00'],
+        'sat' => null,
+        'sun' => null,
+    ],
+
+    /** The days of the week, in the order the form draws them. */
+    'sla_week_days' => [
+        'mon' => 'Monday',
+        'tue' => 'Tuesday',
+        'wed' => 'Wednesday',
+        'thu' => 'Thursday',
+        'fri' => 'Friday',
+        'sat' => 'Saturday',
+        'sun' => 'Sunday',
     ],
 
 ];

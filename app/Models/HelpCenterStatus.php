@@ -43,6 +43,21 @@ class HelpCenterStatus extends Model
 
     public const RESPONSIBILITY_ASSIGNEE = 'assignee';
 
+    /**
+     * What a Request in this status does to its SLA clocks
+     * (docs/features/helpdesk-sla.md, §19).
+     *
+     * Independent of `system_category`, which only seeded it (SLA-D8): a team may want an Active
+     * status that pauses — "With Engineering", where nothing is owed to the customer.
+     */
+    public const SLA_CONTINUE = 'continue';
+
+    public const SLA_PAUSE = 'pause';
+
+    public const SLA_COMPLETE_RESOLUTION = 'complete_resolution';
+
+    public const SLA_STOP = 'stop';
+
     /** Where the two system rows sit. Custom statuses are numbered between them. */
     public const POSITION_OPEN = 0;
 
@@ -59,6 +74,7 @@ class HelpCenterStatus extends Model
         'is_active',
         'system_key',
         'system_category',
+        'sla_behavior',
         'position',
         'default_assignees',
     ];
@@ -215,6 +231,34 @@ class HelpCenterStatus extends Model
             ?? $this->system_category);
     }
 
+    /** The vocabulary a status's SLA behavior may be set to (§19). */
+    public static function slaBehaviors(): array
+    {
+        return array_keys((array) config('help-center.sla_behaviors'));
+    }
+
+    public static function isSlaBehavior(?string $key): bool
+    {
+        return $key !== null && in_array($key, self::slaBehaviors(), true);
+    }
+
+    public function slaBehaviorLabel(): string
+    {
+        return (string) (config('help-center.sla_behaviors.'.$this->sla_behavior.'.label')
+            ?? $this->sla_behavior);
+    }
+
+    /**
+     * Does time count while a Request sits here?
+     *
+     * `continue` is the only behavior that lets the clock move. The other three all stop it —
+     * they differ in what they leave behind, which is the engine's business, not the caller's.
+     */
+    public function slaRuns(): bool
+    {
+        return $this->sla_behavior === self::SLA_CONTINUE;
+    }
+
     /** @return array<string, mixed> */
     public function toPayload(): array
     {
@@ -228,6 +272,8 @@ class HelpCenterStatus extends Model
             'is_active' => $this->is_active,
             'system_key' => $this->system_key,
             'system_category' => $this->system_category,
+            'sla_behavior' => $this->sla_behavior,
+            'sla_behavior_label' => $this->slaBehaviorLabel(),
             'editable' => $this->isEditable(),
             'position' => $this->position,
             'default_assignees' => array_values((array) $this->default_assignees),
