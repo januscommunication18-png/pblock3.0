@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Services\Backoffice\ClientAccess;
+use App\Services\OnboardingRouter;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -22,27 +23,55 @@ class InitializeWorkspaceTenancy
 {
     public function handle(Request $request, Closure $next): Response
     {
-        $workspace = $request->user()?->currentWorkspace;
+        $user = $request->user();
+        $workspace = $user?->currentWorkspace;
 
         if (! $workspace) {
             return redirect()->route('onboarding.workspace');
         }
 
         /*
-         * A workspace whose CLIENT is disabled or pending deletion is closed
+         * A workspace the client may no longer enter is closed
          * (docs/features/backoffice-clients.md, §17, BC-D3).
          *
-         * Here, and not only at sign-in. The sign-in check refuses somebody who has nowhere left
-         * to go, but a person can belong to two clients — one live, one disabled — and signing
-         * in through the live one must not hand them the disabled one's workspace. This is the
-         * chokepoint every tenant-scoped request already passes through, so there is no route
-         * that can quietly miss it.
-         *
-         * The user is signed OUT rather than shown an error page: their session names the closed
-         * workspace as current, so leaving them signed in would loop them back here on every
-         * request with no way to pick a different one.
+         * Here, and not only at sign-in. Sign-in can only ask the GLOBAL question — "is this
+         * client disabled?" — because it does not yet know which workspace the person is heading
+         * for. "Disable Tenant Access" is per-membership, so it can only be answered once a
+         * workspace is in hand, and this is the chokepoint every tenant-scoped request already
+         * passes through: no route can quietly miss it.
          */
-        if (! app(ClientAccess::class)->allowsWorkspace($workspace)) {
+        $access = app(ClientAccess::class);
+
+        if (! $access->allowsTenant($user, $workspace)) {
+            /*
+             * ONE closed workspace is not a closed account.
+             *
+             * Somebody who belongs to five workspaces and has been removed from one must land in
+             * another, not on the sign-in screen. Signing them out here would also be a LOOP
+             * rather than a message: their `current_workspace_id` still names the closed
+             * workspace, so signing back in walks them straight into this branch again.
+             */
+            $fallback = $user->workspaces()
+                ->orderBy('name')
+                ->get()
+                ->first(fn ($candidate) => $access->allowsTenant($user, $candidate));
+
+            if ($fallback) {
+                $user->forceFill(['current_workspace_id' => $fallback->id])->save();
+
+                // Only a GET is worth replaying: redirecting a POST to its own URL lands on a
+                // 405, and the write it carried belonged to the workspace they just lost anyway.
+                return $request->isMethod('GET')
+                    ? redirect($request->fullUrl())
+                    : redirect(app(OnboardingRouter::class)->landingFor($user->refresh()));
+            }
+
+            /*
+             * Nowhere left to go — the client is globally disabled, or every membership is.
+             *
+             * Signed OUT rather than shown an error page: there is no workspace to render the
+             * application around, so an error page would be a dead end they could not leave.
+             */
             Auth::logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();

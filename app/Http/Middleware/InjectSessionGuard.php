@@ -59,6 +59,9 @@ class InjectSessionGuard
     private function shouldInject(Request $request, Response $response): bool
     {
         return Auth::check()
+            // Never on Back Office screens: the countdown it renders belongs to the CUSTOMER
+            // session, and its "Sign In Again" leads to `/signin`. See EnforceIdleTimeout.
+            && ! $request->is('backoffice', 'backoffice/*')
             && $request->isMethod('GET')
             && ! $this->isEmbedded($request)
             && ! $request->expectsJson()

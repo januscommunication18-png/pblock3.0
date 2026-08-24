@@ -98,6 +98,7 @@ already exists and gets its own broker.
 | BO-D6 | The last active Super Admin invariant is enforced in the MODEL, not in the controller | It is the one rule that can lock everybody out of the platform permanently. A controller check is bypassed by the next controller; a model check is not. |
 | BO-D7 | Uniform failure everywhere, including timing | "Do not reveal whether the account exists" is defeated by a fast path for unknown addresses. The unauthorized branch does the same hash work as the authorized one. |
 | BO-D8 | The nine module routes of §12 are NOT stubbed | An empty screen behind a working nav item reads as a broken feature rather than an absent one. |
+| BO-D9 | The customer idle-timeout stack (`EnforceIdleTimeout`, `InjectSessionGuard`) skips `/backoffice*` entirely | Both apps share one browser session. Somebody signed into both who let the CUSTOMER session go idle was signed out by the customer's rules while working in the Back Office — the shared session is invalidated, which takes the `backoffice` guard with it — and landed on `/signin`, which grants nothing here. Back Office timeouts are `BackofficeSessionTimeout`'s alone, and they end at `/backoffice`. |
 
 ---
 

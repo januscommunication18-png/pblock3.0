@@ -33,6 +33,20 @@ class EnforceIdleTimeout
 
     public function handle(Request $request, Closure $next): Response
     {
+        /*
+         * The Back Office runs its own clocks (BackofficeSessionTimeout) and its own front door.
+         *
+         * Without this, a person signed into BOTH apps in one browser who let the CUSTOMER
+         * session go idle was torn down mid-Back-Office by the customer's rules: the shared
+         * session is invalidated — which signs the `backoffice` guard out as collateral — and
+         * they land on `/signin`, a screen that grants nothing in the Back Office. A Back Office
+         * timeout must end at the Back Office front door, so these requests belong to the
+         * middleware that knows that.
+         */
+        if ($request->is('backoffice', 'backoffice/*')) {
+            return $next($request);
+        }
+
         if (! Auth::check() || ! $request->hasSession()) {
             return $next($request);
         }
