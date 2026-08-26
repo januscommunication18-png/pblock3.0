@@ -105,11 +105,21 @@ class ProjectNavigation
      * §38: only Workspace Owner/Admin see every project; everyone else sees exactly the ones
      * they were explicitly added to. Public visibility no longer grants access.
      *
+     * THIS MUST STAY THE ONLY DEFINITION. Every place that lists projects — the sidebar, the
+     * Projects page, Your Work, the /welcome shell — reads it, and `ProjectPolicy::view()` draws
+     * the same line for opening one. A second copy is not a duplication problem, it is a 404
+     * generator: `WelcomeController` kept its own, still granting access by `visibility`, so the
+     * sidebar offered public projects that the policy then refused to open
+     * (docs/features/workspace-project-access.md §1).
+     *
+     * `$status` is a parameter rather than a hardcoded ACTIVE so the Projects page's Archived
+     * tab narrows the same set instead of writing its own.
+     *
      * @return Builder<Project>
      */
-    public function visible(User $user)
+    public function visible(User $user, string $status = Project::STATUS_ACTIVE)
     {
-        $query = Project::query()->where('status', Project::STATUS_ACTIVE)->latest();
+        $query = Project::query()->where('status', $status)->latest();
 
         if (! in_array($this->workspaceRole($user), [WorkspaceMembership::ROLE_OWNER, 'admin'], true)) {
             $query->whereIn('id', ProjectMember::query()->where('user_id', $user->id)->select('project_id'));

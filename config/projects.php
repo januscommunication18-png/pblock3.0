@@ -595,4 +595,16 @@ return [
     'cycle_name_max' => 120,
 
     'cycle_description_max' => 2000,
+
+    /**
+     * May a workspace **Manager** create projects?
+     * (docs/features/workspace-project-access.md §3 — the "Configurable" row.)
+     *
+     * Owner and Admin always may; Member, Viewer and Guest never do. Manager is the one row the
+     * requirement leaves to the product, because the role carries no workspace-level privileges
+     * of its own — it only bites where the same person is also a project's Admin (Project Member
+     * Management §17). Defaults to allowed: a manager who cannot start a project has little left
+     * to manage. Set to false for workspaces where only Owners and Admins shape the project list.
+     */
+    'manager_can_create' => env('PROJECTS_MANAGER_CAN_CREATE', true),
 ];

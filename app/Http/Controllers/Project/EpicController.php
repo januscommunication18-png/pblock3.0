@@ -307,7 +307,11 @@ class EpicController extends Controller
             'tabs' => $this->navigation->tabs($project),
             'activeTab' => 'epics',
             'projects' => $this->navigation->sidebarProjects(Auth::user()),
-            'canCreateProject' => Auth::user()->can('create', [WorkItem::class, $project]),
+            // The sidebar's "+ Add Project" — a PROJECT ability, not a work-item one. These
+            // three screens asked whether the user could create a WORK ITEM here, so a Member
+            // who may add work items was offered a button that creates projects
+            // (docs/features/workspace-project-access.md §3).
+            'canCreateProject' => Auth::user()->can('create', [Project::class, Auth::user()->currentWorkspace]),
             'canManage' => Auth::user()->can('manage', $project),
             'bootstrap' => [
                 'project' => [

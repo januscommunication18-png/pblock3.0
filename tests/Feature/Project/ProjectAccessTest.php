@@ -56,11 +56,16 @@ class ProjectAccessTest extends ProjectTestCase
 
         // Project Member Management §38 supersedes PRJ-030: a workspace member gets no
         // access to a project until they are explicitly added to it, public or not.
+        //
+        // 403, not 404 (workspace-project-access.md §7): the project is PUBLIC and these two
+        // belong to its workspace, so its existence is already open to them and pretending it
+        // is not there would be a lie they can see through. A PRIVATE project still answers
+        // 404 to the same people — the test above.
         $member = $this->member($workspace, 'member', 'member@example.com');
-        $this->actingAs($member)->get(route('projects.show', $project->id))->assertNotFound();
+        $this->actingAs($member)->get(route('projects.show', $project->id))->assertForbidden();
 
         $guest = $this->member($workspace, 'guest', 'guest@example.com');
-        $this->actingAs($guest)->get(route('projects.show', $project->id))->assertNotFound();
+        $this->actingAs($guest)->get(route('projects.show', $project->id))->assertForbidden();
 
         // Once added, the same member can open it.
         $workspace->run(fn () => ProjectMember::create([

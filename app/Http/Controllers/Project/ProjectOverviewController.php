@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Project;
 use App\Http\Controllers\Controller;
 use App\Models\Project;
 use App\Models\WorkItem;
+use App\Services\ProjectAccess;
 use App\Services\ProjectNavigation;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
@@ -47,7 +48,9 @@ class ProjectOverviewController extends Controller
     private function render(Project $project, string $segment): View
     {
         // 404, never leak whether an inaccessible project exists (spec §12).
-        abort_unless(Auth::user()->can('viewAny', [WorkItem::class, $project]), 404);
+        // The project PAGE: refused as §7 asks — 403 with a message where the project's
+        // existence is already open to this user, 404 where it is not.
+        app(ProjectAccess::class)->guardView(Auth::user(), $project);
 
         $project->loadMissing(['lead', 'state', 'priority']);
 

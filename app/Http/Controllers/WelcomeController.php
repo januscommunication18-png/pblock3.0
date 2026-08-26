@@ -3,8 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Project;
-use App\Models\ProjectMember;
-use App\Models\WorkspaceMembership;
+use App\Models\User;
+use App\Models\Workspace;
+use App\Services\ProjectNavigation;
 use App\Services\WorkspaceAccess;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
@@ -51,38 +52,27 @@ class WelcomeController extends Controller
     }
 
     /**
-     * Active projects visible to the user for the sidebar. Runs inside the workspace's
-     * tenancy context so the tenant-scoped Project query is confined to it (this route is
-     * not behind the workspace.tenancy middleware).
+     * The projects the sidebar may offer — ProjectNavigation's list, not one of our own.
+     *
+     * This method used to hold a SECOND definition of "which projects can this person see", and
+     * that copy still granted access by `visibility`: a public project was listed for every
+     * Member. `ProjectPolicy::view()` stopped accepting visibility as access when Project Member
+     * Management §38 landed, so the sidebar went on offering projects the policy then refused —
+     * a link straight to 404 for anybody invited into somebody else's workspace
+     * (docs/features/workspace-project-access.md §1).
+     *
+     * Runs inside the workspace's tenancy context because this route is NOT behind the
+     * `workspace.tenancy` middleware — a user with no workspace at all has to be able to reach
+     * it — and `Project` / `ProjectMember` are tenant-scoped.
      *
      * @return array<int, array<string, mixed>>
      */
-    private function sidebarProjects($workspace, $user): array
+    private function sidebarProjects(?Workspace $workspace, User $user): array
     {
         if (! $workspace) {
             return [];
         }
 
-        return $workspace->run(function () use ($workspace, $user) {
-            $role = WorkspaceMembership::query()
-                ->where('workspace_id', $workspace->id)->where('user_id', $user->id)
-                ->where('status', WorkspaceMembership::STATUS_ACTIVE)->value('role');
-
-            $query = Project::query()->where('status', Project::STATUS_ACTIVE)->latest();
-
-            if (! in_array($role, ['owner', 'admin'], true)) {
-                $memberIds = ProjectMember::query()->where('user_id', $user->id)->pluck('project_id');
-                $query->where(function ($q) use ($memberIds, $role) {
-                    $q->whereIn('id', $memberIds);
-                    if (in_array($role, ['member', 'viewer'], true)) {
-                        $q->orWhere('visibility', 'public');
-                    }
-                });
-            }
-
-            return $query->limit(50)->get()
-                ->map(fn (Project $p) => ['name' => $p->name, 'emoji' => $p->emoji, 'url' => route('projects.show', $p->id)])
-                ->all();
-        });
+        return $workspace->run(fn () => app(ProjectNavigation::class)->sidebarProjects($user));
     }
 }

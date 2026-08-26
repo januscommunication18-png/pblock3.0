@@ -11,6 +11,7 @@ use App\Models\Cycle;
 use App\Models\Project;
 use App\Models\WorkItem;
 use App\Models\WorkItemActivity;
+use App\Services\ProjectAccess;
 use App\Services\ProjectItemStateProvisioner;
 use App\Services\ProjectNavigation;
 use App\Services\WorkItemBlockers;
@@ -47,7 +48,9 @@ class WorkItemController extends Controller
     public function index(Project $project): View
     {
         // 404 rather than 403: never reveal that an inaccessible project exists (spec §12).
-        abort_unless(Auth::user()->can('viewAny', [WorkItem::class, $project]), 404);
+        // The project PAGE: refused as §7 asks — 403 with a message where the project's
+        // existence is already open to this user, 404 where it is not.
+        app(ProjectAccess::class)->guardView(Auth::user(), $project);
 
         return $this->screen($project);
     }

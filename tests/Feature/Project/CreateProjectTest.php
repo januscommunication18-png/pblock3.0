@@ -146,18 +146,45 @@ class CreateProjectTest extends ProjectTestCase
         ], ['Accept' => 'application/json'])->assertStatus(422)->assertJsonValidationErrors('cover');
     }
 
-    public function test_viewer_and_guest_cannot_create(): void
+    /**
+     * §3 of docs/features/workspace-project-access.md: Member is a NO.
+     *
+     * It used to be a yes, which put "+ Add Project" in front of everybody invited into
+     * somebody else's workspace and let them actually create one.
+     */
+    public function test_member_viewer_and_guest_cannot_create(): void
     {
         [, $workspace] = $this->owner();
 
-        foreach (['viewer', 'guest'] as $role) {
+        foreach (['member', 'viewer', 'guest'] as $role) {
             $user = $this->member($workspace, $role, "{$role}@example.com");
             $this->actingAs($user)->postJson(route('projects.store'), [
                 'name' => 'Nope', 'identifier' => strtoupper($role), 'visibility' => 'public',
             ])->assertForbidden();
+
+            // Authorization answers BEFORE validation: somebody who may not create a project
+            // is told so, rather than having their spelling marked first (403, never 422).
+            $this->actingAs($user)->postJson(route('projects.store'), [])->assertForbidden();
         }
 
         $this->assertSame(0, $workspace->run(fn () => Project::count()));
+    }
+
+    /** §3's "Configurable" row: Manager follows `projects.manager_can_create`. */
+    public function test_manager_creation_follows_configuration(): void
+    {
+        [, $workspace] = $this->owner();
+        $manager = $this->member($workspace, 'manager', 'manager@example.com');
+
+        config()->set('projects.manager_can_create', false);
+        $this->actingAs($manager)->postJson(route('projects.store'), [
+            'name' => 'Blocked', 'identifier' => 'blocked', 'visibility' => 'public',
+        ])->assertForbidden();
+
+        config()->set('projects.manager_can_create', true);
+        $this->actingAs($manager)->postJson(route('projects.store'), [
+            'name' => 'Allowed', 'identifier' => 'allowed', 'visibility' => 'public',
+        ])->assertSuccessful();
     }
 
     public function test_unlimited_projects_can_be_created(): void

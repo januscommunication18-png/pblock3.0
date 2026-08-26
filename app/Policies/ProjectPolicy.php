@@ -27,17 +27,37 @@ class ProjectPolicy
     }
 
     /**
-     * Can the user create a project in this workspace (PRJ-020, roles §6)? Owner/Admin/Member
-     * by default; Viewer and Guest cannot. Passed as `$user->can('create', [Project::class,
-     * $workspace])`.
+     * Can the user create a project in this workspace?
+     *
+     * | Owner | Admin | Manager | Member | Viewer | Guest |
+     * |---|---|---|---|---|---|
+     * | yes | yes | `config('projects.manager_can_create')` | no | no | no |
+     *
+     * **Member is NO** (docs/features/workspace-project-access.md §3). It used to be yes, which
+     * put "+ Add Project" in front of everybody invited into somebody else's workspace — and,
+     * because this policy is what `store()` checks too, actually let them create one. Creating
+     * a project is an act of shaping a workspace, and a Member is somebody invited to work
+     * inside one, not to arrange it.
+     *
+     * Manager is the configurable row the requirement asks for, and the reason it is not simply
+     * "yes": a Manager carries no workspace-level privileges of its own here — per Project
+     * Member Management §17 it only bites when the same person is also that project's Admin —
+     * so whether it extends to creating projects is a product decision, not a fact about the
+     * role. It defaults to allowed, since a manager who cannot start a project has little left
+     * to manage.
+     *
+     * Passed as `$user->can('create', [Project::class, $workspace])`, which is also what every
+     * screen's `+ Add Project` button reads — so the button and the endpoint cannot disagree.
      */
     public function create(User $user, Workspace $workspace): bool
     {
-        return in_array(
-            $this->workspaceRole($user, $workspace),
-            [WorkspaceMembership::ROLE_OWNER, 'admin', 'member'],
-            true,
-        );
+        $role = $this->workspaceRole($user, $workspace);
+
+        if (in_array($role, [WorkspaceMembership::ROLE_OWNER, 'admin'], true)) {
+            return true;
+        }
+
+        return $role === 'manager' && (bool) config('projects.manager_can_create', true);
     }
 
     /**

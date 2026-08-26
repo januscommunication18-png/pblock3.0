@@ -11,6 +11,7 @@ use App\Models\ProjectPriority;
 use App\Models\ProjectState;
 use App\Models\Workspace;
 use App\Models\WorkspaceMembership;
+use App\Services\ProjectAccess;
 use App\Services\ProjectCreator;
 use App\Services\ProjectLifecycle;
 use App\Services\ProjectNavigation;
@@ -384,7 +385,9 @@ class ProjectController extends Controller
      */
     public function show(Project $project): RedirectResponse
     {
-        abort_unless(Auth::user()->can('view', $project), 404); // 404, never leak metadata
+        // 403 when the project is public and the user is in its workspace, 404 otherwise —
+        // ProjectAccess owns that choice (docs/features/workspace-project-access.md §7).
+        app(ProjectAccess::class)->guardView(Auth::user(), $project);
 
         return redirect()->route('projects.work-items', $project);
     }
@@ -422,28 +425,27 @@ class ProjectController extends Controller
     }
 
     /**
-     * Projects of a given status visible to the current user (PRJ-010/030/031). Owner/Admin
-     * see all; others see public projects plus projects they are a member of.
+     * Projects of a given status visible to the current user (PRJ-010/030/031).
+     *
+     * The set comes from `ProjectNavigation::visible()` — the same query behind the left-hand
+     * sidebar, the /welcome shell and Your Work — so this page and the navigation beside it
+     * cannot list different things (docs/features/workspace-project-access.md §2/§6). It used
+     * to restate the rule here, which is how two lists drawn from "the same" definition drifted.
      *
      * @return array<int, array<string, mixed>>
      */
     private function visibleProjects(string $status): array
     {
         $user = Auth::user();
-        $wsRole = $this->workspaceRole();
 
-        $query = Project::query()->where('status', $status)->with('lead')->latest();
-
-        // §38: membership, not visibility, decides who sees a project (see ProjectPolicy@view).
-        if (! in_array($wsRole, ['owner', 'admin'], true)) {
-            $query->whereIn('id', ProjectMember::query()->where('user_id', $user->id)->select('project_id'));
-        }
+        $projects = $this->navigation->visible($user, $status)
+            ->with('lead')
+            ->limit((int) (config('projects.page_size') ?? 24))
+            ->get();
 
         $memberIds = ProjectMember::query()->where('user_id', $user->id)->pluck('project_id')->flip();
 
-        return $query->limit((int) (config('projects.page_size') ?? 24))->get()
-            ->map(fn (Project $p) => $this->card($p, $memberIds->has($p->id)))
-            ->all();
+        return $projects->map(fn (Project $p) => $this->card($p, $memberIds->has($p->id)))->all();
     }
 
     /**

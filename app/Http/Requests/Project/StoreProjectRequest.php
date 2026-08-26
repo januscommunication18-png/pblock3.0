@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Project;
 
+use App\Models\Project;
 use App\Models\WorkspaceMembership;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Str;
@@ -18,9 +19,22 @@ use Illuminate\Validation\Rule;
  */
 class StoreProjectRequest extends FormRequest
 {
+    /**
+     * Creating a project is Owner / Admin / (configurable) Manager only
+     * (docs/features/workspace-project-access.md §3).
+     *
+     * Checked HERE rather than only in the controller because a FormRequest authorizes before
+     * it validates. With `true` here, a Member posting a malformed body was told 422 — the
+     * server marking their spelling before telling them they may not do this at all. The
+     * requirement asks for 403, and 403 is the honest first answer whatever the payload.
+     * `ProjectController::store()` re-checks; two cheap gates on the same rule is the right
+     * ratio for one that decides who may shape a workspace.
+     */
     public function authorize(): bool
     {
-        return true;
+        $workspace = $this->user()?->currentWorkspace;
+
+        return $workspace !== null && $this->user()->can('create', [Project::class, $workspace]);
     }
 
     protected function prepareForValidation(): void
