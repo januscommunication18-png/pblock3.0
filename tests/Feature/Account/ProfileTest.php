@@ -3,6 +3,7 @@
 namespace Tests\Feature\Account;
 
 use App\Http\Controllers\Account\ProfileController;
+use App\Models\Account;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceMembership;
@@ -232,7 +233,14 @@ class ProfileTest extends TestCase
     private function workspaceOwner(): array
     {
         $user = User::factory()->create(['email' => 'owner@example.com']);
-        $workspace = Workspace::create(['name' => 'Acme Inc', 'slug' => 'acme-inc', 'owner_id' => $user->id]);
+        // `account_id` is required now (docs/features/tenant-workspace-ownership.md §6). Built
+        // through the factory rather than by hand so the account comes with it; `owner_id` was
+        // never a column and only ever landed in stancl's `data` overflow.
+        $workspace = Workspace::factory()->create([
+            'name' => 'Acme Inc',
+            'slug' => 'acme-inc',
+            'account_id' => Account::factory()->ownedBy($user),
+        ]);
 
         WorkspaceMembership::create([
             'workspace_id' => $workspace->id, 'user_id' => $user->id,

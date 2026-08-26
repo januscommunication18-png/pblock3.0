@@ -63,6 +63,12 @@ finish its unfinished work items. Cancelling an Epic cancels nothing inside it. 
 reason is the right one — silent bulk status changes are the kind of thing a user cannot undo
 and did not ask for. The UI may *suggest*; it does not act.
 
+## The grid and the counter stay in step
+
+The Work Items tab is `<work-items-screen>`, fed by its own payload — so adding or removing
+work items has to write BOTH that payload and the lean `items` behind the count, or the two
+disagree until a reload. See `embedded-work-item-grid.md`.
+
 ## Acceptance criteria → tests
 
 §24's numbered list, in `tests/Feature/Project/EpicTest.php`.

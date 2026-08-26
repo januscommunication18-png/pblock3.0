@@ -185,6 +185,7 @@ class ModuleController extends Controller
             'ok' => true,
             'module' => $this->card($module->fresh(['lead', 'members', 'creator'])),
             'items' => $this->workItems($module),
+            'gridItems' => $this->gridItems($project, $module),
             'message' => $items->count() === 1 ? '1 work item added.' : "{$items->count()} work items added.",
         ]);
     }
@@ -200,6 +201,7 @@ class ModuleController extends Controller
         return response()->json([
             'ok' => true,
             'items' => $this->workItems($module),
+            'gridItems' => $this->gridItems($project, $module),
             'message' => 'Work item removed from the module.',
         ]);
     }
@@ -251,13 +253,7 @@ class ModuleController extends Controller
      */
     private function moduleScreenPayload(Project $project, Module $module): array
     {
-        $items = $module->workItems()
-            ->active()
-            ->with(['state', 'assignees', 'labels', 'parent:id,identifier,title', 'cycle', 'epic', 'estimateValue', 'modules', 'creator'])
-            ->orderBy('sequence_no')
-            ->get();
-
-        return $this->payload->build($project, null, $items, $this->filters($project)) + [
+        return $this->payload->build($project, null, $this->moduleItems($module)->get(), $this->filters($project)) + [
             'seed' => $project->featureEnabled('modules') && ! $module->isArchived()
                 ? ['module_ids' => [$module->id]]
                 : [],
@@ -381,6 +377,32 @@ class ModuleController extends Controller
             'id' => $user->id, 'name' => $user->displayName(),
             'initial' => $user->initial(), 'avatar_url' => $user->avatar_url,
         ];
+    }
+
+    /**
+     * This module's work items, as a query — the payload builder shapes them.
+     */
+    private function moduleItems(Module $module)
+    {
+        return $module->workItems()
+            ->active()
+            ->with(['state', 'assignees', 'labels', 'parent:id,identifier,title', 'cycle', 'epic', 'estimateValue', 'modules', 'creator'])
+            ->orderBy('sequence_no');
+    }
+
+    /**
+     * This module's rows in the WORK ITEMS SCREEN's shape (§8.3).
+     *
+     * The detail page's grid IS <work-items-screen>, so every write that changes which items
+     * the module holds returns these alongside `items`: that leaner overview shape is what the
+     * header count reads, and handing it to the grid would strip the epic, cycle and estimate
+     * chips off every row it replaced.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function gridItems(Project $project, Module $module): array
+    {
+        return $this->payload->rows($this->moduleItems($module)->get(), $project, $this->filters($project));
     }
 
     /**

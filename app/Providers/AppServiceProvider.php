@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Events\WorkspaceInvitationAccepted;
 use App\Listeners\LinkHelpCenterSpaceMemberships;
+use App\Models\BackofficeUser;
 use App\Services\HelpCenter\HelpCenterNavigation;
 use App\Services\OnboardingRouter;
 use App\Services\WikiNavigation;
@@ -14,7 +15,6 @@ use Illuminate\Auth\Middleware\RedirectIfAuthenticated;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Event;
-use App\Models\BackofficeUser;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
@@ -93,9 +93,11 @@ class AppServiceProvider extends ServiceProvider
         View::composer('partials.workspace-switcher', function ($view) {
             $user = Auth::user();
 
+            // Grouped into My Workspaces / Invited Workspaces
+            // (docs/features/tenant-workspace-ownership.md §12).
             $view->with(
-                'switcherWorkspaces',
-                $user ? app(WorkspaceSwitcher::class)->workspacesFor($user) : [],
+                'switcherGroups',
+                $user ? app(WorkspaceSwitcher::class)->groupsFor($user) : [],
             );
         });
 

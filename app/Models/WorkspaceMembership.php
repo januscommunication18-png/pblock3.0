@@ -69,6 +69,40 @@ class WorkspaceMembership extends Model
         ];
     }
 
+    /**
+     * Losing a membership must not leave the pointer behind.
+     *
+     * `users.current_workspace_id` is where the app remembers which workspace somebody is in,
+     * and removing them from a workspace or suspending them there used to leave it aimed at
+     * the workspace they had just lost. The tenancy middleware refuses to enter it either way
+     * (App\Http\Middleware\InitializeWorkspaceTenancy) — this clears the pointer at the
+     * source, so the switcher, the landing router and the next request agree immediately
+     * instead of each having to notice the pointer is stale.
+     *
+     * On the model rather than in the two controllers that revoke access today: an admin
+     * removing a member, the Back Office removing one, and whatever revokes access next all
+     * write this table, and only one of them can be forgotten if the rule lives here.
+     */
+    protected static function booted(): void
+    {
+        static::deleted(fn (self $membership) => $membership->releaseCurrentWorkspace());
+
+        static::updated(function (self $membership) {
+            if ($membership->wasChanged('status') && $membership->status !== self::STATUS_ACTIVE) {
+                $membership->releaseCurrentWorkspace();
+            }
+        });
+    }
+
+    /** Unpin this user from this workspace, if it is the one they were sitting in. */
+    private function releaseCurrentWorkspace(): void
+    {
+        User::query()
+            ->whereKey($this->user_id)
+            ->where('current_workspace_id', $this->workspace_id)
+            ->update(['current_workspace_id' => null]);
+    }
+
     public function workspace(): BelongsTo
     {
         return $this->belongsTo(Workspace::class, 'workspace_id');

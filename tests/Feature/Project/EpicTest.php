@@ -302,9 +302,12 @@ class EpicTest extends ProjectTestCase
 
         $url = ['project' => $project->id, 'epic' => $epic->id];
 
+        // `gridItems` is what the Work Items tab renders; `items` is what the count reads.
+        // They come back together so the two cannot disagree until a reload
+        // (embedded-work-item-grid.md).
         $this->actingAs($owner)->postJson(route('projects.epics.items.store', $url), [
             'work_item_ids' => [$item->id],
-        ])->assertOk()->assertJsonCount(1, 'items');
+        ])->assertOk()->assertJsonCount(1, 'items')->assertJsonCount(1, 'gridItems');
 
         // Adding the same item twice is a no-op, not an error.
         $this->actingAs($owner)->postJson(route('projects.epics.items.store', $url), [
@@ -313,7 +316,8 @@ class EpicTest extends ProjectTestCase
 
         // §24.14: removing the assignment does not delete the work item.
         $this->actingAs($owner)->deleteJson(route('projects.epics.items.destroy',
-            $url + ['workItem' => $item->id]))->assertOk()->assertJsonCount(0, 'items');
+            $url + ['workItem' => $item->id]))->assertOk()
+            ->assertJsonCount(0, 'items')->assertJsonCount(0, 'gridItems');
 
         $this->assertTrue($ws->run(fn () => WorkItem::whereKey($item->id)->exists()));
         $this->assertNull($ws->run(fn () => WorkItem::find($item->id)->epic_id));

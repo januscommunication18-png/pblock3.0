@@ -2,11 +2,13 @@
 
 namespace App\Models;
 
+use App\Services\RichTextSanitizer;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -76,17 +78,63 @@ class User extends Authenticatable
         return $this->hasMany(WorkspaceMembership::class);
     }
 
-    /** Workspaces this user belongs to, through active memberships. */
+    /**
+     * Workspaces this user belongs to, through ACTIVE memberships.
+     *
+     * The status filter is the access rule, not a nicety: this relation is what the switcher,
+     * the landing router and the tenancy middleware's fallback all enumerate, and without it
+     * a suspended membership kept listing — and offering — a workspace its owner had closed.
+     * A removed membership has no row at all, so it drops out either way.
+     *
+     * Everything that asks "which workspaces may this person open?" should read this relation
+     * or App\Services\WorkspaceAccess, never `Workspace::all()` narrowed afterwards.
+     */
     public function workspaces(): BelongsToMany
     {
         return $this->belongsToMany(Workspace::class, 'workspace_memberships', 'user_id', 'workspace_id')
             ->withPivot(['role', 'status'])
+            ->wherePivot('status', WorkspaceMembership::STATUS_ACTIVE)
             ->withTimestamps();
     }
 
     public function currentWorkspace(): BelongsTo
     {
         return $this->belongsTo(Workspace::class, 'current_workspace_id');
+    }
+
+    /**
+     * The account this user OWNS — the requirement's Tenant
+     * (docs/features/tenant-workspace-ownership.md §3).
+     *
+     * Null until they create their first workspace, and null forever for somebody who only
+     * ever accepted invitations (§20). One per user, enforced by a unique index, so every
+     * workspace they create afterwards joins this one instead of starting another.
+     *
+     * This is not the list of workspaces they can open — that is `workspaces()` above, through
+     * memberships. Owning an account grants no access to anything.
+     */
+    public function account(): HasOne
+    {
+        return $this->hasOne(Account::class, 'owner_user_id');
+    }
+
+    /**
+     * Workspaces under this user's own account (§12 — "My Workspaces").
+     *
+     * Ownership, not access: it deliberately does NOT filter by membership, so a workspace the
+     * owner has somehow been removed from still reads as theirs. Anything that OFFERS a
+     * workspace intersects this with `workspaces()`.
+     */
+    public function ownedWorkspaces(): HasManyThrough
+    {
+        return $this->hasManyThrough(
+            Workspace::class,
+            Account::class,
+            'owner_user_id',  // accounts.owner_user_id
+            'account_id',     // tenants.account_id
+            'id',
+            'id',
+        );
     }
 
     public function hasPassword(): bool
@@ -113,7 +161,7 @@ class User extends Authenticatable
     {
         $text = trim((string) $this->signature);
 
-        return $text === '' ? '' : (string) app(\App\Services\RichTextSanitizer::class)->fromPlainText($text);
+        return $text === '' ? '' : (string) app(RichTextSanitizer::class)->fromPlainText($text);
     }
 
     /** Is there a personal signature worth appending? */

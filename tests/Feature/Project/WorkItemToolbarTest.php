@@ -4,6 +4,8 @@ namespace Tests\Feature\Project;
 
 use App\Models\ProjectMember;
 use App\Models\WorkItem;
+use App\Models\WorkItemActivity;
+use App\Models\WorkItemComment;
 use App\Models\WorkItemSubscriber;
 use App\Models\WorkItemVote;
 use App\Services\WorkItemCreator;
@@ -101,6 +103,64 @@ class WorkItemToolbarTest extends ProjectTestCase
 
         $this->actingAs($owner)->postJson($url)->assertOk()->assertJsonPath('subscribed', false);
         $this->assertSame(0, WorkItemSubscriber::where('work_item_id', $item->id)->count());
+    }
+
+    /**
+     * The audit trail of a vote: cast, switched, withdrawn — three rows, kept after the vote
+     * row itself is gone, and never a comment.
+     */
+    public function test_every_vote_action_is_recorded_as_an_audit_event(): void
+    {
+        [$owner, $ws] = $this->owner();
+        $project = $this->makeProject($owner, $ws);
+        $item = $this->makeItem($ws, $owner, $project);
+        $url = route('projects.work-items.vote', ['project' => $project->id, 'workItem' => $item->id]);
+
+        $this->actingAs($owner)->postJson($url, ['value' => 'up'])->assertOk();
+        $this->actingAs($owner)->postJson($url, ['value' => 'down'])->assertOk();
+        $this->actingAs($owner)->postJson($url, ['value' => 'down'])->assertOk();
+
+        $rows = WorkItemActivity::query()
+            ->where('work_item_id', $item->id)
+            ->where('event', WorkItemActivity::EVENT_VOTE_CHANGED)
+            ->orderBy('id')
+            ->get();
+
+        $this->assertSame(
+            [['none', 'up'], ['up', 'down'], ['down', 'none']],
+            $rows->map(fn (WorkItemActivity $a) => [$a->old_value, $a->new_value])->all(),
+        );
+        $this->assertSame('vote', $rows->first()->field);
+        $this->assertSame($owner->id, $rows->first()->actor_id);
+        // The wording is frozen at write time, which is what History renders before → after.
+        $this->assertSame('👍 Up', $rows->first()->meta['new_label']);
+
+        // The current position is gone; the trail is not. And nobody wrote a comment.
+        $this->assertSame(0, WorkItemVote::where('work_item_id', $item->id)->count());
+        $this->assertSame(0, WorkItemComment::where('work_item_id', $item->id)->count());
+    }
+
+    /** The click answers with the rebuilt feed, so an open drawer needs no reload. */
+    public function test_the_vote_response_carries_the_activity_and_history_lines(): void
+    {
+        [$owner, $ws] = $this->owner();
+        $project = $this->makeProject($owner, $ws);
+        $item = $this->makeItem($ws, $owner, $project);
+
+        $response = $this->actingAs($owner)->postJson(
+            route('projects.work-items.vote', ['project' => $project->id, 'workItem' => $item->id]),
+            ['value' => 'up'],
+        )->assertOk();
+
+        $feed = $response->json('feed');
+        $vote = collect($feed['activity'])->firstWhere('field', 'vote');
+        $this->assertNotNull($vote);
+        $this->assertSame('none', $vote['old_value']);
+        $this->assertSame('up', $vote['new_value']);
+
+        // History keeps it (both sides carry a value), and All merges it into the timeline.
+        $this->assertNotNull(collect($feed['history'])->firstWhere('field', 'vote'));
+        $this->assertNotNull(collect($feed['all'])->firstWhere('field', 'vote'));
     }
 
     public function test_a_viewer_may_vote_and_subscribe_without_being_able_to_edit(): void

@@ -61,6 +61,16 @@ The row payload gains `votes: {up, down}`, `my_vote` and `subscribed`.
 - **WT-06** A project Commenter can vote and subscribe, and still cannot edit the item.
 - **WT-07** Someone who cannot see the item gets 404, and no vote is recorded.
 - **WT-08** The row payload carries the counts on load, not only after a click.
+- **WT-09** A first vote writes one `work_item_vote_changed` row with `none → up`, and the
+  Activity tab reads "Rohit voted 👍 Up".
+- **WT-10** Switching sides writes `up → down` and reads "changed vote from 👍 Up to 👎 Down".
+  Still one row in `work_item_votes`.
+- **WT-11** Voting the same side again writes `up → none` and reads "removed their vote" —
+  the withdrawal is kept even though the vote row is gone.
+- **WT-12** Voting creates **no** comment; `work_item_comments` is untouched.
+- **WT-13** The vote lines appear in All, in timestamp order among comments, updates and
+  status changes, and in History as `None → 👍 Up`.
+- **WT-14** A refused vote (404 / 422) writes no activity row.
 
 ## UI Requirements
 
@@ -86,9 +96,41 @@ would carry.
 
 ## Audit Requirements
 
-Neither is recorded in `work_item_activity`. That feed is the item's own history — what it was
-and what it became — and a vote changes nothing about the work item. The vote rows are their
-own record, with timestamps.
+**Voting is audited** (added after the first cut — see D-T5). Every cast, switch and
+withdrawal writes one `work_item_activity` row:
+
+| Column | Value |
+|---|---|
+| `event` | `work_item_vote_changed` |
+| `work_item_id` | the item voted on |
+| `actor_id` | the voter |
+| `field` | `vote` |
+| `old_value` | `up` \| `down` \| `none` |
+| `new_value` | `up` \| `down` \| `none` |
+| `meta` | `old_label` / `new_label` — the 👍 Up / 👎 Down / None wording, frozen at write time |
+| `created_at` | timestamp |
+
+Written by `WorkItemActivityRecorder::voteChanged()`, from
+`WorkItemReactionController@vote`. `none` is stored on either side rather than null, because
+"no vote" is a real state of the trail — and History filters out rows with nothing on either
+side, so a null would hide the withdrawal it is meant to record.
+
+The `work_item_votes` table still holds only the **current** position (one row per person,
+deleted when the vote is taken back). The trail lives in the activity table; the tally lives
+in the votes table. Neither is derived from the other.
+
+Where it shows up:
+
+- **Activity** — "Rohit voted 👍 Up", "Rohit changed vote from 👍 Up to 👎 Down",
+  "Rohit removed their vote", each with the actor and timestamp.
+- **History** — the same line rendered before → after (`None → 👍 Up`).
+- **All** — merged into the single timeline by timestamp, alongside comments, updates,
+  status changes and assignments. No extra work: All merges the activity rows.
+
+**No comment is created for a vote.** The vote endpoint answers with the rebuilt feed as well
+as the counts, so an open drawer shows the new line without a reload.
+
+Subscribing is still **not** audited: it is a private preference, not a position on the item.
 
 ---
 
@@ -102,6 +144,7 @@ own record, with timestamps.
 | D-T2 | One vote table or two? | **One, with a `value` column.** See above: switching sides has to be atomic. |
 | D-T3 | Item subscription vs project subscription | **Separate tables, separate meanings.** Deliberately not reusing `project_subscribers`, which is a different question with a different blast radius. |
 | D-T4 | Counting on a list | **Batched** in `WorkItemReactions`, alongside `WorkItemBlockers` and `WorkItemStatusUpdates`. Per row it would be three queries per work item — 750 on a full list — instead of three in total. |
+| D-T5 | Should a vote be audited? | **Yes — as its own event**, `work_item_vote_changed`, not as an `updated` row and never as a comment. Reversed from the original "a vote changes nothing about the work item": the trail of *who moved which way, and when* is the point of a vote on a proposal, and the votes table cannot answer it — it keeps only where everyone currently stands. |
 
 ### An open question this raises
 

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Project;
 use App\Models\ProjectMember;
 use App\Models\WorkspaceMembership;
+use App\Services\WorkspaceAccess;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
@@ -20,12 +21,24 @@ class WelcomeController extends Controller
     {
         $user = Auth::user();
 
-        // No workspace yet -> send through first-workspace onboarding.
-        if (! $user->workspaces()->exists()) {
+        /*
+         * Which workspace this screen is ABOUT is an access decision, so it comes from
+         * WorkspaceAccess like everywhere else (docs/features/workspace-access-control.md).
+         * This route runs outside `workspace.tenancy` — a user with no workspace has to be able
+         * to reach it — so the middleware's check does not cover it, and reading
+         * `current_workspace_id` directly would render the get-started home, sidebar projects
+         * and all, for a workspace the user had been removed from.
+         */
+        $current = app(WorkspaceAccess::class)->resolveCurrent($user);
+
+        // Nothing they may open -> send through first-workspace onboarding.
+        if (! $current) {
             return redirect()->route('onboarding.workspace');
         }
 
-        $current = $user->currentWorkspace ?? $user->workspaces()->first();
+        if ((string) $user->current_workspace_id !== (string) $current->id) {
+            $user->forceFill(['current_workspace_id' => $current->id])->save();
+        }
 
         // The switcher's own data comes from the view composer on
         // partials.workspace-switcher, which every screen shares — nothing to pass here.

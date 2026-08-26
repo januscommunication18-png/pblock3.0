@@ -25,6 +25,15 @@ class WorkItemActivity extends Model
     /** A property changed; `field`, `old_value` and `new_value` carry the detail. */
     public const EVENT_UPDATED = 'updated';
 
+    /**
+     * Someone voted, switched sides, or took their vote back.
+     *
+     * Its own event rather than a plain `updated` row: a vote is not a property of the work
+     * item, and the audit trail is asked "who voted, and how did it change" as a question of
+     * its own. `old_value` / `new_value` carry `up`, `down` or `none`.
+     */
+    public const EVENT_VOTE_CHANGED = 'work_item_vote_changed';
+
     protected $fillable = [
         'tenant_id',
         'work_item_id',

@@ -291,6 +291,35 @@ PB.boot('project-cycles', {
     },
 
     // ---------- work items (§7.2/§7.3) ----------
+    /**
+     * The embedded work items screen changed WHICH items this cycle holds.
+     *
+     * Clearing a row's chip is how a work item is taken out of a cycle, and creating one from
+     * that grid puts it in — both happen inside the child component, so the count above it
+     * only moves if the child says so. The card it hands back carries every field these rows
+     * read, so it goes straight in.
+     */
+    hostItemsChanged: function (change) {
+      var card = change && change.card;
+      if (!card) return;
+
+      var rest = this.items.filter(function (i) { return String(i.id) !== String(card.id); });
+      this.items = change.type === 'added' ? rest.concat([card]) : rest;
+    },
+    /**
+     * One response, both views of this cycle's work.
+     *
+     * `items` is the lean overview shape behind the header count and the transfer dialog;
+     * `gridItems` is the same work in the work items screen's card shape, which is what the
+     * grid below actually renders. Writing only the first is what left the count saying 5
+     * while the grid still showed 3 until the page was reloaded.
+     */
+    applyItems: function (resp) {
+      if (Array.isArray(resp.items)) this.items = resp.items;
+      // Mutated in place, not replaced: <work-items-screen> watches this property, and the
+      // object it was handed is the one it is watching.
+      if (this.workItems && Array.isArray(resp.gridItems)) this.workItems.items = resp.gridItems;
+    },
     openPicker: function () {
       this.picker = { open: true, query: '', results: [], selected: [], busy: false, loaded: false };
       this.searchItems();
@@ -315,10 +344,10 @@ PB.boot('project-cycles', {
       if (!this.picker.selected.length || this.picker.busy) return;
       this.picker.busy = true;
       try {
-        var resp = await this.$pb.api(this.$pb.withId(this.endpoints.addItems, this.pageCycleId), {
+        var resp = await this.$pb.api(this.$pb.withFilters(this.$pb.withId(this.endpoints.addItems, this.pageCycleId)), {
           method: 'POST', body: { work_item_ids: this.picker.selected }
         });
-        this.items = resp.items || this.items;
+        this.applyItems(resp);
         this.mergeCycle(resp.cycle);
         this.picker.open = false;
         this.$pb.toast(resp.message || 'Added.');
@@ -328,8 +357,8 @@ PB.boot('project-cycles', {
     removeItem: async function (item) {
       try {
         var url = this.$pb.withId(this.endpoints.removeItem, this.pageCycleId).replace('__ITEM__', item.id);
-        var resp = await this.$pb.api(url, { method: 'DELETE' });
-        this.items = resp.items || this.items;
+        var resp = await this.$pb.api(this.$pb.withFilters(url), { method: 'DELETE' });
+        this.applyItems(resp);
         this.$pb.toast(resp.message || 'Removed.');
       } catch (e) { this.$pb.toast(this.$pb.firstError(e), 'error'); }
     },
@@ -353,10 +382,10 @@ PB.boot('project-cycles', {
       if (!this.transfer.to || !this.transfer.selected.length || this.transfer.busy) return;
       this.transfer.busy = true;
       try {
-        var resp = await this.$pb.api(this.$pb.withId(this.endpoints.transfer, this.pageCycleId), {
+        var resp = await this.$pb.api(this.$pb.withFilters(this.$pb.withId(this.endpoints.transfer, this.pageCycleId)), {
           method: 'POST', body: { to_cycle_id: this.transfer.to, work_item_ids: this.transfer.selected }
         });
-        this.items = resp.items || this.items;
+        this.applyItems(resp);
         this.transfer.open = false;
         this.$pb.toast(resp.message || 'Transferred.');
       } catch (e) { this.$pb.toast(this.$pb.firstError(e), 'error'); }
@@ -440,7 +469,7 @@ PB.boot('project-cycles', {
     // same everything, because it is the same component the project's list uses. v-if rather
     // than v-show: the grid inside measures itself on mount and a display:none container
     // gives it a height of zero.
-    '<work-items-screen v-if="workItems && items.length" :bootstrap="workItems" />' +
+    '<work-items-screen v-if="workItems && items.length" :bootstrap="workItems" @items-changed="hostItemsChanged" />' +
     '</div>' +
 
     '<div class="h-8"></div></div>' +

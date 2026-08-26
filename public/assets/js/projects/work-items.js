@@ -33,7 +33,8 @@ var WI_EVENT_ICON = {
   update: '<path d="M5 21V5a1 1 0 011-1h9l-1.5 3L15 10H6"/><path d="M5 21h4"/>',
   archive: '<rect x="3" y="4" width="18" height="5" rx="1.5"/><path d="M5 9v9a1 1 0 001 1h12a1 1 0 001-1V9M10 13h4"/>',
   created: '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/>',
-  cycle: '<path d="M21 12a9 9 0 11-3.6-7.2"/><path d="M21 4v4h-4"/>'
+  cycle: '<path d="M21 12a9 9 0 11-3.6-7.2"/><path d="M21 4v4h-4"/>',
+  vote: '<path d="M7 21V10l5-7 1.2.6a2 2 0 011 2.3L13 10h5.2a2 2 0 012 2.5l-1.6 6A2 2 0 0116.6 20H7z"/><path d="M3 21h4V10H3z"/>'
 };
 /** Which icon a feed row gets. */
 function wiEventKind(entry) {
@@ -47,6 +48,7 @@ function wiEventKind(entry) {
   if (field === 'comment' || field === 'comment_reply') return 'comment';
   if (field === 'worklog') return 'worklog';
   if (field === 'update') return 'update';
+  if (field === 'vote') return 'vote';
   if (field === 'archived_at') return 'archive';
   if (field.indexOf('link') === 0) return 'link';
   if (field.indexOf('relation') === 0 || field.indexOf('subtask') === 0) return 'relation';
@@ -757,6 +759,7 @@ var WiFilterChips = {
 
 var WorkItemsScreen = {
   props: { bootstrap: Object },
+  emits: ['items-changed'],
   data: function () {
     var b = this.bootstrap || {};
     // On the per-item page the detail is the first thing painted, so its drafts are seeded
@@ -851,6 +854,9 @@ var WorkItemsScreen = {
       // typing into a box at the top of the tab gave no sense of what was being answered.
       composer: { content: '', busy: false },
       commentModal: { open: false, mode: 'reply', target: null, content: '', busy: false },
+      // Deleting a comment is permanent and cascades to its replies, so it asks first —
+      // the same contract as deleting a work item (§4.4).
+      commentDelete: { open: false, target: null, isReply: false, busy: false },
       updateForm: { open: false, id: null, status: 'on_track', content: '', busy: false },
       worklogForm: { open: false, id: null, userId: null, date: '', dateOpen: false, hours: '', minutes: '', description: '', busy: false, error: '' },
       // The shared work-item picker behind "add sub-task" and every relation type.
@@ -1144,6 +1150,30 @@ var WorkItemsScreen = {
       ];
     }
   },
+  watch: {
+    /*
+     * THE HOST CHANGED WHICH ITEMS THIS SCREEN IS SHOWING.
+     *
+     * Mounted inside a cycle, epic or module, this component's rows are that record's rows —
+     * and adding or removing one happens up there, in the host's picker, not in here. The host
+     * writes the new rows onto the bootstrap it passed; this copies them in, and <wi-list>'s
+     * own watcher redraws the grid.
+     *
+     * Without it the count in the host's header moved and the grid below it did not, which is
+     * what made "add 2 items" look like it had done nothing until the page was reloaded.
+     */
+    'bootstrap.items': function (rows) {
+      if (!Array.isArray(rows)) return;
+      this.items = rows.slice();
+
+      // The drawer may be standing on a row that just left the list. Nothing behind it to go
+      // back to, so close it — except on the per-item page, where the detail IS the page.
+      var open = this.drawer.id;
+      if (open && !this.pageMode && !this.items.some(function (i) { return String(i.id) === String(open); })) {
+        this.closeDrawer();
+      }
+    }
+  },
   components: { 'wi-calendar': WiCalendar, 'wi-editor': WiEditor, 'wi-avatar': WiAvatar, 'wi-list': WiList, 'pg-editor': PgEditor, 'wi-filter': WiFilter, 'wi-filter-chips': WiFilterChips },
   mounted: function () {
     this.bindGlobalCreate();
@@ -1155,6 +1185,7 @@ var WorkItemsScreen = {
       // Innermost first: pickers, then the parent panel, then the create modal, then the
       // detail drawer — so Escape never closes the drawer out from under an open picker.
       if (self.editingTitle) { self.cancelEditTitle(); }
+      else if (self.commentDelete.open) { self.commentDelete.open = false; }
       else if (self.rowMenu.open) { self.closeRowMenu(); }
       else if (self.commentModal.open) { self.closeCommentModal(); }
       else if (self.linkModal.open) { self.linkModal.open = false; }
@@ -1306,6 +1337,9 @@ var WorkItemsScreen = {
         row.votes = resp.votes;
         row.my_vote = resp.my_vote;
         row.subscribed = resp.subscribed;
+        // Voting writes an audit row, so the response carries the rebuilt feed: without this
+        // the Activity / History / All tabs sit one click behind until the drawer reopens.
+        if (resp.feed) this.feed = resp.feed;
 
         return resp;
       } catch (e) {
@@ -1431,6 +1465,11 @@ var WorkItemsScreen = {
         if (this.items[i].id === card.id) { previous = this.items[i]; this.items.splice(i, 1, card); break; }
       }
 
+      // Embedded, and the edit took the row OUT of the record this screen belongs to —
+      // clearing a Cycle chip is how a work item leaves a cycle. It stops being one of these
+      // rows at that moment, count included.
+      if (!this.inHost(card)) { this.removeItem(card); return; }
+
       // Same state group: update that one row and keep scroll position and collapsed
       // groups. A state change moves the row between groups, which needs a rebuild.
       var sameGroup = previous && String(previous.state_id || '') === String(card.state_id || '');
@@ -1439,12 +1478,50 @@ var WorkItemsScreen = {
       this.refreshTable();
     },
     removeItem: function (item) {
-      var i = this.items.indexOf(item);
-      if (i > -1) this.items.splice(i, 1);
+      if (!item) return;
+      // By ID, not by identity: replaceItem() calls this with the REFRESHED card, which is a
+      // different object from the row already in the list.
+      for (var i = 0; i < this.items.length; i++) {
+        if (String(this.items[i].id) === String(item.id)) { this.items.splice(i, 1); break; }
+      }
       // The detail was showing the item that just left the list (archived or deleted) —
       // close it rather than leave an empty panel, or an empty page in page mode.
-      if (item && this.drawer.id && String(this.drawer.id) === String(item.id)) this.closeDrawer();
+      if (this.drawer.id && String(this.drawer.id) === String(item.id)) this.closeDrawer();
       this.refreshTable();
+      this.hostChanged('removed', item);
+    },
+    /**
+     * Does this row still belong to the record this screen is embedded in?
+     *
+     * `seed` is what the host said its work items have in common — a cycle, an epic, a module.
+     * Clearing that property from a row is how somebody takes a work item OUT of that record,
+     * so the row leaves this grid in the same breath. A screen that is not embedded — the
+     * project's own list — keeps every row it is given.
+     */
+    inHost: function (card) {
+      if (!card || !this.embedded) return true;
+      var seed = this.seed || {};
+
+      if (seed.cycle_id && String(card.cycle_id || '') !== String(seed.cycle_id)) return false;
+      if (seed.epic_id && String(card.epic_id || '') !== String(seed.epic_id)) return false;
+
+      if (seed.module_ids && seed.module_ids.length) {
+        var wanted = String(seed.module_ids[0]);
+        var linked = (card.modules || []).filter(function (m) { return String(m.id) === wanted; });
+        if (!linked.length) return false;
+      }
+
+      return true;
+    },
+    /**
+     * Tell the host that WHICH work items it holds has changed.
+     *
+     * The count above this grid, and the lists behind Transfer, live on the host — and the
+     * actions that change the set (clearing a Cycle chip, archiving, creating from here) all
+     * happen in this component. Without this the header said 3 while the grid showed 2.
+     */
+    hostChanged: function (type, card) {
+      if (this.embedded && card) this.$emit('items-changed', { type: type, card: card });
     },
     setRowState: function (s) { this.patchItem(this.rowMenu.item, { state_id: s ? s.id : '' }, true, 'State updated.'); },
     /** Cycles offered by the picker, filtered by the same search box the others use. */
@@ -1762,10 +1839,34 @@ var WorkItemsScreen = {
       } catch (e) { this.$pb.toast(this.$pb.firstError(e), 'error'); }
       this.composer.busy = false;
     },
-    deleteComment: async function (comment) {
+    /** Delete never fires straight off the icon: it is permanent, and a reply thread goes with it. */
+    askDeleteComment: function (comment, isReply) {
+      this.commentDelete = { open: true, target: comment, isReply: !!isReply, busy: false };
+    },
+    /** The wording the confirmation shows — it names what actually goes, replies included. */
+    deleteCommentMessage: function () {
+      var c = this.commentDelete.target;
+      if (!c) return '';
+      var who = c.author ? c.author.name : 'Someone';
+      if (this.commentDelete.isReply) {
+        return 'This permanently deletes ' + who + '\u2019s reply. This cannot be undone.';
+      }
+      var n = (c.replies || []).length;
+      return n
+        ? 'This permanently deletes ' + who + '\u2019s comment and its ' + n + (n === 1 ? ' reply' : ' replies') + '. This cannot be undone.'
+        : 'This permanently deletes ' + who + '\u2019s comment. This cannot be undone.';
+    },
+    deleteComment: async function () {
+      var comment = this.commentDelete.target;
+      if (!comment || this.commentDelete.busy) return;
+      this.commentDelete.busy = true;
       try {
         this.applyFeed(await this.$pb.api(this.feedUrl('comments', '/' + comment.id), { method: 'DELETE' }));
-      } catch (e) { this.$pb.toast(this.$pb.firstError(e), 'error'); }
+        this.commentDelete = { open: false, target: null, isReply: false, busy: false };
+      } catch (e) {
+        this.$pb.toast(this.$pb.firstError(e), 'error');
+        this.commentDelete.busy = false;
+      }
     },
     canEditComment: function (comment) {
       return comment.author && String(comment.author.id) === String(this.currentUserId);
@@ -2460,6 +2561,14 @@ var WorkItemsScreen = {
         text = 'logged ' + (a.new_value || 'time');
       } else if (a.field === 'update') {
         text = 'posted an update' + (a.new_value ? ' — ' + a.new_value : '');
+      } else if (a.field === 'vote') {
+        // Phrased from the labels frozen onto the row, so the sentence keeps its 👍 / 👎
+        // whatever the toolbar looks like later. Three shapes: cast, switched, withdrawn.
+        var from = meta.old_label || 'None';
+        var to = meta.new_label || 'None';
+        if (a.new_value === 'none' || to === 'None') text = 'removed their vote';
+        else if (a.old_value === 'none' || from === 'None') text = 'voted ' + to;
+        else text = 'changed vote from ' + from + ' to ' + to;
       } else if (a.field === 'assignees' || a.field === 'labels') {
         var names = (meta.new_labels || []).join(', ');
         text = 'set ' + a.field + ' to ' + (names || 'none');
@@ -2526,6 +2635,7 @@ var WorkItemsScreen = {
 
         this.items.push(copy);
         this.refreshTable();
+        if (this.inHost(copy)) this.hostChanged('added', copy);
         // Named, not "Work item copied": the ID and the title are how somebody finds the new
         // row in a list they are now looking at.
         this.$pb.toast(this.copiedMessage(copy));
@@ -2649,6 +2759,7 @@ var WorkItemsScreen = {
         var resp = await this.$pb.api(this.endpoints.store, { method: 'POST', body: this.form });
         this.items.push(resp.item);
         this.refreshTable();
+        if (this.inHost(resp.item)) this.hostChanged('added', resp.item);
         this.$pb.toast('Work item created.');
 
         // Created as a sub-task of the work item currently open — its Sub-tasks section has
@@ -3291,7 +3402,7 @@ var WorkItemsScreen = {
     '<button v-if="canEditComment(c)" type="button" @click="startEditComment(c)" data-tip="Edit" aria-label="Edit comment" ' +
     'class="h-6 w-6 grid place-items-center rounded text-faint hover:text-ink hover:bg-hover">' +
     '' + wiIcon('pen-solid-tip', 14) + '</button>' +
-    '<button v-if="canEdit" type="button" @click="deleteComment(c)" data-tip="Delete" aria-label="Delete comment" ' +
+    '<button v-if="canEdit" type="button" @click="askDeleteComment(c, false)" data-tip="Delete" aria-label="Delete comment" ' +
     'class="h-6 w-6 grid place-items-center rounded text-faint hover:text-danger hover:bg-hover">' +
     '' + wiIcon('trash-can', 14) + '</button>' +
     '</span></div>' +
@@ -3310,7 +3421,7 @@ var WorkItemsScreen = {
     '<button v-if="canEditComment(r)" type="button" @click="startEditComment(r)" data-tip="Edit" aria-label="Edit reply" ' +
     'class="h-6 w-6 grid place-items-center rounded text-faint hover:text-ink hover:bg-hover">' +
     '' + wiIcon('pen-solid-tip', 13) + '</button>' +
-    '<button v-if="canEdit" type="button" @click="deleteComment(r)" data-tip="Delete" aria-label="Delete reply" ' +
+    '<button v-if="canEdit" type="button" @click="askDeleteComment(r, true)" data-tip="Delete" aria-label="Delete reply" ' +
     'class="h-6 w-6 grid place-items-center rounded text-faint hover:text-danger hover:bg-hover">' +
     '' + wiIcon('trash-can', 13) + '</button>' +
     '</span></div>' +
@@ -3759,6 +3870,15 @@ var WorkItemsScreen = {
     'class="h-9 px-4 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold disabled:opacity-50">' +
     '{{ commentModal.busy ? \'Saving…\' : (commentModal.mode === \'edit\' ? \'Save\' : \'Reply\') }}</button>' +
     '</div></div></div>' +
+
+    // ===== Delete a comment or reply — permanent, and it takes the thread with it. =====
+    // Above the comment modal's own layer (z-102): edit/reply is closed by then, but the
+    // drawer is not, and a confirmation nobody can see is a confirmation nobody answers.
+    '<pb-confirm :open="commentDelete.open" ' +
+    ':title="commentDelete.isReply ? \'Delete reply?\' : \'Delete comment?\'" ' +
+    ':message="deleteCommentMessage()" ' +
+    ':confirm-label="commentDelete.busy ? \'Deleting\u2026\' : \'Delete\'" z="z-[103]" ' +
+    '@confirm="deleteComment" @close="commentDelete.open = false" />' +
 
     // ===== Work item picker (§22 / §30 / §34) — one dialog for sub-tasks and every relation
     // type; only the title and what happens on Add differ. =====

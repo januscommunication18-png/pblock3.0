@@ -5,12 +5,18 @@
      `data-ws-open`, and the modal closes on the backdrop, the X, or Escape.
 
      Rows are rendered server-side: switching is a POST (it changes state), so each row is a
-     real form that works without JavaScript. `$switcherWorkspaces` is supplied by the view
+     real form that works without JavaScript. `$switcherGroups` is supplied by the view
      composer in AppServiceProvider, which is why no controller has to pass it. --}}
 @php
-  $switcherWorkspaces = $switcherWorkspaces ?? [];
+  // My Workspaces / Invited Workspaces (docs/features/tenant-workspace-ownership.md §12).
+  // Supplied already grouped, and a group with nothing in it never arrives — so a person who
+  // has only ever been invited sees one heading, not an empty "My Workspaces".
+  $switcherGroups = $switcherGroups ?? [];
   // Stable per-row avatar colours; the workspace itself has no colour of its own yet.
   $wsColors = ['#334155', '#1b5f8a', '#7c3aed', '#0891b2', '#be123c', '#15803d', '#b45309', '#4338ca'];
+  // Counted across the groups, not per group, so the same workspace keeps its colour wherever
+  // it is listed.
+  $wsIndex = 0;
 @endphp
 
 <div id="ws-modal" class="hidden fixed inset-0 z-[60] flex items-start justify-center p-4 sm:pt-24"
@@ -28,9 +34,18 @@
       </button>
     </div>
 
-    <div class="overflow-y-auto px-4 py-3 space-y-2">
-      @forelse ($switcherWorkspaces as $i => $ws)
-        @php $avatarColor = $wsColors[$i % count($wsColors)]; @endphp
+    <div class="overflow-y-auto px-4 py-3">
+      @forelse ($switcherGroups as $group)
+      <section @class(['mt-4' => ! $loop->first]) aria-label="{{ $group['label'] }}">
+        {{-- Only labelled when there is something to tell apart. A single group needs no
+             heading: the modal's own title already says whose workspaces these are. --}}
+        @if (count($switcherGroups) > 1)
+          <h3 class="px-1 pb-2 text-[11px] font-semibold uppercase tracking-wide text-faint">{{ $group['label'] }}</h3>
+        @endif
+
+        <div class="space-y-2">
+        @foreach ($group['workspaces'] as $ws)
+        @php $avatarColor = $wsColors[$wsIndex++ % count($wsColors)]; @endphp
         @php $memberLabel = $ws['members'].' '.\Illuminate\Support\Str::plural('Member', $ws['members']); @endphp
 
         @if ($ws['current'])
@@ -56,6 +71,9 @@
             </button>
           </form>
         @endif
+        @endforeach
+        </div>
+      </section>
       @empty
         <p class="px-3 py-6 text-center text-[13px] text-sub">You don't belong to any workspace yet.</p>
       @endforelse

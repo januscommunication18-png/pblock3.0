@@ -384,14 +384,43 @@ PB.boot('project-epics', {
       if (at > -1) this.picker.selected.splice(at, 1); else this.picker.selected.push(item.id);
     },
     isPicked: function (item) { return item.linked || this.picker.selected.indexOf(item.id) > -1; },
+    /**
+     * The embedded work items screen changed WHICH items this epic holds.
+     *
+     * Clearing a row's chip is how a work item is taken out of an epic, and creating one from
+     * that grid puts it in — both happen inside the child component, so the count above it
+     * only moves if the child says so. The card it hands back carries every field these rows
+     * read, so it goes straight in.
+     */
+    hostItemsChanged: function (change) {
+      var card = change && change.card;
+      if (!card) return;
+
+      var rest = this.items.filter(function (i) { return String(i.id) !== String(card.id); });
+      this.items = change.type === 'added' ? rest.concat([card]) : rest;
+    },
+    /**
+     * One response, both views of this epic's work.
+     *
+     * `items` is the lean shape behind the header count (and, on epics, the Overview's own
+     * filters); `gridItems` is the same work in the work items screen's card shape, which is
+     * what the grid actually renders. Writing only the first is what left the count saying 5
+     * while the grid still showed 3 until the page was reloaded.
+     */
+    applyItems: function (resp) {
+      if (Array.isArray(resp.items)) this.items = resp.items;
+      // Mutated in place, not replaced: <work-items-screen> watches this property, and the
+      // object it was handed is the one it is watching.
+      if (this.workItems && Array.isArray(resp.gridItems)) this.workItems.items = resp.gridItems;
+    },
     addItems: async function () {
       if (!this.picker.selected.length || this.picker.busy) return;
       this.picker.busy = true;
       try {
-        var resp = await this.$pb.api(this.$pb.withId(this.endpoints.addItems, this.pageEpicId), {
+        var resp = await this.$pb.api(this.$pb.withFilters(this.$pb.withId(this.endpoints.addItems, this.pageEpicId)), {
           method: 'POST', body: { work_item_ids: this.picker.selected }
         });
-        this.items = resp.items || this.items;
+        this.applyItems(resp);
         this.mergeEpic(resp.epic);
         this.picker.open = false;
         this.$pb.toast(resp.message || 'Added.');
@@ -401,8 +430,8 @@ PB.boot('project-epics', {
     removeItem: async function (item) {
       try {
         var url = this.$pb.withId(this.endpoints.removeItem, this.pageEpicId).replace('__ITEM__', item.id);
-        var resp = await this.$pb.api(url, { method: 'DELETE' });
-        this.items = resp.items || this.items;
+        var resp = await this.$pb.api(this.$pb.withFilters(url), { method: 'DELETE' });
+        this.applyItems(resp);
         this.$pb.toast(resp.message || 'Removed.');
       } catch (e) { this.$pb.toast(this.$pb.firstError(e), 'error'); }
     },
@@ -525,7 +554,7 @@ PB.boot('project-epics', {
     'class="mt-3 h-9 px-4 rounded-md border border-stroke text-[13px] font-semibold text-ink hover:bg-hover">Add work items</button></div>' +
     // The work items screen itself, given this epic\'s rows. Editable chips, the real drawer,
     // the same everything — because it IS the same component.
-    '<work-items-screen v-else-if="workItems" :bootstrap="workItems" />' +
+    '<work-items-screen v-else-if="workItems" :bootstrap="workItems" @items-changed="hostItemsChanged" />' +
     '</div>' +
 
     // ---- Activity (§8/§22) ----

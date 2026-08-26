@@ -5,17 +5,25 @@ namespace App\Policies;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceMembership;
+use App\Services\WorkspaceAccess;
 
 /**
  * Authorizes workspace access against ACTIVE membership (spec §7/§8). All checks resolve
  * from the central workspace_memberships table, so they work without a tenancy context.
+ *
+ * `view` — "may this person enter this workspace at all?" — is deferred to
+ * App\Services\WorkspaceAccess, which is the same rule the tenancy middleware enforces
+ * (docs/features/workspace-access-control.md). Two definitions of one rule is how a module
+ * ends up stricter at the door than in its policy, or the other way round.
  */
 class WorkspacePolicy
 {
-    /** Any active member may view the workspace. */
+    public function __construct(private readonly WorkspaceAccess $access) {}
+
+    /** Any active member the Back Office has not shut out may view the workspace. */
     public function view(User $user, Workspace $workspace): bool
     {
-        return $this->membership($user, $workspace) !== null;
+        return $this->access->allows($user, $workspace);
     }
 
     /** Owners and admins may manage settings / invite teammates (spec §6). */

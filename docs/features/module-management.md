@@ -93,6 +93,12 @@ a persistent `+` would promise a second cycle the picker will not give.
 | `module_members` | Tenant-stamped pivot. Involvement only — §5.2 keeps it independent of work item assignment. |
 | `module_work_items` | Tenant-stamped pivot, unique on the pair so adding the same item twice is a no-op (§15). |
 
+## The grid and the counter stay in step
+
+The detail page's grid is `<work-items-screen>`, fed by its own payload — so adding or
+removing work items has to write BOTH that payload and the lean `items` behind the header
+count, or the two disagree until a reload. See `embedded-work-item-grid.md`.
+
 ## Acceptance criteria → tests
 
 All in `tests/Feature/Project/ModuleTest.php` (19 tests):

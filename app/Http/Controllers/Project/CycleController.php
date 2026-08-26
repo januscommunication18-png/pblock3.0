@@ -135,6 +135,7 @@ class CycleController extends Controller
             'ok' => true,
             'cycle' => $this->card($cycle->fresh('creator')),
             'items' => $this->workItems($cycle),
+            'gridItems' => $this->gridItems($project, $cycle),
             'message' => $moved === 1 ? '1 work item added.' : "{$moved} work items added.",
         ]);
     }
@@ -150,6 +151,7 @@ class CycleController extends Controller
         return response()->json([
             'ok' => true,
             'items' => $this->workItems($cycle),
+            'gridItems' => $this->gridItems($project, $cycle),
             'message' => 'Work item removed from the cycle.',
         ]);
     }
@@ -191,6 +193,7 @@ class CycleController extends Controller
         return response()->json([
             'ok' => true,
             'items' => $this->workItems($cycle),
+            'gridItems' => $this->gridItems($project, $cycle),
             'message' => $moved === 1
                 ? "1 work item moved to {$destination->name}."
                 : "{$moved} work items moved to {$destination->name}.",
@@ -279,16 +282,36 @@ class CycleController extends Controller
      */
     private function cycleScreenPayload(Project $project, Cycle $cycle): array
     {
-        $items = $cycle->workItems()
-            ->active()
-            ->with(['state', 'assignees', 'labels', 'parent:id,identifier,title', 'cycle', 'epic', 'estimateValue', 'modules', 'creator'])
-            ->orderBy('sequence_no')
-            ->get();
-
-        return $this->payload->build($project, null, $items, $this->filters($project)) + [
+        return $this->payload->build($project, null, $this->cycleItems($cycle)->get(), $this->filters($project)) + [
             'seed' => $cycle->status() === 'completed' ? [] : ['cycle_id' => $cycle->id],
             'embedded' => true,
         ];
+    }
+
+    /**
+     * This cycle's work items, as a query — the payload builder shapes them.
+     */
+    private function cycleItems(Cycle $cycle)
+    {
+        return $cycle->workItems()
+            ->active()
+            ->with(['state', 'assignees', 'labels', 'parent:id,identifier,title', 'cycle', 'epic', 'estimateValue', 'modules', 'creator'])
+            ->orderBy('sequence_no');
+    }
+
+    /**
+     * This cycle's rows in the WORK ITEMS SCREEN's shape (§7.2).
+     *
+     * The detail page's grid IS <work-items-screen>, so every write that changes which items
+     * the cycle holds returns these alongside `items`: that leaner overview shape is what the
+     * header count reads, and handing it to the grid would strip the epic, module and estimate
+     * chips off every row it replaced.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function gridItems(Project $project, Cycle $cycle): array
+    {
+        return $this->payload->rows($this->cycleItems($cycle)->get(), $project, $this->filters($project));
     }
 
     /**

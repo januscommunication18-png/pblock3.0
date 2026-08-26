@@ -58,7 +58,7 @@ class WorkItemScreenPayload
                 'emoji' => $project->emoji,
             ],
             'items' => $items !== null
-                ? $this->cards($this->resolve($items, $project, $filters))
+                ? $this->rows($items, $project, $filters)
                 : $this->items($project, $pageItem, $filters),
             // What the Filter panel draws, and what is currently narrowing the list
             // (docs/features/filters.md).
@@ -201,6 +201,22 @@ class WorkItemScreenPayload
         }
 
         return $items;
+    }
+
+    /**
+     * build()'s `items`, on its own.
+     *
+     * A write that changes WHICH work items a cycle, epic or module holds has to hand the grid
+     * back rows in the shape that grid renders — the same rows a page load would have produced.
+     * Sharing this with build() is what keeps "the rows on that screen" one definition instead
+     * of two that drift.
+     *
+     * @param  Builder|Relation|Collection<int, WorkItem>  $items
+     * @return array<int, array<string, mixed>>
+     */
+    public function rows($items, Project $project, ?FilterSet $filters = null): array
+    {
+        return $this->cards($this->resolve($items, $project, $filters));
     }
 
     /**

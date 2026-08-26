@@ -133,6 +133,12 @@ leaves the old cycle in the same update that adds it to the new one, and each ge
 history row. Nothing else on the work item is touched (§10, "preserve status, assignee,
 priority, comments, worklog, attachments, history").
 
+## The grid and the counter stay in step
+
+The detail page's grid is `<work-items-screen>`, fed by its own payload — so adding or
+removing work items has to write BOTH that payload and the lean `items` behind the header
+count, or the two disagree until a reload. See `embedded-work-item-grid.md`.
+
 ## Acceptance criteria (§18)
 
 Covered by `tests/Feature/Project/CycleTest.php`:

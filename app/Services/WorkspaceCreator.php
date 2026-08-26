@@ -18,7 +18,10 @@ use Illuminate\Validation\ValidationException;
  */
 class WorkspaceCreator
 {
-    public function __construct(private readonly WorkspaceApps $apps) {}
+    public function __construct(
+        private readonly WorkspaceApps $apps,
+        private readonly AccountProvisioner $accounts,
+    ) {}
 
     /**
      * @param  array{name:string, slug:string, company_size:string, view_type?:string, timezone?:string|null, apps?:array<int, string>}  $data
@@ -37,8 +40,20 @@ class WorkspaceCreator
         }
 
         return DB::transaction(function () use ($creator, $data, $viewType) {
+            /*
+             * WHOSE workspace this is (docs/features/tenant-workspace-ownership.md §2/§3/§11).
+             *
+             * The creator's own account, created here the first time they make a workspace and
+             * reused by every one after it — including the case that matters most, somebody who
+             * joined through an invitation and only now creates something of their own (§21).
+             * Inside the transaction with everything else, so a workspace that rolls back does
+             * not leave an account behind.
+             */
+            $account = $this->accounts->forOwner($creator);
+
             /** @var Workspace $workspace */
             $workspace = Workspace::create([
+                'account_id' => $account->id,
                 'name' => $data['name'],
                 'slug' => $data['slug'],
                 // NULL when this workspace runs nothing customer-facing (P72). Never '', which

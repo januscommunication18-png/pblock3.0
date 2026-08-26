@@ -30,6 +30,21 @@
   // Replace the '__ID__' placeholder in a templated endpoint with a real id.
   function withId(url, id) { return String(url).replace('__ID__', encodeURIComponent(id)); }
 
+  /**
+   * Carry the address's filters into a write.
+   *
+   * A screen that lists a filtered set — an epic's Work Items tab — asks the server for the
+   * rows again after adding or removing one. Without the query string that request is a
+   * different question ("all of them"), and the answer would put rows back on screen that the
+   * reader had filtered out. The address is the state (F-D2), so it travels with the write.
+   */
+  function withFilters(url) {
+    var qs = '';
+    try { qs = String(window.location.search || '').replace(/^\?/, ''); } catch (e) { qs = ''; }
+
+    return qs ? String(url) + (String(url).indexOf('?') > -1 ? '&' : '?') + qs : String(url);
+  }
+
   // ---- Avatar fallback colour ----------------------------------------------------------
   /*
    * The background behind someone's initial when they have not uploaded a photo.
@@ -738,12 +753,12 @@
     var bootstrap = {};
     try { bootstrap = JSON.parse(root.getAttribute('data-bootstrap') || '{}'); } catch (e) {}
     var app = Vue.createApp(component, { bootstrap: bootstrap });
-    app.config.globalProperties.$pb = { api: api, withId: withId, firstError: firstError, fieldErrors: fieldErrors, toast: toast, avatarColor: avatarColor };
+    app.config.globalProperties.$pb = { api: api, withId: withId, withFilters: withFilters, firstError: firstError, fieldErrors: fieldErrors, toast: toast, avatarColor: avatarColor };
     registerShared(app);
     tooltips();
     root.innerHTML = '';
     app.mount(root);
   }
 
-  window.PB = { api: api, withId: withId, firstError: firstError, fieldErrors: fieldErrors, toast: toast, boot: boot, tooltips: tooltips, avatarColor: avatarColor };
+  window.PB = { api: api, withId: withId, withFilters: withFilters, firstError: firstError, fieldErrors: fieldErrors, toast: toast, boot: boot, tooltips: tooltips, avatarColor: avatarColor };
 })();

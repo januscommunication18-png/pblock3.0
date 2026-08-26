@@ -34,9 +34,13 @@ class WorkspaceDeleter
             // workspace they still belong to (or leave null). Memberships are central, so
             // this resolves without a tenancy context and without the deleted tenant row.
             foreach (User::query()->whereIn('id', $affectedUserIds)->get() as $user) {
+                // ACTIVE only: repairing the pointer must not aim somebody at a workspace they
+                // are suspended from, which the tenancy middleware would refuse on the next
+                // request anyway (docs/features/workspace-access-control.md).
                 $next = WorkspaceMembership::query()
                     ->where('user_id', $user->id)
                     ->where('workspace_id', '!=', $workspace->id)
+                    ->where('status', WorkspaceMembership::STATUS_ACTIVE)
                     ->value('workspace_id');
                 $user->forceFill(['current_workspace_id' => $next])->save();
             }

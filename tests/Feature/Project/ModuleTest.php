@@ -221,9 +221,12 @@ class ModuleTest extends ProjectTestCase
 
         $url = ['project' => $project->id, 'module' => $module->id];
 
+        // `gridItems` is what the grid on the detail page renders; `items` is what the counter
+        // above it reads. They come back together so the two cannot disagree until a reload
+        // (embedded-work-item-grid.md).
         $this->actingAs($owner)->postJson(route('projects.modules.items.store', $url), [
             'work_item_ids' => [$item->id],
-        ])->assertOk()->assertJsonCount(1, 'items');
+        ])->assertOk()->assertJsonCount(1, 'items')->assertJsonCount(1, 'gridItems');
 
         // §15: adding the same item twice must not create a second relationship.
         $this->actingAs($owner)->postJson(route('projects.modules.items.store', $url), [
@@ -231,7 +234,8 @@ class ModuleTest extends ProjectTestCase
         ])->assertOk()->assertJsonCount(1, 'items');
 
         $this->actingAs($owner)->deleteJson(route('projects.modules.items.destroy',
-            $url + ['workItem' => $item->id]))->assertOk()->assertJsonCount(0, 'items');
+            $url + ['workItem' => $item->id]))->assertOk()
+            ->assertJsonCount(0, 'items')->assertJsonCount(0, 'gridItems');
 
         // §8.3: only the association goes.
         $this->assertNotNull($ws->run(fn () => WorkItem::find($item->id)));

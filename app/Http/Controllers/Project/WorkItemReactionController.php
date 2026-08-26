@@ -7,6 +7,8 @@ use App\Models\Project;
 use App\Models\WorkItem;
 use App\Models\WorkItemSubscriber;
 use App\Models\WorkItemVote;
+use App\Services\WorkItemActivityRecorder;
+use App\Services\WorkItemFeedBuilder;
 use App\Services\WorkItemReactions;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -27,6 +29,11 @@ use Illuminate\Validation\Rule;
  */
 class WorkItemReactionController extends Controller
 {
+    public function __construct(
+        private readonly WorkItemActivityRecorder $activity,
+        private readonly WorkItemFeedBuilder $feed,
+    ) {}
+
     /**
      * POST /projects/{project}/work-items/{workItem}/vote
      *
@@ -46,19 +53,31 @@ class WorkItemReactionController extends Controller
             ->where('user_id', Auth::id())
             ->first();
 
+        $previous = $existing?->value;
+
         if ($existing && $existing->value === $value) {
             $existing->delete();
+            $new = null;
         } elseif ($existing) {
             $existing->forceFill(['value' => $value])->save();
+            $new = $value;
         } else {
             WorkItemVote::create([
                 'work_item_id' => $workItem->id,
                 'user_id' => Auth::id(),
                 'value' => $value,
             ]);
+            $new = $value;
         }
 
-        return response()->json(['ok' => true] + $this->state($workItem));
+        // Every cast, switch and withdrawal is kept — the spec asks for the trail, not just
+        // the current tally, and the tally is already the votes table's job. Recorded as an
+        // audit event rather than a comment: nobody wrote anything.
+        $this->activity->voteChanged($workItem, Auth::user(), $previous, $new);
+
+        // The feed rides along so the open drawer's Activity / History / All tabs show the
+        // new line without a reload — the same contract every collaboration write follows.
+        return response()->json(['ok' => true, 'feed' => $this->feed->for($workItem)] + $this->state($workItem));
     }
 
     /** POST /projects/{project}/work-items/{workItem}/subscribe — on, or back off. */

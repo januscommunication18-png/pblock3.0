@@ -228,6 +228,7 @@ class EpicController extends Controller
             'ok' => true,
             'epic' => $this->card($epic->fresh(['lead', 'members', 'creator'])),
             'items' => $this->workItems($epic),
+            'gridItems' => $this->gridItems($project, $epic),
             'message' => $items->count() === 1 ? '1 work item added.' : "{$items->count()} work items added.",
         ]);
     }
@@ -247,6 +248,7 @@ class EpicController extends Controller
         return response()->json([
             'ok' => true,
             'items' => $this->workItems($epic),
+            'gridItems' => $this->gridItems($project, $epic),
             'message' => 'Work item removed from the epic.',
         ]);
     }
@@ -496,6 +498,22 @@ class EpicController extends Controller
             // Mounted inside the epic screen, which has its own Add button in the header.
             'embedded' => true,
         ];
+    }
+
+    /**
+     * This epic's rows in the WORK ITEMS SCREEN's shape (§9).
+     *
+     * The Work Items tab IS <work-items-screen>, so every write that changes which items the
+     * epic holds returns these alongside `items`: that leaner shape is what the Overview's
+     * counts and filters read, and handing it to the grid would strip the cycle, module and
+     * estimate chips off every row it replaced. Filtered exactly as the tab is on a page load,
+     * so a write cannot surface rows the reader has filtered out.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function gridItems(Project $project, Epic $epic): array
+    {
+        return $this->payload->rows($this->epicItems($epic), $project, $this->filters($project));
     }
 
     /**

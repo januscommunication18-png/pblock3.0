@@ -444,14 +444,17 @@ class CycleTest extends ProjectTestCase
         $one = $this->workItem($owner, $project, 'First');
         $two = $this->workItem($owner, $project, 'Second');
 
+        // `gridItems` is what the grid on the detail page renders; `items` is what the counter
+        // above it reads. They come back together so the two cannot disagree until a reload
+        // (embedded-work-item-grid.md).
         $this->actingAs($owner)->postJson(
             route('projects.cycles.items.store', ['project' => $project->id, 'cycle' => $cycle->id]),
             ['work_item_ids' => [$one->id, $two->id]],
-        )->assertOk()->assertJsonCount(2, 'items');
+        )->assertOk()->assertJsonCount(2, 'items')->assertJsonCount(2, 'gridItems');
 
         $this->actingAs($owner)->deleteJson(route('projects.cycles.items.destroy', [
             'project' => $project->id, 'cycle' => $cycle->id, 'workItem' => $one->id,
-        ]))->assertOk()->assertJsonCount(1, 'items');
+        ]))->assertOk()->assertJsonCount(1, 'items')->assertJsonCount(1, 'gridItems');
 
         $this->assertNull($ws->run(fn () => WorkItem::find($one->id)->cycle_id));
         $this->assertSame($cycle->id, $ws->run(fn () => WorkItem::find($two->id)->cycle_id));

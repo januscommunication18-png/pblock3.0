@@ -32,6 +32,14 @@ class Workspace extends BaseTenant
     {
         return [
             'id',
+            /*
+             * The account that owns this workspace (§6 of
+             * docs/features/tenant-workspace-ownership.md). Declared HERE for the reason the
+             * subdomain note below gives: left off this list, stancl's VirtualColumn folds it
+             * into the `data` JSON instead of the real column the migration added, and the
+             * foreign key would be guarding a column nothing ever writes.
+             */
+            'account_id',
             'name',
             'slug',
             /*
@@ -100,6 +108,22 @@ class Workspace extends BaseTenant
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /**
+     * The account this workspace belongs to — the requirement's Tenant
+     * (docs/features/tenant-workspace-ownership.md).
+     *
+     * Every workspace has exactly one, and it never changes hands on its own: creating a second
+     * workspace reuses the creator's existing account rather than starting another (§3).
+     *
+     * Owning it is not a way into the workspace. Access is an active membership, always
+     * (docs/features/workspace-access-control.md) — which is what stops Mike, invited to
+     * Workspace A, reaching Workspace B under the same account.
+     */
+    public function account(): BelongsTo
+    {
+        return $this->belongsTo(Account::class, 'account_id');
     }
 
     /** Uppercase initial for the workspace avatar tile. */
