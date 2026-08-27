@@ -81,7 +81,10 @@ class Module extends Model
     }
 
     /**
-     * The work items grouped into this module (§9.3).
+     * The work items grouped into this module.
+     *
+     * A work item is in at most one module (docs/features/module-management.md), enforced by a
+     * unique index on the pivot's `work_item_id` rather than by the relation's own shape.
      *
      * Many-to-many: a work item can belong to a functional module and a release module at the
      * same time, which is the case the spec calls out for adopting Plane's model.

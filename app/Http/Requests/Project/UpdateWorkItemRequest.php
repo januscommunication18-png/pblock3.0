@@ -178,7 +178,10 @@ class UpdateWorkItemRequest extends FormRequest
             ],
             // Modules §9.3: a work item may belong to SEVERAL modules, so this is a list
             // rather than a single id like `cycle_id`.
-            'module_ids' => ['sometimes', 'array', 'max:50'],
+            // ONE module at a time (module-management.md). `max:1` rather than a scalar
+            // `module_id`: the payload stays a set, so restoring several modules later is a
+            // number change here instead of a schema and API change everywhere.
+            'module_ids' => ['sometimes', 'array', 'max:1'],
             'module_ids.*' => [
                 'integer',
                 Rule::exists('modules', 'id')->where('project_id', $projectId)->whereNull('deleted_at'),

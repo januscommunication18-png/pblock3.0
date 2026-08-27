@@ -1,4 +1,4 @@
-/* "New work item", from anywhere (docs/features/quick-create.md).
+/* "Create Work Item", from anywhere (docs/features/quick-create.md).
    ------------------------------------------------------------------
    The sidebar button used to NAVIGATE to a project's Work Items and auto-open the modal
    there. That answered a question nobody asked — "which project?" — by taking you off
@@ -176,7 +176,7 @@ PB.boot('work-item-create', {
   },
 
   template:
-    '<pb-modal :open="open" title="New work item" width="max-w-[620px]" @close="open = false">' +
+    '<pb-modal :open="open" title="Create Work Item" width="max-w-[620px]" @close="open = false">' +
 
     '<div v-if="loading && !options" class="py-6 text-center text-[13px] text-sub">Loading…</div>' +
 

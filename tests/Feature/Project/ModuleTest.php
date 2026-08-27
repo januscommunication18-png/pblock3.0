@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Project;
 
+use App\Models\Cycle;
 use App\Models\Module;
 use App\Models\Project;
 use App\Models\User;
@@ -306,7 +307,16 @@ class ModuleTest extends ProjectTestCase
         $this->assertSame(['Customer Portal'], array_column($b['modules'], 'title'));
     }
 
-    public function test_a_work_item_can_belong_to_several_modules_at_once(): void
+    /**
+     * A work item belongs to ONE module — §9.3 reversed
+     * (docs/features/module-management.md).
+     *
+     * This test used to assert the opposite: a functional module AND a release module at once,
+     * which is why the link is a pivot table. It is kept, inverted, rather than deleted — the
+     * pivot is still there, and a test that says "one" where the schema says "many" is the
+     * thing that stops the old behaviour drifting back in.
+     */
+    public function test_a_work_item_belongs_to_one_module_at_a_time(): void
     {
         [$owner, $ws] = $this->owner();
         $project = $this->enabled($owner, $ws);
@@ -314,16 +324,19 @@ class ModuleTest extends ProjectTestCase
         $release = $this->module($ws, $project, 'Q4 Release');
         $item = $this->workItem($owner, $project, 'Redesign the header');
 
-        // §9.3: the whole reason this is many-to-many — a functional module AND a release
-        // module, rather than one replacing the other the way a cycle does.
-        $modules = $this->assign($owner, $project, $item, [$portal->id, $release->id])
-            ->assertOk()->json('item.modules');
+        // Two at once is refused outright, not silently truncated to the first.
+        $this->assign($owner, $project, $item, [$portal->id, $release->id])->assertStatus(422);
 
-        $this->assertEqualsCanonicalizing(['Customer Portal', 'Q4 Release'], array_column($modules, 'title'));
+        $modules = $this->assign($owner, $project, $item, [$portal->id])->assertOk()->json('item.modules');
+        $this->assertSame(['Customer Portal'], array_column($modules, 'title'));
 
-        // Removing one leaves the other.
+        // Choosing another MOVES it; the first is not kept alongside.
         $modules = $this->assign($owner, $project, $item, [$release->id])->assertOk()->json('item.modules');
         $this->assertSame(['Q4 Release'], array_column($modules, 'title'));
+
+        // And clearing it leaves the item in none.
+        $modules = $this->assign($owner, $project, $item, [])->assertOk()->json('item.modules');
+        $this->assertSame([], $modules);
     }
 
     public function test_module_changes_are_recorded_in_history(): void
@@ -459,6 +472,139 @@ class ModuleTest extends ProjectTestCase
     }
 
     /** A project with Modules switched on. */
+    // ================= One module per work item (§9.3 reversed) =================
+
+    /** The picker offers only work that belongs to no module. */
+    public function test_the_picker_only_offers_work_items_with_no_module(): void
+    {
+        [$owner, $ws] = $this->owner();
+        $project = $this->enabled($owner, $ws);
+
+        $one = $this->module($ws, $project, 'Billing');
+        $two = $this->module($ws, $project, 'Reporting');
+
+        $free = $this->workItem($owner, $project, 'Unassigned');
+        $taken = $this->workItem($owner, $project, 'Already in Billing');
+
+        $this->actingAs($owner)->postJson(route('projects.modules.items.store', [
+            'project' => $project->id, 'module' => $one->id,
+        ]), ['work_item_ids' => [$taken->id]])->assertOk();
+
+        $offered = $this->actingAs($owner)->getJson(route('projects.modules.search', [
+            'project' => $project->id, 'module' => $two->id,
+        ]))->assertOk()->json('items');
+
+        $this->assertSame([$free->id], array_column($offered, 'id'));
+    }
+
+    /** The rule where it must hold: the endpoint. */
+    public function test_adding_a_work_item_that_already_belongs_to_another_module_is_refused(): void
+    {
+        [$owner, $ws] = $this->owner();
+        $project = $this->enabled($owner, $ws);
+
+        $one = $this->module($ws, $project, 'Billing');
+        $two = $this->module($ws, $project, 'Reporting');
+        $item = $this->workItem($owner, $project, 'Filed work');
+
+        $this->actingAs($owner)->postJson(route('projects.modules.items.store', [
+            'project' => $project->id, 'module' => $one->id,
+        ]), ['work_item_ids' => [$item->id]])->assertOk();
+
+        $this->actingAs($owner)->postJson(route('projects.modules.items.store', [
+            'project' => $project->id, 'module' => $two->id,
+        ]), ['work_item_ids' => [$item->id]])->assertStatus(422);
+
+        $this->assertSame(
+            [$one->id],
+            $ws->run(fn () => WorkItem::find($item->id)->modules->pluck('id')->all()),
+        );
+    }
+
+    /** Removing it from a module puts it back on the market (acceptance criterion 8). */
+    public function test_removing_a_work_item_from_a_module_makes_it_available_again(): void
+    {
+        [$owner, $ws] = $this->owner();
+        $project = $this->enabled($owner, $ws);
+
+        $one = $this->module($ws, $project, 'Billing');
+        $two = $this->module($ws, $project, 'Reporting');
+        $item = $this->workItem($owner, $project, 'Movable');
+
+        $this->actingAs($owner)->postJson(route('projects.modules.items.store', [
+            'project' => $project->id, 'module' => $one->id,
+        ]), ['work_item_ids' => [$item->id]])->assertOk();
+
+        $this->actingAs($owner)->deleteJson(route('projects.modules.items.destroy', [
+            'project' => $project->id, 'module' => $one->id, 'workItem' => $item->id,
+        ]))->assertOk();
+
+        $offered = $this->actingAs($owner)->getJson(route('projects.modules.search', [
+            'project' => $project->id, 'module' => $two->id,
+        ]))->assertOk()->json('items');
+
+        $this->assertContains($item->id, array_column($offered, 'id'));
+
+        $this->actingAs($owner)->postJson(route('projects.modules.items.store', [
+            'project' => $project->id, 'module' => $two->id,
+        ]), ['work_item_ids' => [$item->id]])->assertOk();
+    }
+
+    /** Cycle and module assignment stay independent: an item may hold one of each. */
+    public function test_a_work_item_can_hold_a_cycle_and_a_module_at_once(): void
+    {
+        [$owner, $ws] = $this->owner();
+        $project = $this->enabled($owner, $ws);
+        $this->actingAs($owner)->postJson(route('projects.settings.features.toggle', $project), [
+            'feature' => 'cycles', 'enabled' => true,
+        ])->assertOk();
+
+        $module = $this->module($ws, $project, 'Billing');
+        $cycle = $ws->run(fn () => Cycle::create([
+            'project_id' => $project->id, 'name' => 'Sprint 08',
+            'start_date' => now()->toDateString(), 'end_date' => now()->addDays(13)->toDateString(),
+        ]));
+        $item = $this->workItem($owner, $project, 'Both');
+
+        $this->actingAs($owner)->postJson(route('projects.modules.items.store', [
+            'project' => $project->id, 'module' => $module->id,
+        ]), ['work_item_ids' => [$item->id]])->assertOk();
+
+        $this->actingAs($owner)->postJson(route('projects.cycles.items.store', [
+            'project' => $project->id, 'cycle' => $cycle->id,
+        ]), ['work_item_ids' => [$item->id]])->assertOk();
+
+        $ws->run(function () use ($item, $module, $cycle) {
+            $fresh = WorkItem::find($item->id);
+            $this->assertSame([$module->id], $fresh->modules->pluck('id')->all());
+            $this->assertSame($cycle->id, $fresh->cycle_id);
+        });
+    }
+
+    /** The chip MOVES rather than adds: a second module replaces the first. */
+    public function test_setting_a_second_module_through_the_item_moves_it(): void
+    {
+        [$owner, $ws] = $this->owner();
+        $project = $this->enabled($owner, $ws);
+
+        $one = $this->module($ws, $project, 'Billing');
+        $two = $this->module($ws, $project, 'Reporting');
+        $item = $this->workItem($owner, $project, 'Moves');
+
+        $this->assign($owner, $project, $item, [$one->id]);
+        $this->assign($owner, $project, $item, [$two->id]);
+
+        $this->assertSame(
+            [$two->id],
+            $ws->run(fn () => WorkItem::find($item->id)->modules->pluck('id')->all()),
+        );
+
+        // And asking for two at once is refused by validation, not silently truncated.
+        $this->actingAs($owner)->patchJson(route('projects.work-items.update', [
+            'project' => $project->id, 'workItem' => $item->id,
+        ]), ['module_ids' => [$one->id, $two->id]])->assertStatus(422);
+    }
+
     private function enabled(User $owner, Workspace $ws, string $identifier = 'web'): Project
     {
         $project = $this->makeProject($owner, $ws, ['identifier' => $identifier]);

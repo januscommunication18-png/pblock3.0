@@ -267,12 +267,10 @@ PB.boot('project-modules', {
       this.picker.busy = false;
     },
     togglePicked: function (item) {
-      // §9.4: already-linked items show as selected and cannot be picked again.
-      if (item.linked) return;
       var at = this.picker.selected.indexOf(item.id);
       if (at > -1) this.picker.selected.splice(at, 1); else this.picker.selected.push(item.id);
     },
-    isPicked: function (item) { return item.linked || this.picker.selected.indexOf(item.id) > -1; },
+    isPicked: function (item) { return this.picker.selected.indexOf(item.id) > -1; },
     /**
      * The embedded work items screen changed WHICH items this module holds.
      *
@@ -311,6 +309,13 @@ PB.boot('project-modules', {
         });
         this.applyItems(resp);
         this.mergeModule(resp.module);
+        // They belong to this module now, so they are no longer unassigned: drop them from the
+        // list behind the modal rather than leaving rows that would be refused if picked again.
+        var added = this.picker.selected.map(String);
+        this.picker.results = this.picker.results.filter(function (r) {
+          return added.indexOf(String(r.id)) === -1;
+        });
+        this.picker.selected = [];
         this.picker.open = false;
         this.$pb.toast(resp.message || 'Added.');
       } catch (e) { this.$pb.toast(this.$pb.firstError(e), 'error'); }
@@ -541,17 +546,21 @@ PB.boot('project-modules', {
     '<input v-model="picker.query" @input="searchItems" placeholder="Search work items…" ' +
     'class="w-full h-9 px-3 rounded-md bg-hover text-[13px] text-ink placeholder:text-faint outline outline-1 -outline-offset-1 outline-transparent focus:bg-white focus:outline-stroke" />' +
     '<div class="mt-2 max-h-[320px] overflow-y-auto">' +
-    '<button v-for="r in picker.results" :key="r.id" type="button" @click="togglePicked(r)" :disabled="r.linked" ' +
+    '<button v-for="r in picker.results" :key="r.id" type="button" @click="togglePicked(r)" ' +
     'class="w-full text-left flex items-center gap-2.5 px-2 py-2 rounded-md hover:bg-hover disabled:opacity-60">' +
     '<span class="h-[18px] w-[18px] rounded border grid place-items-center shrink-0 transition-colors" ' +
     ':class="isPicked(r) ? \'bg-brand border-brand\' : \'border-stroke bg-white\'">' +
     '<svg v-if="isPicked(r)" width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M5 12l4 4L19 7" stroke="#fff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>' +
     '<span class="text-[11px] text-faint font-medium shrink-0">{{ r.identifier }}</span>' +
     '<span class="text-[13px] text-ink truncate flex-1">{{ r.title }}</span>' +
-    '<span v-if="r.linked" class="text-[11px] text-faint shrink-0">Already added</span>' +
     '</button>' +
-    '<p v-if="picker.loaded && !picker.results.length" class="px-2 py-6 text-[13px] text-sub text-center">No work items match.</p>' +
+    // Only work with no module is offered, so an empty list usually means everything is
+    // already filed somewhere — not that the search was wrong. Say which.
+    '<p v-if="picker.loaded && !picker.results.length" class="px-2 py-6 text-[13px] text-sub text-center">' +
+    '{{ picker.query ? \'No unassigned work items match.\' : \'Every work item in this project already belongs to a module.\' }}</p>' +
     '</div>' +
+    '<p class="mt-2 text-[11px] text-faint">A work item belongs to one module at a time, so only work that is not in a module is listed. ' +
+    'To move work here from another module, remove it there first.</p>' +
     '<template #footer>' +
     '<button class="h-9 px-4 rounded-md border border-stroke text-[13px] font-semibold text-ink hover:bg-hover" @click="picker.open = false">Cancel</button>' +
     '<button class="h-9 px-4 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold disabled:opacity-50" ' +

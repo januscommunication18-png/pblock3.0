@@ -538,7 +538,7 @@ PB.boot('project-epics', {
     // A work item can be in several modules, so these deliberately sum to more than the
     // item count. Saying so beats a reader quietly deciding the numbers are wrong.
     '<p v-if="distribution.modules.length" class="text-[11px] text-faint mt-3">' +
-    'A work item can be in more than one module, so these can add up to more than the total.</p>' +
+    'Every work item has at most one module, so these add up to the number of items that have one.</p>' +
     '</div></div>' +
 
     '<div class="h-8"></div></div></div>' +

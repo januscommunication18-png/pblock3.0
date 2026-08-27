@@ -1231,7 +1231,7 @@ var WorkItemsScreen = {
       }
     } catch (e) {}
 
-    // Arrived from another screen's "New work item" action (?create=1) — open the modal.
+    // Arrived from another screen's "Create Work Item" action (?create=1) — open the modal.
     try {
       var params = new URLSearchParams(window.location.search);
       if (this.canCreate && params.get('create') === '1') {
@@ -1290,7 +1290,7 @@ var WorkItemsScreen = {
   },
   methods: {
     /**
-     * The sidebar's global "New work item" action (Blade, outside this component's root).
+     * The sidebar's global "Create Work Item" action (Blade, outside this component's root).
      * Its href already points at this screen with ?create=1 so it works without JS; here we
      * intercept the click and open the modal in place instead of reloading the page.
      */
@@ -1578,16 +1578,23 @@ var WorkItemsScreen = {
     /**
      * Add or remove one module (§9.3).
      *
-     * Multi-select, so the picker stays open and each click toggles one membership — the same
-     * behaviour as labels, and unlike the cycle picker where choosing one replaces the other.
+     * SINGLE-select, the same as the cycle picker: a work item belongs to one module at a
+     * time (docs/features/module-management.md), so choosing a module replaces whichever one
+     * the item was in, and choosing the one it is already in takes it out.
+     *
+     * This used to toggle memberships like labels do, which is what §9.3 allowed. Left that
+     * way it would offer a second module the server now refuses.
      */
     toggleRowModule: function (m) {
       var it = this.rowMenu.item;
       if (!it) return;
       var current = (it.modules || []).map(function (x) { return x.id; });
-      var has = current.indexOf(m.id) > -1;
-      var ids = has ? current.filter(function (id) { return id !== m.id; }) : current.concat([m.id]);
-      this.patchItem(it, { module_ids: ids }, false, has ? 'Removed from ' + m.title + '.' : 'Added to ' + m.title + '.');
+      var same = current.indexOf(m.id) > -1;
+      var was = (it.modules || [])[0];
+
+      this.patchItem(it, { module_ids: same ? [] : [m.id] }, true,
+        same ? 'Removed from ' + m.title + '.'
+             : (was && was.id !== m.id ? 'Moved to ' + m.title + '.' : 'Added to ' + m.title + '.'));
     },
     /**
      * Put the item in a cycle, or take it out (§8.3).
@@ -2869,7 +2876,7 @@ var WorkItemsScreen = {
     // has its own Add button in its header, and two side by side is one too many. Creating
     // new work is still one click away — every group row keeps its "+".
     '<button v-if="canCreate && !embedded" type="button" @click="openCreate(\'\')" class="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold whitespace-nowrap">' +
-    '' + wiIcon('plus', 14) + 'Add work item</button>' +
+    '' + wiIcon('plus', 14) + 'Create Work Item</button>' +
     '</div></div>' +
 
     '<wi-filter-chips v-if="filterChips.length" :chips="filterChips" :active="activeFilters" ' +
@@ -2904,7 +2911,7 @@ var WorkItemsScreen = {
     '<span class="grid place-items-center" v-html="stateIcon(s)"></span>' +
     '<span class="text-[13px] font-semibold text-head">{{ s.name }}</span>' +
     '<span class="text-[11px] font-semibold rounded-full px-1.5 py-0.5 text-sub bg-hover">{{ items.filter(i => i.state_id === s.id).length }}</span>' +
-    '<button v-if="canCreate" type="button" @click="openCreate(String(s.id))" class="ml-auto h-6 w-6 grid place-items-center rounded text-sub hover:bg-line" data-tip="Add work item" aria-label="Add work item">' + wiIcon('plus', 15) + '</button>' +
+    '<button v-if="canCreate" type="button" @click="openCreate(String(s.id))" class="ml-auto h-6 w-6 grid place-items-center rounded text-sub hover:bg-line" data-tip="Create Work Item" aria-label="Create Work Item">' + wiIcon('plus', 15) + '</button>' +
     '</div>' +
     '<div v-for="i in items.filter(i => i.state_id === s.id)" :key="i.id" @click="openDrawer(i)" class="border-b border-line px-4 py-3">' +
     '<div class="text-[12px] text-sub">{{ i.identifier }}</div>' +
@@ -2922,9 +2929,9 @@ var WorkItemsScreen = {
     // ===== Empty state (desktop) =====
     '<div v-if="!items.length" class="hidden sm:flex flex-col items-center text-center px-6 py-16">' +
     '<h2 class="text-[16px] font-bold text-head">No work items yet</h2>' +
-    '<p class="text-[13px] text-sub mt-1.5 max-w-sm">Work items are the units of work in this project. Add the first one to get started.</p>' +
+    '<p class="text-[13px] text-sub mt-1.5 max-w-sm">Work items are the units of work in this project. Create the first one to get started.</p>' +
     '<button v-if="canCreate" type="button" @click="openCreate(\'\')" class="mt-5 inline-flex items-center gap-1.5 h-9 px-4 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold">' +
-    '' + wiIcon('plus', 15) + 'Add work item</button>' +
+    '' + wiIcon('plus', 15) + 'Create Work Item</button>' +
     '</div>' +
 
     '</template>' +
@@ -4221,7 +4228,7 @@ var WorkItemsScreen = {
     // Project context chip — the POC's bordered chip, not a filled one.
     '<span class="inline-flex items-center gap-1.5 h-7 px-2 rounded-md border border-stroke text-[13px] text-ink"><span>{{ project.emoji || \'📁\' }}</span>{{ project.name }}</span>' +
     '' + wiIcon('chevron-right', 13, 'text-faint') + '' +
-    '<span class="text-[13px] text-sub">New work item</span>' +
+    '<span class="text-[13px] text-sub">Create Work Item</span>' +
     '<button @click="closeCreate" class="ml-auto h-8 w-8 grid place-items-center rounded-md text-sub hover:bg-hover" data-tip="Close" aria-label="Close">' + wiIcon('xmark', 16) + '</button>' +
     '</div>' +
 

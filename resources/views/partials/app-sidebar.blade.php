@@ -1,4 +1,4 @@
-{{-- Shared app left navigation: icon rail + sidebar (New work item, nav, collapsible
+{{-- Shared app left navigation: icon rail + sidebar (Create Work Item, nav, collapsible
      Workspace + Projects list). Resolves $workspace/$projects/$canCreateProject
      defensively so it can be included on any authenticated page. --}}
 @php($__ws = $workspace ?? optional(auth()->user())->currentWorkspace)
@@ -62,22 +62,40 @@
     @if ($__wiki && request()->is('wiki*'))
       @include('partials.wiki-nav')
     @else
-    {{-- New work item (above Home). The global create action from Work Items §4.3.
+    {{-- Create Work Item (above Home). The global create action from Work Items §4.3.
          On the Work Items screen its click is intercepted and opens the modal in place;
          anywhere else it navigates to a project's Work Items with ?create=1, which
          auto-opens the same modal there — so it still works with JS disabled.
-         Hidden for Viewers/Guests, who cannot create work items (§7). --}}
+         Hidden for Viewers/Guests, who cannot create work items (§7).
+
+         "Create", not "Add": a work item is CREATED here, whereas "Add work items" on a
+         Cycle, Epic or Module assigns ones that already exist
+         (docs/features/work-item-create-cta.md). --}}
     @if ($__canCreate)
       @php($__wiTarget = $__projects[0]['work_items_url'] ?? null)
-      {{-- Opens the quick-create modal in place (docs/features/quick-create.md). The href is
-           kept as the no-JavaScript fallback and as what the Work Items screen's own richer
-           modal falls back to — it navigates with ?create=1, which auto-opens the modal there. --}}
-      <a id="new-work-item-btn"
-         href="{{ $__wiTarget ? $__wiTarget.'?create=1' : route('projects.index').'?create=1' }}"
-         class="w-full flex items-center justify-center gap-2 px-2 h-9 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold mb-2 transition-colors">
-        {!! pb_icon('plus', 15) !!}
-        New work item
-      </a>
+      @if ($__wiTarget)
+        {{-- Opens the quick-create modal in place (docs/features/quick-create.md). The href is
+             kept as the no-JavaScript fallback and as what the Work Items screen's own richer
+             modal falls back to — it navigates with ?create=1, which auto-opens the modal there. --}}
+        <a id="new-work-item-btn"
+           href="{{ $__wiTarget.'?create=1' }}"
+           class="w-full flex items-center justify-center gap-2 px-2 h-9 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold mb-2 transition-colors">
+          {!! pb_icon('plus', 15) !!}
+          Create Work Item
+        </a>
+      @else
+        {{-- No project to put one in, so the action is shown and refused rather than hidden:
+             disappearing would leave somebody wondering where it went, and it is about to come
+             back. A <span>, deliberately — it carries no href and no id, so it cannot be
+             clicked, cannot be focused, and the two scripts that bind the global create action
+             by `new-work-item-btn` find nothing to bind. `pointer-events` stays ON so the
+             tooltip explaining WHY still appears on hover. --}}
+        <span aria-disabled="true" data-tip="Create a project before creating a work item."
+              class="w-full flex items-center justify-center gap-2 px-2 h-9 rounded-md bg-brand text-white text-[13px] font-semibold mb-2 opacity-50 cursor-not-allowed select-none">
+          {!! pb_icon('plus', 15) !!}
+          Create Work Item
+        </span>
+      @endif
     @endif
     <a href="{{ route('welcome') }}" class="flex items-center gap-2 px-2 h-8 rounded-md text-ink hover:bg-hover">{!! pb_icon('house', 15) !!}Home</a>
     {{-- Inbox (§2), with §26's combined unread count. Resolved here rather than passed, so the

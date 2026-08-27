@@ -113,11 +113,17 @@ class CycleController extends Controller
     }
 
     /**
-     * POST /projects/{project}/cycles/{cycle}/work-items — add existing items (§7.3).
+     * POST /projects/{project}/cycles/{cycle}/work-items — add UNPLANNED items (§7.3, revised).
      *
-     * Each item goes through WorkItemUpdater, so an item already in another cycle is MOVED
-     * and the move lands in its history (§8.4). Items already in this cycle are skipped by
-     * the updater's own diff, so re-adding one is a no-op rather than a duplicate event.
+     * One cycle at a time: an item already committed to another cycle is refused here rather
+     * than silently moved. The picker only offers unplanned work, so reaching this is either a
+     * stale modal — somebody else planned the item first — or a hand-made request; both deserve
+     * the same answer, and neither should quietly empty another team's cycle.
+     *
+     * Moving work between cycles has its own door: Transfer (§10).
+     *
+     * Items already in THIS cycle are skipped by the updater's own diff, so re-adding one is a
+     * no-op rather than a duplicate event.
      */
     public function addWorkItems(Request $request, Project $project, Cycle $cycle): JsonResponse
     {
@@ -128,6 +134,19 @@ class CycleController extends Controller
             'work_item_ids' => ['required', 'array', 'max:200'],
             'work_item_ids.*' => ['integer'],
         ])['work_item_ids'];
+
+        // The rule, enforced where it cannot be skipped — the UI filter above is a courtesy,
+        // this is the guarantee.
+        $committed = WorkItem::query()
+            ->forProject($project->id)
+            ->whereIn('id', $ids)
+            ->whereNotNull('cycle_id')
+            ->where('cycle_id', '!=', $cycle->id)
+            ->count();
+
+        abort_if($committed > 0, 422, $committed === 1
+            ? 'That work item already belongs to another cycle. Remove it from that cycle first, or use Transfer work items.'
+            : "{$committed} of those work items already belong to another cycle. Remove them from that cycle first, or use Transfer work items.");
 
         $moved = $this->assign($project, $ids, $cycle->id);
 
@@ -216,13 +235,22 @@ class CycleController extends Controller
         $items = WorkItem::query()
             ->forProject($project->id)
             ->active()
-            // Grouped: an ungrouped OR would escape every filter above it, including the
-            // project scope, and offer the whole workspace's work items.
-            ->where(fn ($q) => $q->whereNull('cycle_id')->orWhere('cycle_id', '!=', $cycle->id))
+            /*
+             * UNPLANNED WORK ONLY (§7.3, revised).
+             *
+             * A work item belongs to one cycle at a time, so the picker offers only items that
+             * belong to none. It used to offer everything outside THIS cycle and treat adding
+             * as a move — which meant a planner filling Cycle 2 could quietly empty Cycle 1,
+             * from a list that gave no hint the work was already committed somewhere.
+             *
+             * Moving work between cycles is still possible, deliberately and in one place:
+             * Transfer (§10), which names the cycle it is emptying.
+             */
+            ->whereNull('cycle_id')
             ->when($query !== '', fn ($q) => $q->where(fn ($w) => $w
                 ->where('title', 'like', "%{$query}%")
                 ->orWhere('identifier', 'like', "%{$query}%")))
-            ->with(['state', 'cycle'])
+            ->with('state')
             ->orderBy('sequence_no')
             ->limit(50)
             ->get()
@@ -232,8 +260,6 @@ class CycleController extends Controller
                 'identifier' => $i->identifier,
                 'title' => $i->title,
                 'state' => $i->state ? ['name' => $i->state->name, 'color' => $i->state->color, 'group' => $i->state->group] : null,
-                // Named so the picker can warn that adding this MOVES it (§7.3).
-                'cycle' => $i->cycle ? ['id' => $i->cycle->id, 'name' => $i->cycle->name] : null,
             ])->values()->all();
 
         return response()->json(['ok' => true, 'items' => $items]);

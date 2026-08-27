@@ -349,6 +349,14 @@ PB.boot('project-cycles', {
         });
         this.applyItems(resp);
         this.mergeCycle(resp.cycle);
+        // They belong to this cycle now, so they are no longer unplanned work: drop them from
+        // the list behind the modal rather than leaving rows that would be refused if picked
+        // again (§7.3).
+        var added = this.picker.selected.map(String);
+        this.picker.results = this.picker.results.filter(function (r) {
+          return added.indexOf(String(r.id)) === -1;
+        });
+        this.picker.selected = [];
         this.picker.open = false;
         this.$pb.toast(resp.message || 'Added.');
       } catch (e) { this.$pb.toast(this.$pb.firstError(e), 'error'); }
@@ -629,12 +637,14 @@ PB.boot('project-cycles', {
     '<span v-if="isPicked(r)">' + wiIcon('check-on-fill', 12) + '</span></span>' +
     '<span class="text-[11px] text-faint font-medium shrink-0">{{ r.identifier }}</span>' +
     '<span class="text-[13px] text-ink truncate flex-1">{{ r.title }}</span>' +
-    // §7.3: adding an item that already belongs elsewhere is a MOVE, and saying so up front
-    // is the difference between a deliberate act and a surprise.
-    '<span v-if="r.cycle" class="text-[11px] text-amber-700 bg-amber-50 rounded px-1.5 py-0.5 shrink-0" :data-tip="\'Currently in \' + r.cycle.name">Moves from {{ r.cycle.name }}</span>' +
     '</button>' +
-    '<p v-if="picker.loaded && !picker.results.length" class="px-2 py-6 text-[13px] text-sub text-center">No work items match.</p>' +
+    // §7.3: only UNPLANNED work is offered, so an empty list usually means everything is
+    // already committed somewhere — not that the search was wrong. Say which.
+    '<p v-if="picker.loaded && !picker.results.length" class="px-2 py-6 text-[13px] text-sub text-center">' +
+    '{{ picker.query ? \'No unplanned work items match.\' : \'Every work item in this project already belongs to a cycle.\' }}</p>' +
     '</div>' +
+    '<p class="mt-2 text-[11px] text-faint">A work item belongs to one cycle at a time, so only work that is not in a cycle is listed. ' +
+    'To move work out of another cycle, use Transfer work items there.</p>' +
     '<template #footer>' +
     '<button class="h-9 px-4 rounded-md border border-stroke text-[13px] font-semibold text-ink hover:bg-hover" @click="picker.open = false">Cancel</button>' +
     '<button class="h-9 px-4 rounded-md bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold disabled:opacity-50" ' +

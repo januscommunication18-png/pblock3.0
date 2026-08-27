@@ -460,6 +460,77 @@ class CycleTest extends ProjectTestCase
         $this->assertSame($cycle->id, $ws->run(fn () => WorkItem::find($two->id)->cycle_id));
     }
 
+    /**
+     * §7.3 (revised): the picker offers UNPLANNED work only.
+     *
+     * The bug: it used to offer everything outside THIS cycle and treat adding as a move, so
+     * filling Sprint 09 could quietly empty Sprint 08.
+     */
+    public function test_the_picker_only_offers_work_items_that_belong_to_no_cycle(): void
+    {
+        [$owner, $ws] = $this->owner();
+        $project = $this->makeProject($owner, $ws);
+        $this->enable($owner, $project, 'cycles');
+
+        $eight = $this->cycle($ws, $project, 'Sprint 08');
+        $nine = $this->cycle($ws, $project, 'Sprint 09');
+
+        $free = $this->workItem($owner, $project, 'Unplanned');
+        $taken = $this->workItem($owner, $project, 'Already in Sprint 08');
+
+        $this->actingAs($owner)->postJson(
+            route('projects.cycles.items.store', ['project' => $project->id, 'cycle' => $eight->id]),
+            ['work_item_ids' => [$taken->id]],
+        )->assertOk();
+
+        $offered = $this->actingAs($owner)->getJson(route('projects.cycles.search', [
+            'project' => $project->id, 'cycle' => $nine->id,
+        ]))->assertOk()->json('items');
+
+        $this->assertSame([$free->id], array_column($offered, 'id'));
+    }
+
+    /** The same rule, where it actually has to hold: the endpoint (§7.3). */
+    public function test_adding_a_work_item_that_already_belongs_to_another_cycle_is_refused(): void
+    {
+        [$owner, $ws] = $this->owner();
+        $project = $this->makeProject($owner, $ws);
+        $this->enable($owner, $project, 'cycles');
+
+        $eight = $this->cycle($ws, $project, 'Sprint 08');
+        $nine = $this->cycle($ws, $project, 'Sprint 09');
+        $item = $this->workItem($owner, $project, 'Committed work');
+
+        $this->actingAs($owner)->postJson(
+            route('projects.cycles.items.store', ['project' => $project->id, 'cycle' => $eight->id]),
+            ['work_item_ids' => [$item->id]],
+        )->assertOk();
+
+        // A stale modal, or a hand-made request: refused either way, and Sprint 08 keeps it.
+        $this->actingAs($owner)->postJson(
+            route('projects.cycles.items.store', ['project' => $project->id, 'cycle' => $nine->id]),
+            ['work_item_ids' => [$item->id]],
+        )->assertStatus(422);
+
+        $this->assertSame($eight->id, $ws->run(fn () => WorkItem::find($item->id)->cycle_id));
+    }
+
+    /** Re-adding an item this cycle already holds stays a no-op, not a 422. */
+    public function test_re_adding_an_item_this_cycle_already_holds_is_harmless(): void
+    {
+        [$owner, $ws] = $this->owner();
+        $project = $this->makeProject($owner, $ws);
+        $this->enable($owner, $project, 'cycles');
+
+        $cycle = $this->cycle($ws, $project, 'Sprint 08');
+        $item = $this->workItem($owner, $project, 'Planned');
+        $url = route('projects.cycles.items.store', ['project' => $project->id, 'cycle' => $cycle->id]);
+
+        $this->actingAs($owner)->postJson($url, ['work_item_ids' => [$item->id]])->assertOk();
+        $this->actingAs($owner)->postJson($url, ['work_item_ids' => [$item->id]])
+            ->assertOk()->assertJsonCount(1, 'items');
+    }
+
     public function test_the_search_endpoint_never_offers_another_projects_work(): void
     {
         [$owner, $ws] = $this->owner();

@@ -3,8 +3,8 @@
 Source: *ProjectBlock 3.0 — Module Management Requirements* (§ refs are to that document).
 
 A Module groups related work items inside one project towards a common objective. Unlike a
-Cycle it is not time-boxed, and unlike a Cycle a work item can belong to **several** modules
-at once (§9.3).
+Cycle it is not time-boxed. A work item belongs to **one module at a time** — see "One module
+per work item" below, which reverses §9.3.
 
 ## Scope of this build
 
@@ -56,7 +56,9 @@ shape rather than one symptom, so the next relation added cannot reintroduce it 
 
 ## The Module property on work items
 
-§9.1 puts a Module selector on the work item, multi-select per §9.3. Server side:
+§9.1 puts a Module selector on the work item. Single-select: choosing a module replaces
+whichever one the item was in, and choosing the one it is already in takes it out — the same
+control shape as the Cycle chip. Server side:
 
 | Piece | Role |
 |---|---|
@@ -99,6 +101,37 @@ The detail page's grid is `<work-items-screen>`, fed by its own payload — so a
 removing work items has to write BOTH that payload and the lean `items` behind the header
 count, or the two disagree until a reload. See `embedded-work-item-grid.md`.
 
+## One module per work item (§9.3 reversed)
+
+§9.3 originally gave a work item several modules — "a functional module and a release module at
+once" — which is why the link is a pivot table rather than a `module_id` column. The product
+decision is now **one module at a time**, independent of the cycle rule: an item may hold one
+cycle AND one module, because a cycle says *when* work happens and a module says *where* it
+belongs.
+
+Three layers, so the rule holds wherever it is approached:
+
+| Layer | What it does |
+|---|---|
+| `module_work_items.work_item_id` **unique** | the guarantee — no writer can get around it |
+| `ModuleController@search` → `whereDoesntHave('modules')` | the picker offers only unassigned work |
+| `ModuleController@addWorkItems` | **422** for an item already in another module |
+
+Plus `module_ids` capped at `max:1` in both work-item requests, and the work item's own Module
+chip changed from multi-select to single-select.
+
+The pivot **stays**. A unique index expresses "one at a time" without a data migration, and
+reversing the decision later costs one index rather than migrating back out of a column. The
+payload keeps sending `modules` as a list for the same reason.
+
+Migrating existing data: any work item found in more than one module keeps its FIRST link and
+loses the rest — the earliest link is the original decision, the later ones were only possible
+because the rule did not exist yet. It was a no-op on the database this shipped against (153
+links, none duplicated) and exists because that is not a guarantee about anybody else's.
+
+To move work between modules: remove it from the one it is in, or change the item's own Module
+chip, which now moves rather than adds.
+
 ## Acceptance criteria → tests
 
 All in `tests/Feature/Project/ModuleTest.php` (19 tests):
@@ -108,7 +141,9 @@ All in `tests/Feature/Project/ModuleTest.php` (19 tests):
   end date before the start are rejected (§15)
 - Work items can be added and removed without being deleted (§8.3); adding twice does not
   duplicate (§15)
-- A work item can sit in several modules at once (§9.3), and module changes reach history (§17)
+- A work item sits in at most one module, and module changes reach history (§17)
+- The Add work items picker offers only work with no module; adding one that has since been
+  filed elsewhere is refused with 422
 - An archived or foreign module cannot be assigned (§12.2/§15)
 - With the feature off, no new assignment is accepted but clearing still works (§4.2)
 - The screen loads with members attached — the `withPivotValue` regression above

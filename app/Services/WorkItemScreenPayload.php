@@ -377,7 +377,9 @@ class WorkItemScreenPayload
             // §8.1: the chip shows the cycle's name, so the name travels with the row.
             'cycle_id' => $item->cycle_id,
             'cycle' => $item->cycle ? ['id' => $item->cycle->id, 'name' => $item->cycle->name, 'status' => $item->cycle->status()] : null,
-            // §9.3: MANY modules, unlike the single cycle.
+            // A LIST holding at most one, since §9.3's several-modules rule was reversed —
+            // see docs/features/module-management.md. Still a list so the shape survives if it
+            // is ever restored, and so the picker keeps one way of reading it.
             // Epic §9: the chip shows the epic's title, so it travels with the row. One epic,
             // unlike the list of modules below — and independent of it (§11).
             // §16: the chip shows the label, so it travels with the row. Present even when

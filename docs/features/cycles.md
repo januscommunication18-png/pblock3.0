@@ -125,6 +125,26 @@ refuses to open is worse than an absent one.
 A cycle URL from another project 404s rather than 403s, matching the rest of the app: the
 response must not confirm that a cycle exists somewhere the user cannot see.
 
+## "Add work items" offers UNPLANNED work only (§7.3, revised)
+
+A work item belongs to **one cycle at a time**, and the picker enforces it by only offering
+work that belongs to no cycle at all (`CycleController@search` → `whereNull('cycle_id')`).
+
+It used to offer every item outside THIS cycle and treat adding as a MOVE. That is the bug:
+a planner filling Cycle 2 could quietly empty Cycle 1 from a list that gave no hint the work
+was already committed, and the only warning was a badge on the row. Planning a sprint should
+not be able to unplan somebody else's.
+
+`addWorkItems` refuses an item already committed elsewhere with **422**, so the rule survives a
+stale modal and a hand-made request alike — the filtered list is a courtesy, this is the
+guarantee. Two doors remain open for moving work deliberately:
+
+- **Transfer work items** (§10) — the bulk move, which names the cycle it is emptying.
+- **The work item's own Cycle chip** — an edit to that one item, where the item is the subject
+  and the change is the point.
+
+Both still go through `WorkItemUpdater`, so a move is still one UPDATE with one history row.
+
 ## Transfer incomplete work (§10)
 
 Offered on a Completed cycle. It moves every selected work item whose state group is not
@@ -147,7 +167,10 @@ Covered by `tests/Feature/Project/CycleTest.php`:
   the data,
 - overlapping ranges are rejected with Parallel Cycles off and accepted with it on,
 - pre-existing overlaps survive the toggle being switched off,
-- assigning a second cycle moves the item rather than duplicating it, and writes history,
+- the Add work items picker offers only work with no cycle, and adding one that has since
+  been planned elsewhere is refused with 422,
+- assigning a second cycle through the item's own chip moves it rather than duplicating it,
+  and writes history,
 - a cycle from another project cannot be assigned,
 - a completed cycle refuses new assignment,
 - the landing page groups by derived status,

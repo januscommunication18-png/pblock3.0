@@ -239,7 +239,7 @@ var WiList = {
       var add = this.canAdd
         // h-7 w-7 and rounded-md to match wiRowMenuButton exactly: this "+" and a row's ⋯ line
         // up in the same column, and both sit 20px from the right edge (work-items.css).
-        ? '<button type="button" data-gadd="' + wiEsc(value) + '" class="ml-auto h-7 w-7 grid place-items-center rounded-md text-sub hover:bg-line shrink-0" data-tip="Add work item" aria-label="Add work item">' + wiIcon('plus', 15) + '</button>'
+        ? '<button type="button" data-gadd="' + wiEsc(value) + '" class="ml-auto h-7 w-7 grid place-items-center rounded-md text-sub hover:bg-line shrink-0" data-tip="Create Work Item" aria-label="Create Work Item">' + wiIcon('plus', 15) + '</button>'
         : '';
 
       // Inline colours, not utility classes: Tabulator's base theme styles `.tabulator-group

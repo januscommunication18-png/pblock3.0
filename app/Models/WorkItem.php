@@ -80,7 +80,11 @@ class WorkItem extends Model
     }
 
     /**
-     * The modules this item belongs to (Module Management §9.3).
+     * The module this item belongs to — at most ONE (docs/features/module-management.md).
+     *
+     * Still a many-to-many relation: §9.3 originally allowed several, and a unique index on
+     * `module_work_items.work_item_id` is what now holds it to one. Kept as a relation rather
+     * than folded into a `module_id` column so restoring the original rule costs an index.
      *
      * MANY, unlike `cycle` — a work item can sit in a functional module and a release module
      * at once, which is the case the spec adopts Plane's model for.

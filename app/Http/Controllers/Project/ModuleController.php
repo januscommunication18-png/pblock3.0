@@ -170,6 +170,23 @@ class ModuleController extends Controller
             'work_item_ids.*' => ['integer'],
         ])['work_item_ids'];
 
+        /*
+         * One module at a time, enforced where it cannot be skipped.
+         *
+         * The picker only offers unassigned work, so reaching this means a stale modal —
+         * somebody else filed the item first — or a hand-made request. Both get the same
+         * answer, and neither quietly empties another module.
+         */
+        $committed = WorkItem::query()
+            ->forProject($project->id)
+            ->whereIn('id', $ids)
+            ->whereHas('modules', fn ($q) => $q->where('modules.id', '!=', $module->id))
+            ->count();
+
+        abort_if($committed > 0, 422, $committed === 1
+            ? 'That work item already belongs to another module. Remove it from that module first.'
+            : "{$committed} of those work items already belong to another module. Remove them from that module first.");
+
         // §15: only work items from THIS project, and only ones the user may actually touch.
         $items = WorkItem::query()
             ->forProject($project->id)
@@ -218,11 +235,22 @@ class ModuleController extends Controller
 
         $query = trim((string) $request->query('q', ''));
         $user = Auth::user();
-        $linked = $module->workItems()->pluck('work_items.id')->all();
 
         $items = WorkItem::query()
             ->forProject($project->id)
             ->active()
+            /*
+             * UNASSIGNED WORK ONLY — a work item belongs to one module at a time.
+             *
+             * It used to offer every item in the project and mark the ones already here as
+             * `linked`, which was correct while §9.3 allowed several modules. Under one-module
+             * that list would offer work already committed to another module, and adding it
+             * would silently take it from there.
+             *
+             * Independent of the cycle rule: an item already in a cycle is still offered here,
+             * because a cycle says WHEN work happens and a module says WHERE it belongs.
+             */
+            ->whereDoesntHave('modules')
             ->when($query !== '', fn ($q) => $q->where(fn ($w) => $w
                 ->where('title', 'like', "%{$query}%")
                 ->orWhere('identifier', 'like', "%{$query}%")))
@@ -236,8 +264,6 @@ class ModuleController extends Controller
                 'identifier' => $i->identifier,
                 'title' => $i->title,
                 'state' => $i->state ? ['name' => $i->state->name, 'color' => $i->state->color] : null,
-                // §9.4: already linked items show as selected rather than being offered again.
-                'linked' => in_array($i->id, $linked, true),
             ])->values()->all();
 
         return response()->json(['ok' => true, 'items' => $items]);
