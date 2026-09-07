@@ -1,0 +1,18 @@
+{
+  "resources/images/logo.svg": {
+    "file": "assets/logo-G-lSRT-w.svg",
+    "src": "resources/images/logo.svg"
+  },
+  "resources/js/dashboard.js": {
+    "file": "assets/dashboard-CwKVNSj9.js",
+    "name": "dashboard",
+    "src": "resources/js/dashboard.js",
+    "isEntry": true,
+    "css": [
+      "assets/dashboard-Dm6OoSA5.css"
+    ],
+    "assets": [
+      "assets/logo-G-lSRT-w.svg"
+    ]
+  }
+}

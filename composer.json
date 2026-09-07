@@ -31,7 +31,8 @@
         "pestphp/pest": "^4.7",
         "pestphp/pest-plugin-browser": "^4.3",
         "pestphp/pest-plugin-laravel": "^4",
-        "phpunit/phpunit": "^12.5.12"
+        "phpunit/phpunit": "^12.5.12",
+        "redberry/mailbox-for-laravel": "^2.3"
     },
     "autoload": {
         "psr-4": {
